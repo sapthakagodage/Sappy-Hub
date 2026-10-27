@@ -261,7 +261,6 @@ details[open] summary::after{content:"－"}
     <div class="card">
       <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
       <div id="fdList"></div>
-      <button class="btn soft full" id="addFd" style="margin-top:12px">Add fixed deposit</button>
     </div>
   </section>
 
@@ -279,46 +278,12 @@ details[open] summary::after{content:"－"}
       </details>
     </div>
 
-    <h2>iPhone SMS capture</h2>
-    <div class="card">
-      <details>
-        <summary>With cloud sync (silent, recommended)</summary>
-        <ol class="steps">
-          <li>Shortcuts → <b>Automation</b> → <b>+</b> → <b>Message</b>.</li>
-          <li>Message Contains <code>Bal</code> (or pick your bank senders). Choose <b>Run Immediately</b>.</li>
-          <li>Add <b>Get Contents of URL</b>. URL: <code id="inboxUrl">https://YOUR-PROJECT.supabase.co/rest/v1/inbox</code></li>
-          <li>Method <b>POST</b>. Header <code>apikey</code> = your key. Only if the key starts with <code>eyJ</code>, also add <code>Authorization</code> = <code>Bearer </code> + key.</li>
-          <li>Request Body <b>JSON</b>: key <code>raw</code>, value <b>Shortcut Input</b>.</li>
-        </ol>
-        <p class="note">Nothing opens. The SMS lands in your inbox and is added the next time you open the app.</p>
-      </details>
-      <div style="height:8px"></div>
-      <details>
-        <summary>Without cloud (opens the app)</summary>
-        <ol class="steps">
-          <li>Same automation trigger as above.</li>
-          <li>Add <b>URL Encode</b> on Shortcut Input.</li>
-          <li>Add <b>Open URL</b>: <code id="openUrl"></code> followed by the <b>URL Encoded Text</b>.</li>
-        </ol>
-        <p class="note">Use the Safari bookmark, not a Home Screen icon. On iPhone they keep separate data.</p>
-      </details>
-    </div>
-
     <h2>Add past SMS</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Paste one or more bank SMS. Separate them with a blank line.</p>
       <label class="field"><textarea id="paste" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea></label>
       <div class="btns"><button class="btn" id="pasteAdd">Add messages</button><button class="btn soft" id="sample">Try a sample</button></div>
       <div class="row" id="skipRow" style="margin-top:12px"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div>
-    </div>
-
-    <h2>Currency</h2>
-    <div class="card">
-      <div class="row" style="padding-top:0"><div><div class="k">1 AUD in LKR</div><div class="d" id="rateWhen">Not updated yet</div></div>
-        <input id="rateAud" inputmode="decimal" class="num" style="width:110px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px;text-align:right" aria-label="AUD rate"></div>
-      <div class="row"><div><div class="k">1 USD in LKR</div></div>
-        <input id="rateUsd" inputmode="decimal" class="num" style="width:110px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px;text-align:right" aria-label="USD rate"></div>
-      <div class="btns"><button class="btn soft" id="rateFetch">Get today’s rates</button></div>
     </div>
 
     <h2>Backup</h2>
@@ -332,7 +297,6 @@ details[open] summary::after{content:"－"}
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
 
     <p class="note" style="text-align:center;margin-top:24px">Pocket Ledger <span id="ver"></span></p>
-    <p style="text-align:center"><button class="btn warn" id="wipe" style="padding-left:18px">Delete all data on this device</button></p>
   </section>
 </div>
 
@@ -354,7 +318,7 @@ details[open] summary::after{content:"－"}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 
 /* =============== categories =============== */
 const CATS = {
@@ -409,7 +373,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 4;
+const PARSER_VERSION = 5;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -434,7 +398,7 @@ function parseSms(raw){
   if(amount===null || !(amount>0)) return null;
 
   const L=s.toLowerCase();
-  const isFd = /(fixed deposit|\bfd\b|term deposit)/.test(L);
+  let isFd = /(fixed deposit|\bfd\b|term deposit|for funding a\/?c|funding a\/?c)/.test(L);
   const iC = L.search(/(credited|deposited|received|salary|refund|reversal|reversed|cash ?back)/);
   const iD = L.search(/(debited|purchase|spent|withdraw|payment|paid|txn at|transaction at|\bdr\b|\bpos\b|charged)/);
   let type = (iC>=0 && (iD<0 || iC<iD) && !isFd) ? "in" : "out";
@@ -450,10 +414,12 @@ function parseSms(raw){
     const junk=/^(mb|ib|ob|mob|bill ?pmt|bill ?pay(?:ment)?|pos|ecom|e-?com|trf|ft|ceft|slips|ipg|upay|cdm|atm|online|payment|pmt|fund ?transfer|own ?a\/?c?|lankaqr|qr|[\d\s+\-x*#:.]+)$/i;
     const junkWord=/^(mb|ib|ob|mob|billpmt|pmt|pos|ecom|trf|ft|ceft|slips|ipg|upay|cdm|qr|lankaqr|[\d+\-x*#:.]+)$/i;
     const parts=reason.split(/[\/|]/).map(x=>x.trim().split(/\s+/).filter(w=>!junkWord.test(w)).join(" ")).filter(x=>x && !junk.test(x) && /[a-z]{2}/i.test(x));
-    if(/\btran\b|funding|own ?a\/?c/i.test(reason)) isTransfer=true;
+    if(/\btran\b|own ?a\/?c/i.test(reason)) isTransfer=true;
     if(parts.length) merchant=parts[0];
     if(/^\s*sal\b|salary/i.test(reason)) merchant="Salary";
-    else if(isTransfer && /\btran\b|funding|own/i.test(reason)){
+    if(/funding/i.test(reason)){ isFd=true; isTransfer=false; }
+    if(isFd){ const to=reason.match(/a\/?c\s*[:#]?\s*[\dXx*]*?(\d{2})\b/i); merchant="Fixed deposit"+(to?" ••"+to[1]:""); }
+    else if(isTransfer && /\btran\b|own/i.test(reason)){
       const to=reason.match(/a\/?c\s*[:#]?\s*[\dXx*]*?(\d{2})\b/i); merchant="Transfer"+(to?" to ••"+to[1]:"");
     }
     if(isBill){ for(const [r,n] of BILLERS) if(r.test(reason)){ merchant=n; break; } }
@@ -481,7 +447,7 @@ function parseSms(raw){
     else merchant = type==="in"?"Money in":"Card payment";
   }
   merchant=merchant.replace(/\b(pty|pvt|private)?\s*(ltd|lt|limited|plc)\.?$/i,"").replace(/\b(pty|pvt)\s*$/i,"").replace(/[\s,]+(lk|lka)$/i,"").trim();
-  merchant=titleCase(merchant).slice(0,40);
+  merchant=titleCase(merchant).slice(0,40).replace(/^Fixed Deposit/,"Fixed deposit");
   if(isBill && !/bill/i.test(merchant)) merchant+=" bill";
 
   // date and time
@@ -632,6 +598,7 @@ function reparseAll(force){
     if(!t.catSet) n.cat=guessCat(n);
     n.lkr=n.amount*rateFor(n.cur);
     if(JSON.stringify(n)!==JSON.stringify(t)){ n.u=Date.now(); S.tx[t.id]=n; S.dirty["tx:"+t.id]=1; fixed++; }
+    if(n.cat==="Fixed deposit" && n.type==="out" && !S.fd["f"+t.id]){ S.fd["f"+t.id]={id:"f"+t.id, bank:n.bank, amount:n.amount, cur:n.cur, rate:0, start:ymd(n.ts), months:12, note:"From SMS", u:Date.now()}; S.dirty["fd:f"+t.id]=1; }
   });
   Object.values(S.skip).forEach(k=>{
     if(!live(k)) return;
@@ -778,7 +745,7 @@ function renderSavings(){
     return '<button class="fd" data-id="'+esc(f.id)+'"><div class="top"><span>'+esc(f.bank)+(f.note&&f.note!=="From SMS"?' · '+esc(f.note):'')+'</span><span class="num">'+rs(v.p)+'</span></div>'+
       '<div class="sub"><span>'+(+f.rate?f.rate+'% · ':'Add rate · ')+'matures '+new Date(v.end).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</span><span class="num">→ '+rs(v.maturity)+'</span></div>'+
       '<div class="prog"><i style="width:'+(v.done*100)+'%"></i></div></button>'; }).join("")
-    : '<div class="empty" style="padding:12px 0"><b>No deposits yet</b>Add one, or it appears here when your bank SMS mentions a fixed deposit.</div>';
+    : '<div class="empty" style="padding:12px 0"><b>No deposits yet</b>They appear here automatically when your bank SMS shows a fixed deposit.</div>';
   $("fdList").querySelectorAll(".fd").forEach(b=>b.onclick=()=>openFd(b.dataset.id));
 }
 
@@ -788,10 +755,6 @@ function renderSettings(){
   const sk=Object.values(S.skip).filter(live).length;
   $("skipRow").hidden=!sk; $("skipD").textContent=sk+" message"+(sk>1?"s":"")+" kept. Send one to Claude to improve reading.";
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
-  $("inboxUrl").textContent=(S.sb.url?cleanUrl(S.sb.url):"https://YOUR-PROJECT.supabase.co")+"/rest/v1/inbox";
-  $("openUrl").textContent=location.origin+location.pathname+"#sms=";
-  $("rateAud").value=S.rate.AUD; $("rateUsd").value=S.rate.USD;
-  $("rateWhen").textContent=S.rate.at?"Updated "+new Date(S.rate.at).toLocaleDateString("en-GB"):"Set by hand";
   document.querySelectorAll("#theme button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.theme));
   setPill(sbOn()?"ok":"off");
 }
@@ -835,7 +798,7 @@ function openTx(id){
       Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
     closeSheet(); toast("Saved");
   };
-  $("tdel").onclick=()=>{ remove("tx",t.id); closeSheet(); toast("Deleted"); };
+  $("tdel").onclick=()=>{ remove("tx",t.id); if(live(S.fd["f"+t.id])) remove("fd","f"+t.id); closeSheet(); toast("Deleted"); };
 }
 
 function openAdd(){
@@ -843,14 +806,14 @@ function openAdd(){
   const draw=()=>{
     const cats = type==="in"?["Income","Transfers","Other"]:SPEND;
     if(!cats.includes(cat)) cat=type==="in"?"Income":"Other";
-    openSheet('<h2>Add entry</h2><div class="note">For cash, AUD salary, or anything without an SMS.</div><div style="height:12px"></div>'+
-      '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Income</button><button data-t="fd">Fixed deposit</button></div>'+
+    openSheet('<h2>Add entry</h2><div class="note">For cash or anything without an SMS.</div><div style="height:12px"></div>'+
+      '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Income</button></div>'+
       '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option'+(type==="in"?' selected':'')+'>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num"></div></label>'+
       '<label class="field"><span>'+(type==="in"?"From":"Where")+'</span><input id="aname" placeholder="'+(type==="in"?"Salary":"Shop or place")+'"></label>'+
       catPicker(cats,cat)+
       '<label class="field"><span>Date</span><input id="adate" type="date" value="'+ymd(Date.now())+'"></label>'+
       '<button class="btn full" id="asave">Add</button>');
-    $("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.t==="fd"){ openFd(); return; } type=b.dataset.t; draw(); });
+    $("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ type=b.dataset.t; draw(); });
     wirePicker(c=>cat=c);
     $("acur").value = type==="in"?"AUD":"LKR";
     $("asave").onclick=()=>{
@@ -894,7 +857,6 @@ $("fab").onclick=openAdd;
 $("prev").onclick=()=>{ month.setMonth(month.getMonth()-1); focusCat=null; render(); };
 $("next").onclick=()=>{ month.setMonth(month.getMonth()+1); focusCat=null; render(); };
 $("q").oninput=renderActivity;
-$("addFd").onclick=()=>openFd();
 
 $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
   if(!/^https:\/\/.+\..+/.test(u)) return toast("Check the Project URL");
@@ -916,13 +878,6 @@ $("sample").onclick=()=>{ const d=new Date(), ds=String(d.getDate()).padStart(2,
   "HNB: LKR 450,000.00 credited to A/C XXXX9087 from AVONET TECHNOLOGIES on "+ds+". Bal LKR 627,840.50",
   "Your OTP is 482913. Do not share. ComBank"].join("\n\n"); toast("Sample ready. Tap Add messages."); };
 
-function saveRate(){ const a=parseFloat($("rateAud").value), u=parseFloat($("rateUsd").value);
-  if(a>0) S.rate.AUD=a; if(u>0) S.rate.USD=u; persist(); }
-$("rateAud").onchange=saveRate; $("rateUsd").onchange=saveRate;
-$("rateFetch").onclick=async()=>{ try{ const r=await (await fetch("https://open.er-api.com/v6/latest/LKR")).json();
-  if(!r.rates||!r.rates.AUD) throw 0; S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); renderSettings(); toast("Rates updated");
-  }catch(e){ toast("Couldn’t get rates. Type them in."); } };
-
 $("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"application/json"})); a.download="pocket-ledger-"+ymd(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
 $("impBtn").onclick=()=>$("imp").click();
@@ -932,12 +887,11 @@ $("imp").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ cons
 
 document.querySelectorAll("#theme button").forEach(b=>b.onclick=()=>{ S.theme=b.dataset.t; persist(); applyTheme(); renderSettings(); });
 function applyTheme(){ if(S.theme==="auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",S.theme); }
-$("wipe").onclick=()=>{ if(!confirm("Delete all data on this phone? Cloud copy (if connected) stays.")) return; localStorage.removeItem(KEY); S=blank(); render(); toast("Deleted"); };
 
 window.addEventListener("hashchange",checkHash);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ sync(); checkHash(); } });
 applyTheme(); render(); if(S.pv<PARSER_VERSION) reparseAll(); checkHash(); sync(); setInterval(()=>sync(),60000);
-if(!S.rate.at) fetch("https://open.er-api.com/v6/latest/LKR").then(r=>r.json()).then(r=>{ if(r.rates&&r.rates.AUD){ S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); render(); } }).catch(()=>{});
+if(Date.now()-(S.rate.at||0)>864e5) fetch("https://open.er-api.com/v6/latest/LKR").then(r=>r.json()).then(r=>{ if(r.rates&&r.rates.AUD){ S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); render(); } }).catch(()=>{});
 })();
 </script>
 </body>
