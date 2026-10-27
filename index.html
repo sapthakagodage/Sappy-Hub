@@ -309,6 +309,7 @@ details[open] summary::after{content:"－"}
       <p class="note" style="margin-top:0">Paste one or more bank SMS. Separate them with a blank line.</p>
       <label class="field"><textarea id="paste" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea></label>
       <div class="btns"><button class="btn" id="pasteAdd">Add messages</button><button class="btn soft" id="sample">Try a sample</button></div>
+      <div class="row" id="skipRow" style="margin-top:12px"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div>
     </div>
 
     <h2>Currency</h2>
@@ -353,7 +354,7 @@ details[open] summary::after{content:"－"}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2.0.1";
+const APP_VERSION = "2.2.0";
 
 /* =============== categories =============== */
 const CATS = {
@@ -363,7 +364,7 @@ const CATS = {
   "Day out":    {e:"🌴", c:"#8E5BD8", k:["resort","cinnamon","shangri","jetwing","hilton","marriott","hotel","villa","zoo","park","safari","ticket","travel","airline","srilankan","booking.com","agoda","airbnb"]},
   "Fun":        {e:"🎬", c:"#E0559A", k:["scope cinema","ccc","pvr","majestic","cinema","movie","game","steam","playstation","event","club","bar "]},
   "Shopping":   {e:"🛍️", c:"#E8B634", k:["daraz","odel","nolimit","fashion bug","cool planet","abans","singer","softlogic","damro","kapruka","amazon","aliexpress","temu","house of fashion","mall"]},
-  "Bills":      {e:"💡", c:"#36B5D8", k:["dialog","mobitel","slt","hutch","airtel","ceb","leco","water board","nwsdb","electricity","insurance","netflix","spotify","icloud","apple.com","google","peo tv","bill","subscription"]},
+  "Bills":      {e:"💡", c:"#36B5D8", k:["dialog","mobitel","slt","hutch","airtel","ceb","leco","water board","nwsdb","electricity","insurance","netflix","spotify","icloud","apple.com","google","peo tv","bill","billpmt","subscription"]},
   "Health":     {e:"💊", c:"#12A397", k:["pharmacy","osu sala","healthguard","hospital","asiri","nawaloka","lanka hospital","durdans","hemas","clinic","medical","channel"]},
   "Cash":       {e:"🏧", c:"#8A918C", k:["atm","cash withdrawal","withdrawal","cdm"]},
   "Transfers":  {e:"🔁", c:"#A6ADA8", k:["transfer","ceft","slips","fund tr","lankapay","justpay","own account"]},
@@ -379,7 +380,10 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (n,d=0) => Number(n||0).toLocaleString("en-LK",{minimumFractionDigits:d,maximumFractionDigits:d});
 const rs = n => (n<0?"−":"")+"Rs "+fmt(Math.round(Math.abs(n)));
-const titleCase = s => s.toLowerCase().replace(/\b([a-z])/g,m=>m.toUpperCase()).replace(/\s+/g," ").trim();
+const titleCase = s => String(s).replace(/\s+/g," ").trim().split(" ").map((w,i)=>
+  (/^[A-Z]{2,3}$/.test(w) && !/^(THE|AND|FOR|OF|LTD|PTY|PVT|SUPER|MART|SHOP|CITY)$/.test(w)) ? w
+  : (i>0 && /^(to|of|at|and|for|the)$/i.test(w)) ? w.toLowerCase()
+  : w.toLowerCase().replace(/(^|[-(])([a-z])/g,(m,a,b)=>a+b.toUpperCase())).join(" ");
 function hashStr(s){let a=0x811c9dc5,b=5381;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,16777619);b=((b<<5)+b+c)|0;}return (a>>>0).toString(16)+(b>>>0).toString(16);}
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const sameDay = (a,b) => { const x=new Date(a),y=new Date(b); return x.toDateString()===y.toDateString(); };
@@ -393,7 +397,7 @@ function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
   return blank();
 }
-function blank(){ return {tx:{}, fd:{}, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"auto"}; }
+function blank(){ return {tx:{}, fd:{}, skip:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"auto"}; }
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
 const live = o => o && !o.del;
 
@@ -405,11 +409,18 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-function parseSms(raw){
-  const s = String(raw||"").replace(/\s+/g," ").trim();
-  if(!s) return null;
-  if(/\b(otp|one[- ]?time|password|passcode|verification code|do not share)\b/i.test(s)) return null;
+const PARSER_VERSION = 4;
+const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
+const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
+function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
 
+function cleanRaw(raw){ return String(raw||"").replace(/^\s*\[[^\]]{6,30}\]\s*[^:]{1,40}:\s*/,"").replace(/\s+/g," ").trim(); }
+const BILLERS=[[/\bceb\b|\bedl\b|electricity/i,"CEB Electricity"],[/leco/i,"LECO Electricity"],[/water|nwsdb/i,"Water Board"],[/mobitel/i,"Mobitel"],[/dialog/i,"Dialog"],[/\bslt\b|sltmobitel/i,"SLT"],[/hutch/i,"Hutch"],[/airtel/i,"Airtel"],[/peo ?tv/i,"PEO TV"]];
+function parseSms(raw){
+  const s = cleanRaw(raw);
+  if(!s || looksOtp(s)) return null;
+
+  // amounts: first non-balance figure is the amount
   const re = /(LKR|Rs\.?|SLR|AUD|A\$|USD|US\$)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+\.\d{2})\s*(LKR|AUD|USD)/gi;
   let m, amount=null, cur="LKR", balance=null;
   while((m=re.exec(s))){
@@ -423,50 +434,93 @@ function parseSms(raw){
   if(amount===null || !(amount>0)) return null;
 
   const L=s.toLowerCase();
-  const isFd = /(fixed deposit|\bfd\b|term deposit|\bft\s?d\b)/.test(L);
-  let type;
-  if(/(credited|deposited|received|salary|refund|reversal|reversed)/.test(L) && !isFd) type="in";
-  else if(/(debited|purchase|spent|withdraw|payment|paid|txn at|transaction at|\bdr\b|pos |charged|debit)/.test(L)) type="out";
-  else if(/(credit|\bcr\b|cash ?back)/.test(L)) type="in";
-  else type="out";
+  const isFd = /(fixed deposit|\bfd\b|term deposit)/.test(L);
+  const iC = L.search(/(credited|deposited|received|salary|refund|reversal|reversed|cash ?back)/);
+  const iD = L.search(/(debited|purchase|spent|withdraw|payment|paid|txn at|transaction at|\bdr\b|\bpos\b|charged)/);
+  let type = (iC>=0 && (iD<0 || iC<iD) && !isFd) ? "in" : "out";
+  if(iC<0 && iD<0 && /\bcr\b/.test(L)) type="in";
 
-  const stop="(?=\\s+(?:on|for|from|with|dated|ref|reference|card|a\\/c|acc|lkr|rs\\.?|aud|usd|via|using)\\b|\\s+\\d{1,2}[\\/\\-.]\\d{1,2}|[.,;]|\\s*$)";
-  const W="([A-Za-z0-9&'*.\\-/ ]{2,40}?)";
-  const pats = type==="in"
-    ? [new RegExp("\\bfrom\\s+"+W+stop,"i"), new RegExp("\\bby\\s+"+W+stop,"i")]
-    : [new RegExp("\\bat\\s+"+W+stop,"i"), new RegExp("@\\s*"+W+stop,"i"), new RegExp("merchant[:\\s]+"+W+stop,"i"), new RegExp("\\bto\\s+"+W+stop,"i")];
-  let merchant="";
-  for(const p of pats){ const mm=s.match(p); if(mm){ merchant=mm[1]; break; } }
-  merchant=merchant.replace(/\*+/g," ").replace(/\s{2,}/g," ").trim();
-  if(/^(your|the|a\/c|acc|account|card)\b/i.test(merchant)) merchant="";
+  // "Reason:" field (HNB and others)
+  let merchant="", isBill=false, isTransfer=false;
+  const rm = s.match(/\breason\s*[:\-]\s*(.+?)(?=\s+(?:bal|avl|av\.|available|protect|hotline|call|do not)\b|$)/i);
+  if(rm){
+    const reason=rm[1];
+    isBill = /bill ?pmt|bill ?pay/i.test(reason);
+    isTransfer = /ceft|slips|trf|fund ?tr|transfer|own ?a/i.test(reason);
+    const junk=/^(mb|ib|ob|mob|bill ?pmt|bill ?pay(?:ment)?|pos|ecom|e-?com|trf|ft|ceft|slips|ipg|upay|cdm|atm|online|payment|pmt|fund ?transfer|own ?a\/?c?|lankaqr|qr|[\d\s+\-x*#:.]+)$/i;
+    const junkWord=/^(mb|ib|ob|mob|billpmt|pmt|pos|ecom|trf|ft|ceft|slips|ipg|upay|cdm|qr|lankaqr|[\d+\-x*#:.]+)$/i;
+    const parts=reason.split(/[\/|]/).map(x=>x.trim().split(/\s+/).filter(w=>!junkWord.test(w)).join(" ")).filter(x=>x && !junk.test(x) && /[a-z]{2}/i.test(x));
+    if(/\btran\b|funding|own ?a\/?c/i.test(reason)) isTransfer=true;
+    if(parts.length) merchant=parts[0];
+    if(/^\s*sal\b|salary/i.test(reason)) merchant="Salary";
+    else if(isTransfer && /\btran\b|funding|own/i.test(reason)){
+      const to=reason.match(/a\/?c\s*[:#]?\s*[\dXx*]*?(\d{2})\b/i); merchant="Transfer"+(to?" to ••"+to[1]:"");
+    }
+    if(isBill){ for(const [r,n] of BILLERS) if(r.test(reason)){ merchant=n; break; } }
+    if(/atm/i.test(reason) && !merchant) merchant="ATM withdrawal";
+  }
+
+  if(!merchant){
+    const lm=s.match(/\b(?:location|merchant|at merchant)\s*:\s*([^,]+)/i);
+    if(lm) merchant=lm[1].replace(/-/g," ");
+  }
+  if(!merchant){
+    const stop="(?=\\s+(?:on|for|from|with|dated|ref|reference|card|a\\/?c|ac|acc|lkr|rs\\.?|aud|usd|via|using|reason|bal)\\b|\\s+\\d{1,2}[\\/\\-.]\\d{1,2}|[.,;]|\\s*$)";
+    const W="([A-Za-z0-9&'*.\\-/ ]{2,40}?)";
+    const pats = type==="in"
+      ? [new RegExp("\\bfrom\\s+"+W+stop,"i"), new RegExp("\\bby\\s+"+W+stop,"i")]
+      : [new RegExp("\\bat\\s+"+W+stop,"i"), new RegExp("@\\s*"+W+stop,"i"), new RegExp("merchant[:\\s]+"+W+stop,"i"), new RegExp("\\bto\\s+"+W+stop,"i")];
+    for(const p of pats){ const mm=s.match(p); if(mm && !/^(your|the|a\/?c|ac\b|acc|account|card|ac no)/i.test(mm[1].trim())){ merchant=mm[1]; break; } }
+  }
+  merchant=merchant.replace(/\*+/g," ").replace(/\b\d{6,}\b/g,"").replace(/\s{2,}/g," ").trim();
   if(!merchant){
     if(isFd) merchant="Fixed deposit";
     else if(/atm|withdraw/.test(L)) merchant="ATM withdrawal";
     else if(type==="in"&&/salary/.test(L)) merchant="Salary";
-    else if(/transfer|ceft|slips/.test(L)) merchant="Transfer";
+    else if(isTransfer||/transfer|ceft|slips/.test(L)) merchant="Transfer";
     else merchant = type==="in"?"Money in":"Card payment";
   }
+  merchant=merchant.replace(/\b(pty|pvt|private)?\s*(ltd|lt|limited|plc)\.?$/i,"").replace(/\b(pty|pvt)\s*$/i,"").replace(/[\s,]+(lk|lka)$/i,"").trim();
   merchant=titleCase(merchant).slice(0,40);
+  if(isBill && !/bill/i.test(merchant)) merchant+=" bill";
 
+  // date and time
   let ts=Date.now();
-  const dm=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
-  if(dm){ let d=+dm[1],mo=+dm[2],y=+dm[3]; if(y<100)y+=2000; if(mo>12&&d<=12){const t=d;d=mo;mo=t;}
-    const dt=new Date(y,mo-1,d,12); if(!isNaN(dt)&&Math.abs(dt-Date.now())<400*864e5){ ts=dt.getTime(); if(sameDay(ts,Date.now())) ts=Date.now(); } }
+  const dm=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[\s,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?/i);
+  if(dm){
+    let d=+dm[1],mo=+dm[2],y=+dm[3]; if(y<100)y+=2000; if(mo>12&&d<=12){const t=d;d=mo;mo=t;}
+    let h=12, mi=0, se=0, hasTime=dm[4]!=null;
+    if(!hasTime){ const tm=s.match(/\btime\s*[:\-]?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/i); if(tm){ dm[4]=tm[1]; dm[5]=tm[2]; dm[6]=tm[3]; hasTime=true; } }
+    if(hasTime){ h=+dm[4]; mi=+dm[5]; se=+(dm[6]||0); if(dm[7]){ const pm=/pm/i.test(dm[7]); if(pm&&h<12)h+=12; if(!pm&&h===12)h=0; } }
+    const dt=new Date(y,mo-1,d,h,mi,se);
+    if(!isNaN(dt)&&Math.abs(dt-Date.now())<400*864e5){ ts=dt.getTime(); if(!hasTime && sameDay(ts,Date.now())) ts=Date.now(); }
+  }
 
-  let bank="Bank";
+  // account / card
+  let acct="";
+  const am=s.match(/(?:a\/?c|acc(?:t|ount)?)(?:\s*no\.?)?\s*[:.#]?\s*([0-9Xx*]{4,24})/i);
+  if(am){ const t=am[1].match(/(\d{2})$/); if(t) acct=t[1]; }
+  if(!acct){ const cm=s.match(/card(?:\s*(?:no|ending|number|ending with))?[^0-9]{0,14}\d{2}(\d{2})\b/i); if(cm) acct=cm[1]; }
+
+  // bank
+  let bank="";
   if(/combank|commercial bank|\bcbc\b/i.test(s)) bank="ComBank";
   else if(/sampath/i.test(s)) bank="Sampath";
   else if(/\bhnb\b|hatton/i.test(s)) bank="HNB";
+  else if(/\bboc\b|bank of ceylon/i.test(s)) bank="BOC";
   else if(/commbank|commonwealth|\bcba\b/i.test(s)) bank="CommBank AU";
-  const acct=(s.match(/(?:a\/c|acc(?:ount)?|card)[^0-9]{0,15}(?:x+|\*+|#)?\s*(\d{3,4})\b/i)||[])[1]||"";
+  if(!bank){ const digits=s.replace(/[^\d]/g,""); for(const k in HOTLINES) if(digits.includes(k)){ bank=HOTLINES[k]; break; } }
+  if(!bank && acct && S.bankByAcct && S.bankByAcct[acct]) bank=S.bankByAcct[acct];
+  if(!bank) bank="Bank";
 
-  return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, ts, bank, acct, balance, isFd};
+  return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, ts, bank, acct, balance, isFd, isTransfer};
 }
 function guessCat(t){
   if(t.isFd) return "Fixed deposit";
-  if(t.type==="in") return /transfer|ceft|own account/i.test(t.raw||"")?"Transfers":"Income";
   const key=t.merchant.toLowerCase();
   if(S.rules[key]) return S.rules[key];
+  if(t.type==="in") return /own ?a\/?c|own account/i.test(t.raw||"")?"Transfers":"Income";
+  if(t.isTransfer) return "Transfers";
   const hay=(t.merchant+" "+(t.raw||"")).toLowerCase();
   for(const n of ["Eating out","Groceries","Transport","Day out","Fun","Shopping","Bills","Health","Cash","Transfers"])
     if(CATS[n].k.some(k=>hay.includes(k))) return n;
@@ -476,7 +530,12 @@ function lkrOf(t){ return t.lkr!=null ? t.lkr : t.amount*rateFor(t.cur||"LKR"); 
 
 /* returns "added" | "dup" | "skip" */
 function ingest(raw){
-  const p=parseSms(raw); if(!p) return {r:"skip"};
+  const p=parseSms(raw);
+  if(!p){
+    const t=cleanRaw(raw);
+    if(/(lkr|rs\.?|aud|usd)\s*[\d,]/i.test(t) && !looksOtp(t)){ const id="k"+hashStr(t); if(!live(S.skip[id])) put("skip",{id,raw:t}); }
+    return {r:"skip"};
+  }
   if(S.tx[p.id] && live(S.tx[p.id])) return {r:"dup",p};
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
   put("tx",p);
@@ -548,7 +607,7 @@ async function sync(manual){
         await sbf("items",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload.slice(i,i+400))});
       keys.forEach(k=>delete S.dirty[k]);
     }
-    S.sb.at=Date.now(); persist(); if(changed) render(); setPill("ok");
+    S.sb.at=Date.now(); persist(); if(changed){ if(S.pv<PARSER_VERSION||Object.values(S.skip).some(live)) reparseAll(); else render(); } setPill("ok");
     if(added) toast("Added "+added+" new from your iPhone");
     else if(manual) toast("Synced");
   }catch(e){ console.warn(e); setPill("err", String(e.message||e)); if(manual) toast("Sync failed. Check URL and key."); }
@@ -558,6 +617,31 @@ function setPill(st,msg){
   const p=$("syncPill"); p.className="pill"+(st==="ok"?" ok":st==="err"?" err":"");
   p.querySelector("span").textContent= !sbOn()?"Off": st==="ok"?"On": st==="err"?"Error":"Syncing";
   $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected";
+}
+
+
+/* =============== re-read old SMS with a newer parser =============== */
+function reparseAll(force){
+  let fixed=0, rescued=0;
+  Object.values(S.tx).forEach(t=>{
+    if(!live(t) || t.src!=="sms" || !t.raw) return;
+    const p=parseSms(t.raw); if(!p) return;
+    const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer});
+    if(!t.nameSet) n.merchant=p.merchant;
+    if(!t.bankSet) n.bank=p.bank;
+    if(!t.catSet) n.cat=guessCat(n);
+    n.lkr=n.amount*rateFor(n.cur);
+    if(JSON.stringify(n)!==JSON.stringify(t)){ n.u=Date.now(); S.tx[t.id]=n; S.dirty["tx:"+t.id]=1; fixed++; }
+  });
+  Object.values(S.skip).forEach(k=>{
+    if(!live(k)) return;
+    const p=parseSms(k.raw); if(!p) return;
+    if(!live(S.tx[p.id])){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
+    S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1;
+  });
+  S.pv=PARSER_VERSION; persist(); render(); queueSync();
+  if(force||rescued) toast(rescued?"Recovered "+rescued+" message"+(rescued>1?"s":""):"Messages re-read");
+  return {fixed,rescued};
 }
 
 /* =============== link intake (#sms=…) =============== */
@@ -701,6 +785,8 @@ function renderSavings(){
 /* ---------- settings ---------- */
 function renderSettings(){
   $("ver").textContent="v"+APP_VERSION;
+  const sk=Object.values(S.skip).filter(live).length;
+  $("skipRow").hidden=!sk; $("skipD").textContent=sk+" message"+(sk>1?"s":"")+" kept. Send one to Claude to improve reading.";
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
   $("inboxUrl").textContent=(S.sb.url?cleanUrl(S.sb.url):"https://YOUR-PROJECT.supabase.co")+"/rest/v1/inbox";
   $("openUrl").textContent=location.origin+location.pathname+"#sms=";
@@ -723,17 +809,30 @@ function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").for
 function openTx(id){
   const t=S.tx[id]; if(!t) return; let cat=t.cat;
   const cats = t.type==="in"?["Income","Transfers","Other"]:[...SPEND,"Fixed deposit"];
-  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</div>'+
+  const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
+  if(!banks.includes(t.bank)) banks.unshift(t.bank);
+  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+(t.acct?' · ••'+esc(t.acct):'')+'</div>'+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
-    (t.type==="out"?'<label class="chk"><input type="checkbox" id="rem" checked> Always use this for '+esc(t.merchant)+'</label>':'')+
+    '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
+    '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
+    '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
   $("tsave").onclick=()=>{
-    const n=Object.assign({},t,{cat,note:$("tnote").value.trim()}); put("tx",n);
-    if($("rem")&&$("rem").checked){ const k=t.merchant.toLowerCase(); S.rules[k]=cat; persist();
-      Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat}))); }
+    const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
+    const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
+    if(name!==t.merchant) n.nameSet=true;
+    if(bank!==t.bank){ n.bank=bank; n.bankSet=true;
+      if(t.acct){ S.bankByAcct[t.acct]=bank; Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.acct===t.acct&&!o.bankSet&&o.bank!==bank).forEach(o=>put("tx",Object.assign({},o,{bank}))); } }
+    put("tx",n);
+    if(cat==="Fixed deposit" && t.type==="out" && !live(S.fd["f"+t.id])){
+      put("fd",{id:"f"+t.id, bank:n.bank, amount:t.amount, cur:t.cur, rate:0, start:ymd(t.ts), months:12, note:"From SMS"});
+      toast("Added to Savings. Tap it there to set the rate."); closeSheet(); return;
+    }
+    if($("rem")&&$("rem").checked){ const k=name.toLowerCase(); S.rules[k]=cat; persist();
+      Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
     closeSheet(); toast("Saved");
   };
   $("tdel").onclick=()=>{ remove("tx",t.id); closeSheet(); toast("Deleted"); };
@@ -803,6 +902,7 @@ $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value
   S.sb={url:u,key:k}; S.lastPull=""; Object.values(S.tx).forEach(t=>S.dirty["tx:"+t.id]=1); Object.values(S.fd).forEach(f=>S.dirty["fd:"+f.id]=1);
   persist(); renderSettings(); sync(true); };
 $("sbSync").onclick=()=>sync(true);
+$("skipRetry").onclick=()=>{ reparseAll(true); renderSettings(); };
 $("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
 
 $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
@@ -836,7 +936,7 @@ $("wipe").onclick=()=>{ if(!confirm("Delete all data on this phone? Cloud copy (
 
 window.addEventListener("hashchange",checkHash);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ sync(); checkHash(); } });
-applyTheme(); render(); checkHash(); sync(); setInterval(()=>sync(),60000);
+applyTheme(); render(); if(S.pv<PARSER_VERSION) reparseAll(); checkHash(); sync(); setInterval(()=>sync(),60000);
 if(!S.rate.at) fetch("https://open.er-api.com/v6/latest/LKR").then(r=>r.json()).then(r=>{ if(r.rates&&r.rates.AUD){ S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); render(); } }).catch(()=>{});
 })();
 </script>
