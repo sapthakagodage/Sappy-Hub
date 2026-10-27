@@ -274,7 +274,7 @@ details[open] summary::after{content:"－"}
         <summary>Connect Supabase (free)</summary>
         <p class="note">Keeps every record safe in the cloud and lets your iPhone add SMS silently. Setup steps are in the README on GitHub.</p>
         <label class="field"><span>Project URL</span><input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
-        <label class="field"><span>Anon key</span><input id="sbKey" placeholder="eyJ…" autocomplete="off" autocapitalize="off"></label>
+        <label class="field"><span>API key (anon or publishable)</span><input id="sbKey" placeholder="eyJ… or sb_publishable_…" autocomplete="off" autocapitalize="off"></label>
         <div class="btns"><button class="btn" id="sbSave">Connect</button><button class="btn soft" id="sbSync">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
       </details>
     </div>
@@ -287,7 +287,7 @@ details[open] summary::after{content:"－"}
           <li>Shortcuts → <b>Automation</b> → <b>+</b> → <b>Message</b>.</li>
           <li>Message Contains <code>Bal</code> (or pick your bank senders). Choose <b>Run Immediately</b>.</li>
           <li>Add <b>Get Contents of URL</b>. URL: <code id="inboxUrl">https://YOUR-PROJECT.supabase.co/rest/v1/inbox</code></li>
-          <li>Method <b>POST</b>. Headers: <code>apikey</code> = your anon key, <code>Authorization</code> = <code>Bearer </code> + anon key.</li>
+          <li>Method <b>POST</b>. Header <code>apikey</code> = your key. Only if the key starts with <code>eyJ</code>, also add <code>Authorization</code> = <code>Bearer </code> + key.</li>
           <li>Request Body <b>JSON</b>: key <code>raw</code>, value <b>Shortcut Input</b>.</li>
         </ol>
         <p class="note">Nothing opens. The SMS lands in your inbox and is added the next time you open the app.</p>
@@ -353,7 +353,7 @@ details[open] summary::after{content:"－"}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.0.1";
 
 /* =============== categories =============== */
 const CATS = {
@@ -489,10 +489,32 @@ function ingest(raw){
 /* =============== cloud sync (Supabase) =============== */
 let syncing=false, syncTimer=null;
 function sbOn(){ return !!(S.sb.url && S.sb.key); }
+function cleanUrl(u){
+  u=String(u||"").trim();
+  const ref=u.match(/dashboard\/project\/([a-z0-9]{10,})/i);           // pasted the dashboard link
+  if(ref) return "https://"+ref[1]+".supabase.co";
+  if(/^[a-z0-9]{15,}$/i.test(u)) return "https://"+u+".supabase.co";      // pasted only the project ID
+  if(!/^https?:\/\//i.test(u)) u="https://"+u;
+  return u.replace(/\/(rest\/v1|auth\/v1)?\/*$/i,"").replace(/\/+$/,"");
+}
+function authHeaders(){
+  const k=S.sb.key.trim(), h={apikey:k};
+  if(/^eyJ/.test(k)) h.Authorization="Bearer "+k;                          // legacy anon key is a JWT
+  return h;
+}
 async function sbf(path, opt={}){
-  const res=await fetch(S.sb.url.replace(/\/+$/,"")+"/rest/v1/"+path, Object.assign({}, opt, {headers:Object.assign({
-    apikey:S.sb.key, Authorization:"Bearer "+S.sb.key, "Content-Type":"application/json"}, opt.headers||{})}));
-  if(!res.ok) throw new Error(res.status+" "+(await res.text()).slice(0,140));
+  let res;
+  try{
+    res=await fetch(cleanUrl(S.sb.url)+"/rest/v1/"+path, Object.assign({}, opt, {headers:Object.assign(authHeaders(),{"Content-Type":"application/json"}, opt.headers||{})}));
+  }catch(e){ throw new Error("Can’t reach that URL. Check the Project URL."); }
+  if(!res.ok){
+    const body=(await res.text()).slice(0,300); let msg=body;
+    try{ const j=JSON.parse(body); msg=j.message||j.msg||j.error||body; }catch(e){}
+    if(res.status===401||/jwt|api key|apikey/i.test(msg)) throw new Error("Key not accepted. Copy the anon or publishable key again.");
+    if(/does not exist|PGRST205|PGRST202|42P01|schema cache/i.test(body)) throw new Error("Tables not found. Run supabase-setup.sql again.");
+    if(res.status===403||/permission denied|row-level security/i.test(msg)) throw new Error("No permission. Run supabase-setup.sql again.");
+    throw new Error("Error "+res.status+": "+String(msg).slice(0,90));
+  }
   const tx=await res.text(); return tx?JSON.parse(tx):null;
 }
 function queueSync(){ if(!sbOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(sync,1500); }
@@ -680,7 +702,7 @@ function renderSavings(){
 function renderSettings(){
   $("ver").textContent="v"+APP_VERSION;
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
-  $("inboxUrl").textContent=(S.sb.url||"https://YOUR-PROJECT.supabase.co").replace(/\/+$/,"")+"/rest/v1/inbox";
+  $("inboxUrl").textContent=(S.sb.url?cleanUrl(S.sb.url):"https://YOUR-PROJECT.supabase.co")+"/rest/v1/inbox";
   $("openUrl").textContent=location.origin+location.pathname+"#sms=";
   $("rateAud").value=S.rate.AUD; $("rateUsd").value=S.rate.USD;
   $("rateWhen").textContent=S.rate.at?"Updated "+new Date(S.rate.at).toLocaleDateString("en-GB"):"Set by hand";
@@ -775,8 +797,9 @@ $("next").onclick=()=>{ month.setMonth(month.getMonth()+1); focusCat=null; rende
 $("q").oninput=renderActivity;
 $("addFd").onclick=()=>openFd();
 
-$("sbSave").onclick=()=>{ const u=$("sbUrl").value.trim(), k=$("sbKey").value.trim();
-  if(!/^https:\/\/.+/.test(u)||k.length<20) return toast("Check the URL and key");
+$("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
+  if(!/^https:\/\/.+\..+/.test(u)) return toast("Check the Project URL");
+  if(k.length<20) return toast("Paste the full key");
   S.sb={url:u,key:k}; S.lastPull=""; Object.values(S.tx).forEach(t=>S.dirty["tx:"+t.id]=1); Object.values(S.fd).forEach(f=>S.dirty["fd:"+f.id]=1);
   persist(); renderSettings(); sync(true); };
 $("sbSync").onclick=()=>sync(true);
