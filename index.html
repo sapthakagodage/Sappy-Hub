@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<meta name="theme-color" content="#F4F5F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101412" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>Pocket Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F5F2; --card:#FFFFFF; --ink:#1A1F1C; --soft:#6B736E; --faint:#9AA19C; --line:#E6E9E4;
+  --pos:#17865A; --neg:#C8442B; --chip:#ECEFEA; --press:#E3E7E1;
+  --shadow:0 1px 0 rgba(26,31,28,.04),0 8px 24px -12px rgba(26,31,28,.12);
+  --r-lg:24px; --r-md:16px; --r-sm:12px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101412; --card:#181E1B; --ink:#EDF2EE; --soft:#9CA8A1; --faint:#6F7B74; --line:#252D29;
+    --pos:#43C48A; --neg:#F07A5F; --chip:#212925; --press:#2A332E; --shadow:none; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101412; --card:#181E1B; --ink:#EDF2EE; --soft:#9CA8A1; --faint:#6F7B74; --line:#252D29;
+  --pos:#43C48A; --neg:#F07A5F; --chip:#212925; --press:#2A332E; --shadow:none; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Onest",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:16px;line-height:1.4;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-user-select:none;user-select:none}
+:focus-visible{outline:2px solid var(--pos);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wrap{max-width:540px;margin:0 auto;padding:12px 18px calc(120px + env(safe-area-inset-bottom,0px))}
+[hidden]{display:none!important}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);
+  display:flex;align-items:center;justify-content:space-between;padding:10px 0 12px}
+.bar h1{font-size:28px;font-weight:800;letter-spacing:-.03em;margin:0}
+.mswitch{display:flex;align-items:center;gap:2px;background:var(--card);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
+.mswitch button{border:0;background:none;width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--soft)}
+.mswitch button:active{background:var(--press)}
+.mswitch span{font-weight:600;font-size:14px;min-width:78px;text-align:center}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--r-lg);padding:20px;box-shadow:var(--shadow);margin-bottom:14px}
+.card h3{font-size:15px;font-weight:600;margin:0 0 12px;color:var(--soft)}
+.card h3 .r{float:right;font-weight:500;color:var(--faint)}
+
+/* donut hero */
+.donut-wrap{position:relative;width:min(72vw,260px);aspect-ratio:1;margin:4px auto 18px}
+.donut-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.donut-wrap circle{fill:none;stroke-width:15}
+.donut-wrap .seg{transition:stroke-dasharray .6s cubic-bezier(.2,.8,.2,1),stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.donut-wrap .seg.dim{opacity:.18}
+.center{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none}
+.center .l{font-size:13px;color:var(--soft)}
+.center .v{font-size:clamp(28px,8.5vw,36px);font-weight:800;letter-spacing:-.035em;line-height:1.1}
+.center .v small{font-size:.45em;font-weight:600;color:var(--soft);margin-right:3px;letter-spacing:0}
+.center .s{font-size:13px;color:var(--faint)}
+.io{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.io div{background:var(--bg);border-radius:var(--r-md);padding:12px 14px}
+.io span{font-size:13px;color:var(--soft);display:block}
+.io b{font-size:19px;font-weight:700}
+.io .in b{color:var(--pos)}
+
+/* legend */
+.legend{display:grid;gap:2px;margin-top:6px}
+.lg{display:grid;grid-template-columns:28px 1fr auto 44px;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;border:0;background:none;text-align:left;width:100%}
+.lg:active,.lg.on{background:var(--bg)}
+.lg .e{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:15px}
+.lg .n{font-weight:500}
+.lg .bar2{grid-column:2/5;height:4px;border-radius:2px;background:var(--chip);overflow:hidden;margin-top:-2px}
+.lg .bar2 i{display:block;height:100%;border-radius:2px}
+.lg .a{font-weight:600}
+.lg .p{color:var(--faint);font-size:13px;text-align:right}
+
+/* balances */
+.bal{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line)}
+.bal:first-of-type{border-top:0}
+.bal .k{font-weight:500}
+.bal .t{font-size:12px;color:var(--faint)}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.total b{font-size:26px;font-weight:800;letter-spacing:-.03em}
+
+/* tx list */
+.day{font-size:13px;font-weight:600;color:var(--faint);margin:18px 4px 8px}
+.list{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+.tx{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:13px 16px;position:relative}
+.tx+.tx::before{content:"";position:absolute;top:0;left:66px;right:0;border-top:1px solid var(--line)}
+.tx:active{background:var(--press)}
+.ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:18px;flex:none}
+.tx .mid{flex:1;min-width:0}
+.tx .m{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .c{font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .rt{text-align:right}
+.tx .a{font-weight:700;white-space:nowrap}
+.tx .a.in{color:var(--pos)}
+.tx .o{font-size:12px;color:var(--faint)}
+.empty{text-align:center;padding:28px 20px;color:var(--soft)}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+
+/* activity tools */
+.search{display:flex;gap:8px;margin-bottom:10px}
+.search input{flex:1;border:0;background:var(--card);border-radius:var(--r-sm);padding:12px 14px;box-shadow:var(--shadow);min-width:0}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{border:0;background:var(--card);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:500;white-space:nowrap;box-shadow:var(--shadow)}
+.chip.on{background:var(--ink);color:var(--bg)}
+.sum{display:flex;justify-content:space-between;font-size:14px;color:var(--soft);margin:12px 4px 0}
+
+/* savings */
+.fd{padding:14px 0;border-top:1px solid var(--line);display:block;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0}
+.fd:first-of-type{border-top:0}
+.fd .top{display:flex;justify-content:space-between;font-weight:600}
+.fd .sub{display:flex;justify-content:space-between;font-size:13px;color:var(--soft);margin-top:2px}
+.prog{height:6px;border-radius:3px;background:var(--chip);margin-top:10px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--pos);border-radius:3px}
+
+/* settings */
+.set h2{font-size:13px;font-weight:600;color:var(--faint);margin:22px 6px 8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .k{font-weight:500}
+.row .d{font-size:13px;color:var(--soft)}
+.field{display:block;margin:10px 0}
+.field span{display:block;font-size:13px;color:var(--soft);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:var(--r-sm);padding:12px;font-size:16px}
+.field textarea{min-height:96px;resize:vertical}
+.btn{border:0;border-radius:var(--r-sm);padding:13px 18px;font-weight:600;background:var(--ink);color:var(--bg)}
+.btn.soft{background:var(--chip);color:var(--ink)}
+.btn.warn{background:none;color:var(--neg);padding-left:0}
+.btn.full{width:100%}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.steps{margin:6px 0 0;padding-left:20px}
+.steps li{margin:8px 0}
+code{background:var(--chip);border-radius:6px;padding:1px 6px;font-size:14px;word-break:break-all}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--soft)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.pill.ok i{background:var(--pos)} .pill.err i{background:var(--neg)}
+.note{font-size:14px;color:var(--soft);margin:6px 0}
+details summary{cursor:pointer;font-weight:600;list-style:none;padding:4px 0}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"＋";float:right;color:var(--faint)}
+details[open] summary::after{content:"－"}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:0 14px calc(10px + env(safe-area-inset-bottom,0px))}
+.tabs .in{max-width:420px;margin:0 auto;display:flex;align-items:center;gap:4px;background:color-mix(in srgb,var(--card) 88%,transparent);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-radius:999px;padding:6px;box-shadow:0 10px 30px -10px rgba(0,0,0,.25);border:1px solid var(--line)}
+.tab{flex:1;border:0;background:none;border-radius:999px;padding:9px 0 7px;display:grid;justify-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--faint)}
+.tab svg{width:22px;height:22px}
+.tab[aria-current="true"]{color:var(--ink);background:var(--bg)}
+.fab{flex:none;width:52px;height:52px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center}
+.fab svg{width:24px;height:24px}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:540px;margin:0 auto;background:var(--card);
+  border-radius:28px 28px 0 0;padding:10px 20px calc(20px + env(safe-area-inset-bottom,0px));
+  transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);max-height:88vh;overflow-y:auto}
+.sheet.on{transform:none}
+.sheet:not(.on){visibility:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s .32s}
+.sx{position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:50%;border:0;background:var(--chip);color:var(--soft);font-size:14px}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
+.sheet h2{font-size:22px;margin:0 0 2px;letter-spacing:-.02em}
+.raw{font-size:13px;color:var(--soft);background:var(--bg);border-radius:var(--r-sm);padding:10px 12px;margin:12px 0;max-height:120px;overflow:auto}
+.seg{display:flex;background:var(--bg);border-radius:var(--r-sm);padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:9px 0;font-weight:600;color:var(--soft)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.pick button{border:1px solid var(--line);background:var(--bg);border-radius:var(--r-sm);padding:10px 4px;font-size:13px;font-weight:500;display:grid;justify-items:center;gap:4px}
+.pick button.on{border-color:var(--ink);background:var(--card);box-shadow:inset 0 0 0 1px var(--ink)}
+.pick button em{font-style:normal;font-size:20px}
+.amt{display:flex;gap:8px}
+.amt select{width:96px;flex:none}
+.chk{display:flex;align-items:center;gap:10px;font-size:14px;margin:8px 0}
+.chk input{width:20px;height:20px;accent-color:var(--ink)}
+
+/* toast */
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translate(-50%,-160%);z-index:60;
+  background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:999px;font-weight:600;font-size:15px;
+  transition:transform .35s cubic-bezier(.2,.8,.2,1);max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast.on{transform:translate(-50%,0)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <h1 id="title">Overview</h1>
+    <div class="mswitch" id="mswitch">
+      <button id="prev" aria-label="Previous month">‹</button>
+      <span id="mlabel"></span>
+      <button id="next" aria-label="Next month">›</button>
+    </div>
+  </header>
+
+  <!-- HOME -->
+  <section id="v-home">
+    <div class="card">
+      <div class="donut-wrap">
+        <svg viewBox="0 0 120 120" id="donut" aria-hidden="true"></svg>
+        <div class="center">
+          <div class="l" id="cLabel">Spent</div>
+          <div class="v num"><small>Rs</small><span id="cVal">0</span></div>
+          <div class="s" id="cSub"></div>
+        </div>
+      </div>
+      <div class="io">
+        <div class="in"><span>Came in</span><b class="num" id="inc">Rs 0</b></div>
+        <div><span>Left over</span><b class="num" id="left">Rs 0</b></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="card" id="balCard">
+      <h3>Bank balances <span class="r" id="balWhen"></span></h3>
+      <div class="total"><span class="note">Total</span><b class="num" id="balTotal">Rs 0</b></div>
+      <div id="balList"></div>
+    </div>
+
+    <div class="day" style="margin-top:22px">Latest</div>
+    <div class="list" id="latest"></div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section id="v-activity" hidden>
+    <div class="search"><input id="q" type="search" placeholder="Search shop or note" aria-label="Search"></div>
+    <div class="chips" id="fchips"></div>
+    <div class="sum" id="fsum"></div>
+    <div id="allList"></div>
+  </section>
+
+  <!-- SAVINGS -->
+  <section id="v-savings" hidden>
+    <div class="card">
+      <h3>Net worth</h3>
+      <div class="total"><span class="note">Banks + deposits</span><b class="num" id="nw">Rs 0</b></div>
+      <div class="bal"><span class="k">Bank balances</span><span class="num" id="nwBank">Rs 0</span></div>
+      <div class="bal"><span class="k">Fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
+    </div>
+    <div class="card">
+      <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
+      <div id="fdList"></div>
+      <button class="btn soft full" id="addFd" style="margin-top:12px">Add fixed deposit</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="v-settings" class="set" hidden>
+    <h2>Cloud sync</h2>
+    <div class="card">
+      <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
+      <details id="sbBox">
+        <summary>Connect Supabase (free)</summary>
+        <p class="note">Keeps every record safe in the cloud and lets your iPhone add SMS silently. Setup steps are in the README on GitHub.</p>
+        <label class="field"><span>Project URL</span><input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
+        <label class="field"><span>Anon key</span><input id="sbKey" placeholder="eyJ…" autocomplete="off" autocapitalize="off"></label>
+        <div class="btns"><button class="btn" id="sbSave">Connect</button><button class="btn soft" id="sbSync">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
+      </details>
+    </div>
+
+    <h2>iPhone SMS capture</h2>
+    <div class="card">
+      <details>
+        <summary>With cloud sync (silent, recommended)</summary>
+        <ol class="steps">
+          <li>Shortcuts → <b>Automation</b> → <b>+</b> → <b>Message</b>.</li>
+          <li>Message Contains <code>Bal</code> (or pick your bank senders). Choose <b>Run Immediately</b>.</li>
+          <li>Add <b>Get Contents of URL</b>. URL: <code id="inboxUrl">https://YOUR-PROJECT.supabase.co/rest/v1/inbox</code></li>
+          <li>Method <b>POST</b>. Headers: <code>apikey</code> = your anon key, <code>Authorization</code> = <code>Bearer </code> + anon key.</li>
+          <li>Request Body <b>JSON</b>: key <code>raw</code>, value <b>Shortcut Input</b>.</li>
+        </ol>
+        <p class="note">Nothing opens. The SMS lands in your inbox and is added the next time you open the app.</p>
+      </details>
+      <div style="height:8px"></div>
+      <details>
+        <summary>Without cloud (opens the app)</summary>
+        <ol class="steps">
+          <li>Same automation trigger as above.</li>
+          <li>Add <b>URL Encode</b> on Shortcut Input.</li>
+          <li>Add <b>Open URL</b>: <code id="openUrl"></code> followed by the <b>URL Encoded Text</b>.</li>
+        </ol>
+        <p class="note">Use the Safari bookmark, not a Home Screen icon. On iPhone they keep separate data.</p>
+      </details>
+    </div>
+
+    <h2>Add past SMS</h2>
+    <div class="card">
+      <p class="note" style="margin-top:0">Paste one or more bank SMS. Separate them with a blank line.</p>
+      <label class="field"><textarea id="paste" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea></label>
+      <div class="btns"><button class="btn" id="pasteAdd">Add messages</button><button class="btn soft" id="sample">Try a sample</button></div>
+    </div>
+
+    <h2>Currency</h2>
+    <div class="card">
+      <div class="row" style="padding-top:0"><div><div class="k">1 AUD in LKR</div><div class="d" id="rateWhen">Not updated yet</div></div>
+        <input id="rateAud" inputmode="decimal" class="num" style="width:110px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px;text-align:right" aria-label="AUD rate"></div>
+      <div class="row"><div><div class="k">1 USD in LKR</div></div>
+        <input id="rateUsd" inputmode="decimal" class="num" style="width:110px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px;text-align:right" aria-label="USD rate"></div>
+      <div class="btns"><button class="btn soft" id="rateFetch">Get today’s rates</button></div>
+    </div>
+
+    <h2>Backup</h2>
+    <div class="card">
+      <p class="note" style="margin-top:0">Download a full copy of your records. Keep one even with cloud sync.</p>
+      <div class="btns"><button class="btn" id="exp">Download backup</button><button class="btn soft" id="impBtn">Restore</button></div>
+      <input type="file" id="imp" accept="application/json" hidden>
+    </div>
+
+    <h2>Look</h2>
+    <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+
+    <p class="note" style="text-align:center;margin-top:24px">Pocket Ledger <span id="ver"></span></p>
+    <p style="text-align:center"><button class="btn warn" id="wipe" style="padding-left:18px">Delete all data on this device</button></p>
+  </section>
+</div>
+
+<!-- tab bar -->
+<nav class="tabs" aria-label="Main">
+  <div class="in">
+    <button class="tab" data-v="home" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg>Overview</button>
+    <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>Activity</button>
+    <button class="fab" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="tab" data-v="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v9H4zM4 10l8-5 8 5M8 13v3M12 13v3M16 13v3"/></svg>Savings</button>
+    <button class="tab" data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>Settings</button>
+  </div>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const APP_VERSION = "2.0.0";
+
+/* =============== categories =============== */
+const CATS = {
+  "Eating out": {e:"🍜", c:"#F08A3C", k:["uber eats","pickme food","kfc","pizza","mcdonald","burger","domino","cafe","coffee","restaurant","bakery","java lounge","barista","kottu","pilawoos","sushi","dine","bistro","eatery","food"]},
+  "Groceries":  {e:"🛒", c:"#2EA36B", k:["keells","cargills","food city","arpico","glomark","laughs","spar","sathosa","supermarket","super market","grocery","mart"]},
+  "Transport":  {e:"🚕", c:"#3D7BE0", k:["uber","pickme","kangaroo","fuel","ceypetco","lanka ioc","lioc","petrol","filling","parking","expressway","sinopec","shed","railway"]},
+  "Day out":    {e:"🌴", c:"#8E5BD8", k:["resort","cinnamon","shangri","jetwing","hilton","marriott","hotel","villa","zoo","park","safari","ticket","travel","airline","srilankan","booking.com","agoda","airbnb"]},
+  "Fun":        {e:"🎬", c:"#E0559A", k:["scope cinema","ccc","pvr","majestic","cinema","movie","game","steam","playstation","event","club","bar "]},
+  "Shopping":   {e:"🛍️", c:"#E8B634", k:["daraz","odel","nolimit","fashion bug","cool planet","abans","singer","softlogic","damro","kapruka","amazon","aliexpress","temu","house of fashion","mall"]},
+  "Bills":      {e:"💡", c:"#36B5D8", k:["dialog","mobitel","slt","hutch","airtel","ceb","leco","water board","nwsdb","electricity","insurance","netflix","spotify","icloud","apple.com","google","peo tv","bill","subscription"]},
+  "Health":     {e:"💊", c:"#12A397", k:["pharmacy","osu sala","healthguard","hospital","asiri","nawaloka","lanka hospital","durdans","hemas","clinic","medical","channel"]},
+  "Cash":       {e:"🏧", c:"#8A918C", k:["atm","cash withdrawal","withdrawal","cdm"]},
+  "Transfers":  {e:"🔁", c:"#A6ADA8", k:["transfer","ceft","slips","fund tr","lankapay","justpay","own account"]},
+  "Other":      {e:"•",  c:"#C5CBC7", k:[]},
+  "Income":     {e:"💰", c:"#17865A", k:[]},
+  "Fixed deposit": {e:"🏦", c:"#1F6F78", k:[]}
+};
+const SPEND = ["Eating out","Groceries","Transport","Day out","Fun","Shopping","Bills","Health","Cash","Transfers","Other"];
+const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income"]);
+
+/* =============== helpers =============== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n,d=0) => Number(n||0).toLocaleString("en-LK",{minimumFractionDigits:d,maximumFractionDigits:d});
+const rs = n => (n<0?"−":"")+"Rs "+fmt(Math.round(Math.abs(n)));
+const titleCase = s => s.toLowerCase().replace(/\b([a-z])/g,m=>m.toUpperCase()).replace(/\s+/g," ").trim();
+function hashStr(s){let a=0x811c9dc5,b=5381;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);a=Math.imul(a^c,16777619);b=((b<<5)+b+c)|0;}return (a>>>0).toString(16)+(b>>>0).toString(16);}
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const sameDay = (a,b) => { const x=new Date(a),y=new Date(b); return x.toDateString()===y.toDateString(); };
+const ymd = ts => { const d=new Date(ts); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const fromYmd = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d,12).getTime(); };
+
+/* =============== storage =============== */
+const KEY = "pocketledger.v2";
+let S = load();
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
+  return blank();
+}
+function blank(){ return {tx:{}, fd:{}, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"auto"}; }
+function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
+const live = o => o && !o.del;
+
+function put(kind, obj){
+  obj.u = Date.now(); S[kind][obj.id] = obj;
+  S.dirty[kind+":"+obj.id] = 1; persist(); render(); queueSync();
+}
+function remove(kind, id){ put(kind, {id, del:true}); }
+
+/* =============== SMS parser =============== */
+function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
+function parseSms(raw){
+  const s = String(raw||"").replace(/\s+/g," ").trim();
+  if(!s) return null;
+  if(/\b(otp|one[- ]?time|password|passcode|verification code|do not share)\b/i.test(s)) return null;
+
+  const re = /(LKR|Rs\.?|SLR|AUD|A\$|USD|US\$)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+\.\d{2})\s*(LKR|AUD|USD)/gi;
+  let m, amount=null, cur="LKR", balance=null;
+  while((m=re.exec(s))){
+    let c=(m[1]||m[4]||"LKR").toUpperCase().replace(/\.|\$/g,"");
+    c = c==="RS"||c==="SLR"?"LKR": c==="A"?"AUD": c==="US"?"USD": c;
+    const val=parseFloat(String(m[2]||m[3]).replace(/,/g,""));
+    const before=s.slice(Math.max(0,m.index-24),m.index).toLowerCase();
+    if(/bal|avl|available|limit/.test(before)){ if(balance===null) balance=val; continue; }
+    if(amount===null){ amount=val; cur=c; }
+  }
+  if(amount===null || !(amount>0)) return null;
+
+  const L=s.toLowerCase();
+  const isFd = /(fixed deposit|\bfd\b|term deposit|\bft\s?d\b)/.test(L);
+  let type;
+  if(/(credited|deposited|received|salary|refund|reversal|reversed)/.test(L) && !isFd) type="in";
+  else if(/(debited|purchase|spent|withdraw|payment|paid|txn at|transaction at|\bdr\b|pos |charged|debit)/.test(L)) type="out";
+  else if(/(credit|\bcr\b|cash ?back)/.test(L)) type="in";
+  else type="out";
+
+  const stop="(?=\\s+(?:on|for|from|with|dated|ref|reference|card|a\\/c|acc|lkr|rs\\.?|aud|usd|via|using)\\b|\\s+\\d{1,2}[\\/\\-.]\\d{1,2}|[.,;]|\\s*$)";
+  const W="([A-Za-z0-9&'*.\\-/ ]{2,40}?)";
+  const pats = type==="in"
+    ? [new RegExp("\\bfrom\\s+"+W+stop,"i"), new RegExp("\\bby\\s+"+W+stop,"i")]
+    : [new RegExp("\\bat\\s+"+W+stop,"i"), new RegExp("@\\s*"+W+stop,"i"), new RegExp("merchant[:\\s]+"+W+stop,"i"), new RegExp("\\bto\\s+"+W+stop,"i")];
+  let merchant="";
+  for(const p of pats){ const mm=s.match(p); if(mm){ merchant=mm[1]; break; } }
+  merchant=merchant.replace(/\*+/g," ").replace(/\s{2,}/g," ").trim();
+  if(/^(your|the|a\/c|acc|account|card)\b/i.test(merchant)) merchant="";
+  if(!merchant){
+    if(isFd) merchant="Fixed deposit";
+    else if(/atm|withdraw/.test(L)) merchant="ATM withdrawal";
+    else if(type==="in"&&/salary/.test(L)) merchant="Salary";
+    else if(/transfer|ceft|slips/.test(L)) merchant="Transfer";
+    else merchant = type==="in"?"Money in":"Card payment";
+  }
+  merchant=titleCase(merchant).slice(0,40);
+
+  let ts=Date.now();
+  const dm=s.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);
+  if(dm){ let d=+dm[1],mo=+dm[2],y=+dm[3]; if(y<100)y+=2000; if(mo>12&&d<=12){const t=d;d=mo;mo=t;}
+    const dt=new Date(y,mo-1,d,12); if(!isNaN(dt)&&Math.abs(dt-Date.now())<400*864e5){ ts=dt.getTime(); if(sameDay(ts,Date.now())) ts=Date.now(); } }
+
+  let bank="Bank";
+  if(/combank|commercial bank|\bcbc\b/i.test(s)) bank="ComBank";
+  else if(/sampath/i.test(s)) bank="Sampath";
+  else if(/\bhnb\b|hatton/i.test(s)) bank="HNB";
+  else if(/commbank|commonwealth|\bcba\b/i.test(s)) bank="CommBank AU";
+  const acct=(s.match(/(?:a\/c|acc(?:ount)?|card)[^0-9]{0,15}(?:x+|\*+|#)?\s*(\d{3,4})\b/i)||[])[1]||"";
+
+  return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, ts, bank, acct, balance, isFd};
+}
+function guessCat(t){
+  if(t.isFd) return "Fixed deposit";
+  if(t.type==="in") return /transfer|ceft|own account/i.test(t.raw||"")?"Transfers":"Income";
+  const key=t.merchant.toLowerCase();
+  if(S.rules[key]) return S.rules[key];
+  const hay=(t.merchant+" "+(t.raw||"")).toLowerCase();
+  for(const n of ["Eating out","Groceries","Transport","Day out","Fun","Shopping","Bills","Health","Cash","Transfers"])
+    if(CATS[n].k.some(k=>hay.includes(k))) return n;
+  return "Other";
+}
+function lkrOf(t){ return t.lkr!=null ? t.lkr : t.amount*rateFor(t.cur||"LKR"); }
+
+/* returns "added" | "dup" | "skip" */
+function ingest(raw){
+  const p=parseSms(raw); if(!p) return {r:"skip"};
+  if(S.tx[p.id] && live(S.tx[p.id])) return {r:"dup",p};
+  p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
+  put("tx",p);
+  if(p.isFd && p.type==="out"){
+    put("fd",{id:"f"+p.id, bank:p.bank, amount:p.amount, cur:p.cur, rate:0, start:ymd(p.ts), months:12, note:"From SMS"});
+  }
+  return {r:"added",p};
+}
+
+/* =============== cloud sync (Supabase) =============== */
+let syncing=false, syncTimer=null;
+function sbOn(){ return !!(S.sb.url && S.sb.key); }
+async function sbf(path, opt={}){
+  const res=await fetch(S.sb.url.replace(/\/+$/,"")+"/rest/v1/"+path, Object.assign({}, opt, {headers:Object.assign({
+    apikey:S.sb.key, Authorization:"Bearer "+S.sb.key, "Content-Type":"application/json"}, opt.headers||{})}));
+  if(!res.ok) throw new Error(res.status+" "+(await res.text()).slice(0,140));
+  const tx=await res.text(); return tx?JSON.parse(tx):null;
+}
+function queueSync(){ if(!sbOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(sync,1500); }
+async function sync(manual){
+  if(!sbOn()||syncing) return; syncing=true; setPill("busy");
+  let added=0;
+  try{
+    // 1. pull SMS inbox from the iPhone shortcut
+    const inbox=await sbf("inbox?select=id,raw&order=id.asc&limit=500");
+    if(inbox&&inbox.length){
+      for(const r of inbox){ if(ingest(r.raw).r==="added") added++; }
+      await sbf("inbox?id=lte."+inbox[inbox.length-1].id,{method:"DELETE"});
+    }
+    // 2. pull changes from other devices
+    let q="items?select=id,kind,data,updated_at&order=updated_at.asc&limit=5000";
+    if(S.lastPull){ const t=new Date(new Date(S.lastPull).getTime()-5000).toISOString(); q+="&updated_at=gt."+encodeURIComponent(t); }
+    const rows=await sbf(q)||[];
+    let maxT=S.lastPull, changed=false;
+    for(const r of rows){
+      if(!S[r.kind]) continue;
+      const loc=S[r.kind][r.data.id];
+      if(!loc || (r.data.u||0)>(loc.u||0)){ S[r.kind][r.data.id]=r.data; changed=true; }
+      if(!maxT||r.updated_at>maxT) maxT=r.updated_at;
+    }
+    S.lastPull=maxT;
+    // 3. push local changes
+    const keys=Object.keys(S.dirty);
+    if(keys.length){
+      const payload=keys.map(k=>{const [kind,id]=k.split(/:(.+)/); const d=S[kind]&&S[kind][id]; return d?{id:k,kind,data:d}:null;}).filter(Boolean);
+      for(let i=0;i<payload.length;i+=400)
+        await sbf("items",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload.slice(i,i+400))});
+      keys.forEach(k=>delete S.dirty[k]);
+    }
+    S.sb.at=Date.now(); persist(); if(changed) render(); setPill("ok");
+    if(added) toast("Added "+added+" new from your iPhone");
+    else if(manual) toast("Synced");
+  }catch(e){ console.warn(e); setPill("err", String(e.message||e)); if(manual) toast("Sync failed. Check URL and key."); }
+  finally{ syncing=false; }
+}
+function setPill(st,msg){
+  const p=$("syncPill"); p.className="pill"+(st==="ok"?" ok":st==="err"?" err":"");
+  p.querySelector("span").textContent= !sbOn()?"Off": st==="ok"?"On": st==="err"?"Error":"Syncing";
+  $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected";
+}
+
+/* =============== link intake (#sms=…) =============== */
+let lastHash="";
+function checkHash(){
+  const h=location.hash.slice(1); if(!h||h===lastHash) return; lastHash=h;
+  let text="";
+  try{
+    if(h.startsWith("sms=")) text=decodeURIComponent(h.slice(4));
+    else if(h.startsWith("sms-")){ let b=h.slice(4).replace(/-/g,"+").replace(/_/g,"/"); while(b.length%4)b+="="; text=new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))); }
+    else return;
+  }catch(e){ toast("That SMS link couldn’t be read"); return; }
+  const r=ingest(text);
+  if(r.r==="added") toast((r.p.type==="in"?"＋ ":"− ")+r.p.cur+" "+fmt(r.p.amount,2)+" · "+r.p.merchant);
+  else toast(r.r==="dup"?"Already added":"Not a bank transaction");
+  history.replaceState(null,"",location.pathname+location.search);
+}
+
+/* =============== view state =============== */
+let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
+let focusCat=null, filter="All";
+const TITLES={home:"Overview",activity:"Activity",savings:"Savings",settings:"Settings"};
+const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
+const inMonth = t => { const d=new Date(t.ts); return d.getFullYear()===month.getFullYear()&&d.getMonth()===month.getMonth(); };
+
+function render(){
+  $("title").textContent=TITLES[view];
+  $("mswitch").hidden = !(view==="home"||view==="activity");
+  $("mlabel").textContent=month.toLocaleDateString("en-GB",{month:"short",year:"numeric"});
+  if(view==="home") renderHome();
+  if(view==="activity") renderActivity();
+  if(view==="savings") renderSavings();
+  if(view==="settings") renderSettings();
+}
+
+/* ---------- home ---------- */
+function renderHome(){
+  const all=txList(), mt=all.filter(inMonth);
+  const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
+  const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
+  const spent=out.reduce((s,t)=>s+lkrOf(t),0);
+  const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+lkrOf(t));
+  const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+
+  // donut
+  const C=2*Math.PI*48; let off=0, svg='<circle cx="60" cy="60" r="48" stroke="var(--chip)"/>';
+  const gap=rows.length>1?1.2:0;
+  rows.forEach(([c,v])=>{
+    const len=Math.max(0,(v/spent)*C-gap);
+    svg+='<circle class="seg'+(focusCat&&focusCat!==c?' dim':'')+'" cx="60" cy="60" r="48" stroke="'+CATS[c].c+'" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'"/>';
+    off+=(v/spent)*C;
+  });
+  $("donut").innerHTML=svg;
+  if(focusCat&&by[focusCat]){
+    $("cLabel").textContent=CATS[focusCat].e+" "+focusCat; $("cVal").textContent=fmt(Math.round(by[focusCat]));
+    $("cSub").textContent=Math.round(by[focusCat]/spent*100)+"% of spending";
+  }else{
+    focusCat=null; $("cLabel").textContent="Spent"; $("cVal").textContent=fmt(Math.round(spent));
+    $("cSub").textContent=out.length?out.length+" payments":"No spending yet";
+  }
+  $("inc").textContent=rs(inc); $("left").textContent=rs(inc-spent);
+  $("left").style.color = inc-spent<0?"var(--neg)":"";
+
+  $("legend").innerHTML=rows.map(([c,v])=>{
+    const p=spent?v/spent*100:0;
+    return '<button class="lg'+(focusCat===c?' on':'')+'" data-c="'+esc(c)+'"><span class="e" style="background:'+CATS[c].c+'22">'+CATS[c].e+'</span><span class="n">'+esc(c)+'</span><span class="a num">'+rs(v)+'</span><span class="p num">'+Math.round(p)+'%</span><span class="bar2"><i style="width:'+p+'%;background:'+CATS[c].c+'"></i></span></button>';
+  }).join("");
+  $("legend").querySelectorAll(".lg").forEach(b=>b.onclick=()=>{ focusCat = focusCat===b.dataset.c?null:b.dataset.c; renderHome(); });
+
+  // balances
+  const bals=balances();
+  $("balCard").hidden=!bals.length;
+  $("balTotal").textContent=rs(bals.reduce((s,b)=>s+b.lkr,0));
+  $("balWhen").textContent=bals.length?"from latest SMS":"";
+  $("balList").innerHTML=bals.map(b=>'<div class="bal"><div><div class="k">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+'</div><div class="t">'+timeAgo(b.ts)+'</div></div><div class="num">'+(b.cur!=="LKR"?esc(b.cur)+" "+fmt(b.balance,2):"Rs "+fmt(b.balance,2))+'</div></div>').join("");
+
+  listInto($("latest"), mt.slice(0,6), "Bank SMS will show up here once your iPhone shortcut is set. Or tap ＋ to add one.", true);
+}
+function balances(){
+  const map={};
+  txList().forEach(t=>{ if(t.balance==null) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
+  return Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")})).sort((a,b)=>b.lkr-a.lkr);
+}
+function timeAgo(ts){ const d=Math.floor((Date.now()-ts)/864e5); return d<=0?"Today":d===1?"Yesterday":d+" days ago"; }
+
+/* ---------- list ---------- */
+function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(ts);d.setHours(0,0,0,0); const n=(t-d)/864e5;
+  return n===0?"Today":n===1?"Yesterday":new Date(ts).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"}); }
+function txHtml(t){
+  const c=CATS[t.cat]||CATS.Other, pos=t.type==="in";
+  const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
+  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'22">'+c.e+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(t.cat)+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':'')+'</span></button>';
+}
+function listInto(el, list, emptyMsg, flat){
+  if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
+  if(flat){ el.className="list"; el.innerHTML=list.map(txHtml).join(""); }
+  else{
+    el.className=""; let html="", cur="", open=false;
+    list.forEach(t=>{ const d=dayLabel(t.ts); if(d!==cur){ if(open) html+='</div>'; html+='<div class="day">'+esc(d)+'</div><div class="list">'; cur=d; open=true; } html+=txHtml(t); });
+    if(open) html+='</div>'; el.innerHTML=html;
+  }
+  el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
+}
+
+/* ---------- activity ---------- */
+function renderActivity(){
+  const opts=["All","Spending","Income","Fixed deposit",...SPEND];
+  $("fchips").innerHTML=opts.map(o=>'<button class="chip'+(o===filter?' on':'')+'" data-f="'+esc(o)+'">'+esc(o)+'</button>').join("");
+  $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
+  const q=$("q").value.trim().toLowerCase();
+  let list=txList().filter(inMonth);
+  if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
+  else if(filter==="Income") list=list.filter(t=>t.type==="in");
+  else if(filter!=="All") list=list.filter(t=>t.cat===filter);
+  if(q) list=list.filter(t=>(t.merchant+" "+(t.note||"")+" "+t.bank+" "+t.cat).toLowerCase().includes(q));
+  const tin=list.filter(t=>t.type==="in").reduce((s,t)=>s+lkrOf(t),0), tout=list.filter(t=>t.type==="out").reduce((s,t)=>s+lkrOf(t),0);
+  $("fsum").innerHTML='<span>'+list.length+' entries</span><span class="num">In '+rs(tin)+' · Out '+rs(tout)+'</span>';
+  listInto($("allList"), list, "No entries match for this month.");
+}
+
+/* ---------- savings ---------- */
+function fdValue(f){
+  const p=f.amount*rateFor(f.cur||"LKR");
+  const start=fromYmd(f.start), end=new Date(start); end.setMonth(end.getMonth()+(+f.months||12));
+  const days=(end-start)/864e5, done=Math.min(1,Math.max(0,(Date.now()-start)/(end-start)));
+  return {p, maturity:p*(1+(+f.rate||0)/100*days/365), end:end.getTime(), done};
+}
+function renderSavings(){
+  const fds=Object.values(S.fd).filter(live).sort((a,b)=>fdValue(a).end-fdValue(b).end);
+  const bank=balances().reduce((s,b)=>s+b.lkr,0), fdt=fds.reduce((s,f)=>s+fdValue(f).p,0);
+  $("nw").textContent=rs(bank+fdt); $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
+  $("fdCount").textContent=fds.length?fds.length+" active":"";
+  $("fdList").innerHTML = fds.length ? fds.map(f=>{ const v=fdValue(f);
+    return '<button class="fd" data-id="'+esc(f.id)+'"><div class="top"><span>'+esc(f.bank)+(f.note&&f.note!=="From SMS"?' · '+esc(f.note):'')+'</span><span class="num">'+rs(v.p)+'</span></div>'+
+      '<div class="sub"><span>'+(+f.rate?f.rate+'% · ':'Add rate · ')+'matures '+new Date(v.end).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</span><span class="num">→ '+rs(v.maturity)+'</span></div>'+
+      '<div class="prog"><i style="width:'+(v.done*100)+'%"></i></div></button>'; }).join("")
+    : '<div class="empty" style="padding:12px 0"><b>No deposits yet</b>Add one, or it appears here when your bank SMS mentions a fixed deposit.</div>';
+  $("fdList").querySelectorAll(".fd").forEach(b=>b.onclick=()=>openFd(b.dataset.id));
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  $("ver").textContent="v"+APP_VERSION;
+  $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
+  $("inboxUrl").textContent=(S.sb.url||"https://YOUR-PROJECT.supabase.co").replace(/\/+$/,"")+"/rest/v1/inbox";
+  $("openUrl").textContent=location.origin+location.pathname+"#sms=";
+  $("rateAud").value=S.rate.AUD; $("rateUsd").value=S.rate.USD;
+  $("rateWhen").textContent=S.rate.at?"Updated "+new Date(S.rate.at).toLocaleDateString("en-GB"):"Set by hand";
+  document.querySelectorAll("#theme button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.theme));
+  setPill(sbOn()?"ok":"off");
+}
+
+/* =============== sheets =============== */
+function openSheet(html){ $("sheetBody").innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html; $("sx").onclick=closeSheet; $("scrim").classList.add("on"); $("sheet").classList.add("on"); }
+function closeSheet(){ $("scrim").classList.remove("on"); $("sheet").classList.remove("on"); }
+$("scrim").onclick=closeSheet;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
+
+function catPicker(list, cur){ return '<div class="pick" id="pk">'+list.map(c=>'<button type="button" data-c="'+esc(c)+'" class="'+(c===cur?'on':'')+'"><em>'+CATS[c].e+'</em>'+esc(c)+'</button>').join("")+'</div>'; }
+function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").forEach(b=>b.onclick=()=>{ pk.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); onPick(b.dataset.c); }); }
+
+function openTx(id){
+  const t=S.tx[id]; if(!t) return; let cat=t.cat;
+  const cats = t.type==="in"?["Income","Transfers","Other"]:[...SPEND,"Fixed deposit"];
+  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</div>'+
+    (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
+    catPicker(cats,cat)+
+    (t.type==="out"?'<label class="chk"><input type="checkbox" id="rem" checked> Always use this for '+esc(t.merchant)+'</label>':'')+
+    '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
+    '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
+  wirePicker(c=>cat=c);
+  $("tsave").onclick=()=>{
+    const n=Object.assign({},t,{cat,note:$("tnote").value.trim()}); put("tx",n);
+    if($("rem")&&$("rem").checked){ const k=t.merchant.toLowerCase(); S.rules[k]=cat; persist();
+      Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat}))); }
+    closeSheet(); toast("Saved");
+  };
+  $("tdel").onclick=()=>{ remove("tx",t.id); closeSheet(); toast("Deleted"); };
+}
+
+function openAdd(){
+  let type="out", cat="Other";
+  const draw=()=>{
+    const cats = type==="in"?["Income","Transfers","Other"]:SPEND;
+    if(!cats.includes(cat)) cat=type==="in"?"Income":"Other";
+    openSheet('<h2>Add entry</h2><div class="note">For cash, AUD salary, or anything without an SMS.</div><div style="height:12px"></div>'+
+      '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Income</button><button data-t="fd">Fixed deposit</button></div>'+
+      '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option'+(type==="in"?' selected':'')+'>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num"></div></label>'+
+      '<label class="field"><span>'+(type==="in"?"From":"Where")+'</span><input id="aname" placeholder="'+(type==="in"?"Salary":"Shop or place")+'"></label>'+
+      catPicker(cats,cat)+
+      '<label class="field"><span>Date</span><input id="adate" type="date" value="'+ymd(Date.now())+'"></label>'+
+      '<button class="btn full" id="asave">Add</button>');
+    $("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.t==="fd"){ openFd(); return; } type=b.dataset.t; draw(); });
+    wirePicker(c=>cat=c);
+    $("acur").value = type==="in"?"AUD":"LKR";
+    $("asave").onclick=()=>{
+      const amount=parseFloat($("aamt").value.replace(/,/g,"")); if(!(amount>0)) return toast("Enter an amount");
+      const cur=$("acur").value, d=$("adate").value?fromYmd($("adate").value):Date.now();
+      const ts= sameDay(d,Date.now())?Date.now():d;
+      put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, merchant:$("aname").value.trim()||(type==="in"?"Income":cat), ts, bank:"Manual", lkr:amount*rateFor(cur), fx:rateFor(cur)});
+      closeSheet(); toast("Added");
+    };
+  };
+  draw();
+}
+
+function openFd(id){
+  const f=id?S.fd[id]:{id:"f"+uid(), bank:"", amount:"", cur:"LKR", rate:"", start:ymd(Date.now()), months:12, note:""};
+  openSheet('<h2>'+(id?"Fixed deposit":"Add fixed deposit")+'</h2>'+
+    '<label class="field"><span>Bank</span><input id="fbank" value="'+esc(f.bank)+'" placeholder="Sampath"></label>'+
+    '<label class="field"><span>Amount</span><div class="amt"><select id="fcur"><option>LKR</option><option>AUD</option><option>USD</option></select><input id="famt" inputmode="decimal" class="num" value="'+esc(f.amount)+'"></div></label>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="field"><span>Interest % a year</span><input id="frate" inputmode="decimal" value="'+esc(f.rate||"")+'" placeholder="9.5"></label>'+
+    '<label class="field"><span>Months</span><input id="fmon" inputmode="numeric" value="'+esc(f.months)+'"></label></div>'+
+    '<label class="field"><span>Start date</span><input id="fstart" type="date" value="'+esc(f.start)+'"></label>'+
+    '<label class="field"><span>Note</span><input id="fnote" value="'+esc(f.note&&f.note!=="From SMS"?f.note:"")+'" placeholder="Optional"></label>'+
+    '<div class="btns"><button class="btn" id="fsave" style="flex:1">Save</button>'+(id?'<button class="btn soft" id="fdel">Close deposit</button>':'')+'</div>');
+  $("fcur").value=f.cur||"LKR";
+  $("fsave").onclick=()=>{
+    const amount=parseFloat(String($("famt").value).replace(/,/g,"")); if(!(amount>0)) return toast("Enter an amount");
+    put("fd",Object.assign({},f,{bank:$("fbank").value.trim()||"Bank", amount, cur:$("fcur").value, rate:parseFloat($("frate").value)||0, months:parseInt($("fmon").value)||12, start:$("fstart").value||ymd(Date.now()), note:$("fnote").value.trim()}));
+    closeSheet(); toast("Saved"); if(view!=="savings") go("savings");
+  };
+  if(id) $("fdel").onclick=()=>{ remove("fd",id); closeSheet(); toast("Deposit closed"); };
+}
+
+/* =============== toast =============== */
+let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("on"),2600); }
+
+/* =============== wiring =============== */
+function go(v){ view=v; document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
+  ["home","activity","savings","settings"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); }
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(b.dataset.v));
+$("fab").onclick=openAdd;
+$("prev").onclick=()=>{ month.setMonth(month.getMonth()-1); focusCat=null; render(); };
+$("next").onclick=()=>{ month.setMonth(month.getMonth()+1); focusCat=null; render(); };
+$("q").oninput=renderActivity;
+$("addFd").onclick=()=>openFd();
+
+$("sbSave").onclick=()=>{ const u=$("sbUrl").value.trim(), k=$("sbKey").value.trim();
+  if(!/^https:\/\/.+/.test(u)||k.length<20) return toast("Check the URL and key");
+  S.sb={url:u,key:k}; S.lastPull=""; Object.values(S.tx).forEach(t=>S.dirty["tx:"+t.id]=1); Object.values(S.fd).forEach(f=>S.dirty["fd:"+f.id]=1);
+  persist(); renderSettings(); sync(true); };
+$("sbSync").onclick=()=>sync(true);
+$("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
+
+$("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
+  const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
+  parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
+  $("paste").value=""; toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
+$("sample").onclick=()=>{ const d=new Date(), ds=String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(2);
+  $("paste").value=["Purchase at UBER TRIP for LKR 1,250.00 on "+ds+" from card ending #4417. Av.Bal LKR 84,320.50 - ComBank",
+  "Your A/C XXXX1234 debited LKR 6,480.00 at KEELLS SUPER NAWALA on "+ds+". Avl Bal LKR 77,840.50. Sampath Bank",
+  "Purchase at PIZZA HUT KANDY for LKR 3,900.00 on "+ds+" from card ending #4417. Av.Bal LKR 80,420.50 - ComBank",
+  "HNB: LKR 450,000.00 credited to A/C XXXX9087 from AVONET TECHNOLOGIES on "+ds+". Bal LKR 627,840.50",
+  "Your OTP is 482913. Do not share. ComBank"].join("\n\n"); toast("Sample ready. Tap Add messages."); };
+
+function saveRate(){ const a=parseFloat($("rateAud").value), u=parseFloat($("rateUsd").value);
+  if(a>0) S.rate.AUD=a; if(u>0) S.rate.USD=u; persist(); }
+$("rateAud").onchange=saveRate; $("rateUsd").onchange=saveRate;
+$("rateFetch").onclick=async()=>{ try{ const r=await (await fetch("https://open.er-api.com/v6/latest/LKR")).json();
+  if(!r.rates||!r.rates.AUD) throw 0; S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); renderSettings(); toast("Rates updated");
+  }catch(e){ toast("Couldn’t get rates. Type them in."); } };
+
+$("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"application/json"})); a.download="pocket-ledger-"+ymd(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
+$("impBtn").onclick=()=>$("imp").click();
+$("imp").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); let n=0;
+  ["tx","fd"].forEach(k=>Object.values(d[k]||{}).forEach(o=>{ const l=S[k][o.id]; if(!l||(o.u||0)>(l.u||0)){ S[k][o.id]=o; S.dirty[k+":"+o.id]=1; n++; } }));
+  Object.assign(S.rules,d.rules||{}); persist(); render(); queueSync(); toast("Restored "+n+" records"); }catch(err){ toast("That file isn’t a Pocket Ledger backup"); } e.target.value=""; };
+
+document.querySelectorAll("#theme button").forEach(b=>b.onclick=()=>{ S.theme=b.dataset.t; persist(); applyTheme(); renderSettings(); });
+function applyTheme(){ if(S.theme==="auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme",S.theme); }
+$("wipe").onclick=()=>{ if(!confirm("Delete all data on this phone? Cloud copy (if connected) stays.")) return; localStorage.removeItem(KEY); S=blank(); render(); toast("Deleted"); };
+
+window.addEventListener("hashchange",checkHash);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ sync(); checkHash(); } });
+applyTheme(); render(); checkHash(); sync(); setInterval(()=>sync(),60000);
+if(!S.rate.at) fetch("https://open.er-api.com/v6/latest/LKR").then(r=>r.json()).then(r=>{ if(r.rates&&r.rates.AUD){ S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); render(); } }).catch(()=>{});
+})();
+</script>
+</body>
+</html>
