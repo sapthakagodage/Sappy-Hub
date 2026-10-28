@@ -223,8 +223,12 @@ body:not(.in-travel) .tfab{display:none}
 .fromhome span{font-size:12px;font-weight:700;color:#A2A79B}
 .fromhome b{font-size:15px;font-weight:800;color:#8FDDFF;text-align:right}
 /* trip tiles with a photo */
-#trTrips{display:grid;gap:10px}
-.ttile{position:relative;display:block;width:100%;height:178px;border:0;border-radius:24px;overflow:hidden;background-size:cover;background-position:center;text-align:left;padding:0;color:#fff;box-shadow:var(--shadow)}
+#trTrips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#trTrips .empty{grid-column:1/-1}
+.tdot{position:absolute;top:10px;left:10px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center}
+.tname{position:absolute;left:12px;right:12px;bottom:11px;font-size:15px;font-weight:800;line-height:1.2;letter-spacing:-.01em;text-shadow:0 1px 8px rgba(0,0,0,.5);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ttile{position:relative;display:block;width:100%;aspect-ratio:1/1;border:0;border-radius:24px;overflow:hidden;background-size:cover;background-position:center;text-align:left;padding:0;color:#fff;box-shadow:var(--shadow)}
 .tshade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 30%,rgba(0,0,0,.75) 100%)}
 .ttype{position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 10px 5px 7px;color:#12140D;font-size:12px;font-weight:800}
 .ttype i{font-style:normal}
@@ -1204,6 +1208,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
     <h2 style="margin-top:0">Look · all apps</h2>
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
 
+    <h2>Maps (optional)</h2>
+    <div class="card">
+      <p class="note" style="margin-top:0">Maps work without a key. Add a free MapTiler key only if you want their map style.</p>
+      <label class="fl2" style="margin:0"><span>MapTiler key</span><input class="inp" id="mapKey" placeholder="Leave empty to use the free maps" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    </div>
+
     <h2>Cloud sync</h2>
     <div class="card">
       <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
@@ -1328,7 +1338,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.1.0";
+const APP_VERSION = "6.2.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1654,6 +1664,7 @@ async function sync(manual){
     }
     S.lastPull=maxT;
     if(live(S.cfg.profile) && S.cfg.profile.name) S.name=S.cfg.profile.name;
+    if(live(S.cfg.maps)) S.mapKey=S.cfg.maps.key||"";
     if(live(S.cfg.travel) && S.cfg.travel.home) S.travelHome=S.cfg.travel.home;
     if(live(S.cfg.accounts)){ S.tracked=Object.assign({},S.cfg.accounts.tracked||{}); S.topupRules=Object.assign({},S.cfg.accounts.topupRules||{}); }
     if(live(S.cfg.noti)) S.notiRead=Object.assign({},S.notiRead||{},S.cfg.noti.read||{});
@@ -2020,6 +2031,7 @@ function renderSavings(){
 
 /* ---------- settings ---------- */
 function renderSettings(){
+  if($("mapKey") && document.activeElement!==$("mapKey")) $("mapKey").value=S.mapKey||"";
   showLatest();
   $("ver").textContent="v"+APP_VERSION;
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
@@ -2406,8 +2418,21 @@ function loadLeaflet(){
     .then(()=>{ if(!window.L) throw new Error("map"); }).catch(e=>{ window.__lfp=null; throw e; });
   return window.__lfp;
 }
-function tileLayer(){ const light=document.documentElement.getAttribute("data-theme")==="light";
-  return L.tileLayer("https://{s}.basemaps.cartocdn.com/"+(light?"light_all":"dark_all")+"/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:"© OpenStreetMap © CARTO"}); }
+function tileLayer(){
+  const light=document.documentElement.getAttribute("data-theme")==="light";
+  const key=(S.mapKey||"").trim();
+  const P=[];
+  if(key) P.push({u:"https://api.maptiler.com/maps/"+(light?"streets-v2":"streets-v2-dark")+"/{z}/{x}/{y}.png?key="+encodeURIComponent(key),a:"© MapTiler © OpenStreetMap"});
+  P.push(light?{u:"https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",a:"Tiles © Esri"}
+              :{u:"https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",a:"Tiles © Esri",max:16});
+  P.push({u:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",a:"© OpenStreetMap"});
+  // a layer group that moves to the next provider if tiles fail to load
+  const grp=L.layerGroup(); let k=0, errs=0, cur=null;
+  const use=n=>{ if(cur) grp.removeLayer(cur); errs=0; const o=P[n];
+    cur=L.tileLayer(o.u,{maxZoom:19,maxNativeZoom:o.max||19,attribution:o.a,crossOrigin:true});
+    cur.on("tileerror",()=>{ if(++errs>=4 && k<P.length-1){ k++; use(k); } }); grp.addLayer(cur); };
+  use(0); return grp;
+}
 function hav(a,b){ const R=6371,r=x=>x*Math.PI/180, dLa=r(b[0]-a[0]), dLo=r(b[1]-a[1]);
   const h=Math.sin(dLa/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 function fmtDur(sec){ if(!(sec>0)) return "—"; const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return h?h+"h "+m+"m":m+" min"; }
@@ -2455,6 +2480,7 @@ function openTravel(){
   loadLeaflet().then(()=>{ initMap(); drawMap(); locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function initMap(){
+  if(LMAP && !document.getElementById("tMap").classList.contains("leaflet-container")) LMAP=null;
   if(LMAP){ [50,350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms)); return; }
   LMAP=L.map("tMap",{zoomControl:false,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(LMAP);
   LLAYER=L.layerGroup().addTo(LMAP); LMAP.fitBounds(LK); [350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms));
@@ -2483,7 +2509,7 @@ function renderTravel(){
   if(trYear!=="all" && !yrs.includes(+trYear)) trYear="all";
   const sel=all.filter(t=>trYear==="all"||tYear(t)===+trYear);
   const countries=new Set(sel.map(t=>t.cc).filter(Boolean)), foot=sel.filter(t=>t.type==="hike"||t.type==="walk").reduce((a,t)=>a+(t.dist||0),0);
-  $("trStats").innerHTML='<div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Km on foot</span><b class="num">'+fmt(foot,foot<100?1:0)+'</b></div>';
+  $("trStats").innerHTML='<div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Hikes</span><b class="num">'+sel.filter(t=>t.type==="hike").length+'</b></div>';
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
   $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(); });
   $("trTrips").innerHTML=sel.length?sel.map(tripTile).join(""):'<div class="empty" style="padding:16px"><b>No trips yet</b>Tap ＋ to add your first trip.</div>';
@@ -2505,7 +2531,7 @@ function miniMap(el, t){
 async function showFromHome(t){
   const box=$("tHome"); if(!box) return;
   const home=(S.travelHome&&S.travelHome.lat)?[S.travelHome.lat,S.travelHome.lng]:null;
-  if(!home){ box.innerHTML='<span>From home</span><button class="link" id="setHomeHere">Set home to my location</button>';
+  if(!home){ box.hidden=false; if($("tFromKm")){ $("tFromKm").textContent="—"; $("tFromMin").textContent="—"; } box.innerHTML='<span>From home</span><button class="link" id="setHomeHere">Set home to my location</button>';
     $("setHomeHere").onclick=()=>navigator.geolocation.getCurrentPosition(pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; persist(); put("cfg",{id:"travel",home:S.travelHome}); toast("Home set"); showFromHome(t); },()=>toast("Location not allowed")); return; }
   if(t.lat==null){ box.hidden=true; return; }
   const straight=hav(home,[t.lat,t.lng]);
@@ -2514,10 +2540,16 @@ async function showFromHome(t){
     if(d){ const n=Object.assign({},S.trip[t.id],{drive:d,driveFrom:home.join(",")}); put("trip",n); renderTravel(); } }
   if(!$("tHome")) return;
   $("tHome").innerHTML='<span>From home</span><b class="num">'+(d?fmt(d.km,d.km<100?1:0)+' km by road · '+fmtDur(d.min*60)+' drive':fmt(straight,0)+' km away (straight line)')+'</b>';
+  if($("tFromKm")){ $("tFromKm").textContent=d?fmt(d.km,d.km<100?1:0)+" km":fmt(straight,0)+" km"; $("tFromMin").textContent=d?fmtDur(d.min*60):"Flight"; $("tHome").hidden=true; }
 }
 /* ===== Sappy Travel v2: manual trips with one photo ===== */
 function tripLoc(t){ return t.loc || t.country || ""; }
 function tripTile(t){
+  const T0=TYPES[t.type]||TYPES.place;
+  const bg0=t.photo?'background-image:url('+t.photo+')':'background:linear-gradient(140deg,'+T0.c+' 0%,#23261F 115%)';
+  return '<button class="ttile" data-id="'+esc(t.id)+'" style="'+bg0+'"><span class="tshade"></span><span class="tdot" style="background:'+T0.c+'">'+tsvg(t.type,12)+'</span><span class="tname">'+esc(t.name)+'</span></button>';
+}
+function tripTileOld(t){
   const T=TYPES[t.type]||TYPES.place, when=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):(t.year||"");
   const chips=[t.dist?fmt(t.dist,t.dist<10?1:0)+" km":"", t.moving?fmtDur(t.moving):"", (t.dist&&t.moving&&t.type!=="drive")?fmtPace(t):""].filter(Boolean);
   const bg=t.photo?'background-image:url('+t.photo+')':'background:linear-gradient(135deg,'+T.c+' 0%,#23261F 120%)';
@@ -2536,9 +2568,10 @@ function openTrip(id){
       :'<div class="catHead"><span class="ic" style="background:'+T.c+'">'+tsvg(t.type,26)+'</span><div><h2>'+esc(t.name)+'</h2><div class="note" style="margin:0">'+T.name+' · '+esc(when)+'</div></div></div>')+
     (tripLoc(t)?'<div class="tloc">📍 '+esc(tripLoc(t))+'</div>':'')+
     '<div class="tdmap" id="tdMap"></div>'+
-    '<div class="tgrid"><div><span>Distance</span><b class="num">'+(t.dist?fmt(t.dist,t.dist<10?2:1)+' km':'—')+'</b></div><div><span>Time</span><b class="num">'+fmtDur(t.moving)+'</b></div>'+
-    '<div><span>'+(t.type==="drive"?"Average speed":"Average pace")+'</span><b class="num">'+fmtPace(t)+'</b></div><div><span>Year</span><b class="num">'+(tYear(t)||"—")+'</b></div></div>'+
-    '<div class="fromhome" id="tHome"><span>From home</span><b>…</b></div>'+
+    '<div class="tgrid"><div><span>Date</span><b>'+(t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"Not set")+'</b></div>'+
+    '<div><span>Time on trail</span><b class="num">'+fmtDur(t.moving)+'</b></div>'+
+    '<div><span>From home</span><b class="num" id="tFromKm">…</b></div><div><span>Drive time</span><b class="num" id="tFromMin">…</b></div></div>'+
+    '<div id="tHome" class="fromhome" hidden><span>From home</span><b>…</b></div>'+
     '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit</button><button class="btn soft" id="tDel">Delete</button></div>');
   miniMap($("tdMap"),t); showFromHome(t);
   $("tEdit").onclick=()=>openTripForm(t.id);
@@ -2553,7 +2586,7 @@ function openTripForm(id){
     '<label class="fl2"><span>Name</span><input class="inp" id="fName" value="'+esc(t.name||"")+'" placeholder="e.g. Ambuluwawa hike"></label>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Date</span><input class="inp" type="date" id="fDate" value="'+esc(t.date||"")+'"></label>'+
     '<label class="fl2"><span>Type</span><select class="inp" id="fType">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===t.type?' selected':'')+'>'+TYPES[k].name+'</option>').join("")+'</select></label></div>'+
-    '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px"><label class="fl2"><span>Distance (km)</span><input class="inp num" id="fDist" inputmode="decimal" data-plain="1" value="'+(t.dist||"")+'" placeholder="5.2"></label>'+
+    '<div style="font-size:13px;color:var(--soft);font-weight:600;margin:2px 0 6px">Time on the trail</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
     '<label class="fl2"><span>Hours</span><input class="inp num" id="fH" inputmode="numeric" data-plain="1" value="'+h+'" placeholder="2"></label>'+
     '<label class="fl2"><span>Minutes</span><input class="inp num" id="fM" inputmode="numeric" data-plain="1" value="'+m+'" placeholder="30"></label></div>'+
     '<div class="fl2"><span style="display:block;font-size:13px;color:var(--soft);margin-bottom:6px;font-weight:600">Photo (one)</span>'+
@@ -2570,7 +2603,7 @@ function openTripForm(id){
   $("fPhoto").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ t.photo=await compressPhoto(f); $("fPhotoBox").style.backgroundImage="url("+t.photo+")"; $("fPhotoBox").querySelector("span").textContent="Change photo"; }catch(_){ toast("Couldn’t read that photo"); } };
   $("fSave").onclick=()=>{
     const name=$("fName").value.trim(); if(!name) return toast("Add a name");
-    const dist=parseFloat(String($("fDist").value).replace(/,/g,""))||0, sec=((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
+    const dist=t.dist||0, sec=((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
     const date=$("fDate").value||"";
     put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,dist,moving:sec,dur:sec}));
     closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
@@ -2725,6 +2758,7 @@ function closeSettings(){
   if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); enterScreen(); }
 }
 $("hubSet").onclick=openSettings;
+$("mapKey").onchange=()=>{ S.mapKey=$("mapKey").value.trim(); persist(); put("cfg",{id:"maps",key:S.mapKey}); if(typeof LMAP!=="undefined" && LMAP){ try{ LMAP.remove(); }catch(e){} LMAP=null; } toast(S.mapKey?"Map key saved":"Using the free maps"); };
 document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=closeNoti;
 $("setBack").onclick=closeSettings;
 
