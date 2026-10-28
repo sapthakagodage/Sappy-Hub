@@ -112,8 +112,24 @@ button:active{transform:scale(.98)}
 .from{display:inline-flex;align-items:center;gap:8px;background:var(--lime);color:var(--on-lime);border-radius:999px;padding:7px 14px;margin:8px 0 6px;font-size:14px}
 .from span{font-weight:600;opacity:.7}
 .from b{font-weight:800}
-.swipeback{position:fixed;left:0;top:50%;transform:translate(-40px,-50%) scale(.6);width:44px;height:44px;border-radius:50%;background:var(--lime);color:var(--on-lime);
+.swipeback_unused{position:fixed;left:0;top:50%;transform:translate(-40px,-50%) scale(.6);width:44px;height:44px;border-radius:50%;background:var(--lime);color:var(--on-lime);
   display:grid;place-items:center;font-size:26px;font-weight:800;opacity:0;pointer-events:none;z-index:70;transition:opacity .15s}
+/* ===== motion: quick, subtle, professional ===== */
+:root{--ease:cubic-bezier(.2,.8,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes grow{from{clip-path:inset(0 100% 0 0 round 14px)}to{clip-path:inset(0 0 0 0 round 14px)}}
+@keyframes barup{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.rise{animation:rise .46s var(--ease) both;animation-delay:calc(var(--i,0) * 55ms)}
+.grow{animation:grow .75s var(--ease) both;animation-delay:calc(var(--i,0) * 60ms + 180ms)}
+.barup{transform-origin:bottom;animation:barup .7s var(--ease) both;animation-delay:calc(var(--i,0) * 60ms + 150ms)}
+.fadein{animation:fadein .35s var(--ease) both}
+.donut-wrap .seg{transition:stroke-dasharray .9s var(--ease),stroke-dashoffset .9s var(--ease)}
+.tab{transition:background .25s var(--ease),color .25s var(--ease)}
+.chip{transition:background .2s var(--ease),color .2s var(--ease)}
+.dragging{transition:none!important;will-change:transform;box-shadow:-18px 0 40px -12px rgba(0,0,0,.55)}
+.snap{transition:transform .26s var(--ease)!important}
+@media (prefers-reduced-motion: reduce){.rise,.grow,.barup,.fadein{animation:none!important}.donut-wrap .seg,.snap{transition:none!important}}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -517,7 +533,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.13.0";
+const APP_VERSION = "5.14.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -982,12 +998,12 @@ function renderHome(){
 
   // lime hero: spent on top, balance + came in below
   $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"});
-  $("cVal").textContent=fmt(Math.round(net));
+  $("cVal").textContent=fmt(Math.round(net)); $("cVal").dataset.count=Math.round(net);
   $("cSub").textContent=out.length?out.length+" payments · "+(back?"friends paid back "+rs(back):rs(net/days)+" a day"):"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
   $("insBadge").textContent=badge;
   const fx=balances().filter(b=>b.cur!=="LKR"), accs=mainAccounts();
-  $("inc").textContent=fmt(Math.round(inc));
+  $("inc").textContent=fmt(Math.round(inc)); $("inc").dataset.count=Math.round(inc);
   document.querySelector(".hc-flow").style.gridTemplateColumns="1fr";
   $("hcBals").innerHTML=accs.map(accTile).join("");
   $("hcBals").style.gridTemplateColumns=accs.length>1?"1fr 1fr":"1fr";
@@ -1002,7 +1018,7 @@ function renderHome(){
   const gap=rows.length>1?7:0;
   rows.forEach(([c,v])=>{ const len=Math.max(.5,(v/spent)*C-gap);
     svg+='<circle class="seg" cx="60" cy="60" r="46" stroke="'+CATS[c].c+'" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'"/>'; off+=(v/spent)*C; });
-  $("donut").innerHTML=svg; $("dVal").textContent=short(net);
+  $("donut").innerHTML=svg; $("dVal").textContent=short(net); $("dVal").dataset.count=Math.round(net);
   if(rows.length){ const [c,v]=rows[0];
     $("dSide").innerHTML='<div class="top">Top category<b>'+esc(c)+'</b></div><div class="top">That’s<b>'+Math.round(v/spent*100)+'% of spending</b></div><div class="tip">'+rows.length+' categor'+(rows.length>1?'ies':'y')+' this month</div>'; }
   const maxP=rows.length?rows[0][1]/spent:1;
@@ -1303,11 +1319,11 @@ let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add(
 
 /* =============== wiring =============== */
 function go(v){ if(sheetOpen) closeSheet(); view=v; document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
-  ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); }
+  ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("fab").onclick=openAdd;
-$("prev").onclick=()=>{ month.setMonth(month.getMonth()-1); focusCat=null; render(); };
-$("next").onclick=()=>{ month.setMonth(month.getMonth()+1); focusCat=null; render(); };
+$("prev").onclick=()=>{ setTimeout(enterScreen,0); month.setMonth(month.getMonth()-1); focusCat=null; render(); };
+$("next").onclick=()=>{ setTimeout(enterScreen,0); month.setMonth(month.getMonth()+1); focusCat=null; render(); };
 $("q").oninput=renderActivity;
 
 $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
@@ -1443,7 +1459,7 @@ let notiFrom="hub";
 function openNoti(){
   if(sheetOpen) closeSheet();
   notiFrom=document.body.classList.contains("in-hub")?"hub":"app";
-  document.body.classList.remove("in-hub","in-set"); document.body.classList.add("in-noti"); renderNoti(); window.scrollTo(0,0);
+  document.body.classList.remove("in-hub","in-set"); document.body.classList.add("in-noti"); renderNoti(); window.scrollTo(0,0); enterScreen();
 }
 function closeNoti(){ document.body.classList.remove("in-noti"); showHub(); }
 function renderNoti(){
@@ -1459,6 +1475,44 @@ function renderNoti(){
   $("notiBody").querySelectorAll(".nrow").forEach((b,ix)=>b.onclick=()=>{ const i=it.find(x=>x.kind===b.dataset.k&&x.id===b.dataset.id); if(i&&i.d<=1) markRead([i]); renderNoti(); if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
   if($("readAll")) $("readAll").onclick=()=>{ markRead(unread); renderNoti(); toast("All read"); };
   if($("fixMat")) $("fixMat").onclick=()=>{ document.body.classList.remove("in-noti"); openApp("pocket"); go("savings"); };
+}
+
+
+/* =============== motion =============== */
+const REDUCED=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function screenRoot(){
+  const b=document.body.classList;
+  if(b.contains("in-hub")) return $("hubView");
+  if(b.contains("in-set")) return $("setView");
+  if(b.contains("in-noti")) return $("notiView");
+  return $("v-"+view);
+}
+function playClass(el,cls,i){ el.classList.remove(cls); void el.offsetWidth; el.style.setProperty("--i",i); el.classList.add(cls);
+  el.addEventListener("animationend",function h(){ el.classList.remove(cls); el.removeEventListener("animationend",h); }); }
+function countUp(el){
+  const to=parseFloat(el.dataset.count); if(!isFinite(to)) return;
+  const pre=el.dataset.prefix||"", dec=+(el.dataset.dec||0);
+  if(REDUCED){ el.textContent=pre+fmt(to,dec); return; }
+  const t0=performance.now(), dur=750;
+  (function step(now){ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=pre+fmt(to*e,dec); if(k<1) requestAnimationFrame(step); })(t0);
+}
+function enterScreen(){
+  if(REDUCED) return;
+  const root=screenRoot(); if(!root) return;
+  const items=[...root.children].filter(x=>!x.hidden && x.offsetParent!==null);
+  // header of the app too
+  if(!document.body.classList.contains("in-hub")&&!document.body.classList.contains("in-set")&&!document.body.classList.contains("in-noti")) playClass(document.querySelector(".bar"),"fadein",0);
+  items.slice(0,12).forEach((el,i)=>playClass(el,"rise",i));
+  // lists inside a card: rows rise one after another
+  root.querySelectorAll(".list .tx, .nrow, .sub, .fd").forEach((el,i)=>{ if(i<14) playClass(el,"rise",Math.min(i,10)*0.6+2); });
+  // charts
+  root.querySelectorAll(".pb .bar3").forEach((el,i)=>playClass(el,"grow",i));
+  root.querySelectorAll(".tb .col i").forEach((el,i)=>playClass(el,"barup",i));
+  root.querySelectorAll("#donut .seg").forEach(c=>{ const da=c.getAttribute("stroke-dasharray"); const C=2*Math.PI*46;
+    c.style.transition="none"; c.setAttribute("stroke-dasharray","0 "+C); void c.getBoundingClientRect();
+    requestAnimationFrame(()=>{ c.style.transition=""; c.setAttribute("stroke-dasharray",da); }); });
+  root.querySelectorAll("[data-count]").forEach(countUp);
 }
 
 /* =============== Sappy Hub =============== */
@@ -1484,12 +1538,12 @@ function renderHub(){
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
   $("hFeat").innerHTML = feat ? '<div class="h-feat" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><button class="go" data-app="'+feat.id+'" aria-label="Open '+esc(feat.name)+'">›</button></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
-    (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num">'+(a.unset?'—':rs(a.balance))+'</b></div>'));
+    (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num" data-count="'+Math.round(sp)+'" data-prefix="Rs ">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num"'+(a.unset?'':' data-count="'+Math.round(a.balance)+'" data-prefix="Rs "')+'>'+(a.unset?'—':rs(a.balance))+'</b></div>'));
       return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</div>' : "";
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
-function showHub(){ if(sheetOpen) closeSheet(); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); }
+function showHub(){ if(sheetOpen) closeSheet(); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); enterScreen(); }
 function openApp(id){
   if(id==="pocket"){ document.body.classList.remove("in-hub"); go("home"); }
 }
@@ -1499,11 +1553,11 @@ function openSettings(){
   if(sheetOpen) closeSheet();
   setFrom=document.body.classList.contains("in-hub")?"hub":"app";
   document.body.classList.remove("in-hub"); document.body.classList.add("in-set");
-  renderSettings(); window.scrollTo(0,0);
+  renderSettings(); window.scrollTo(0,0); enterScreen();
 }
 function closeSettings(){
   document.body.classList.remove("in-set");
-  if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); }
+  if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); enterScreen(); }
 }
 $("hubSet").onclick=openSettings;
 document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=closeNoti;
@@ -1523,13 +1577,23 @@ function goBack(){
   showHub();
 }
 (function(){
-  let sx=0, sy=0, on=false, dx=0;
-  const ind=document.createElement("div"); ind.className="swipeback"; ind.textContent="‹"; document.body.appendChild(ind);
-  document.addEventListener("touchstart",e=>{ const t=e.touches[0]; on = t.clientX<28 && !document.body.classList.contains("in-hub"); sx=t.clientX; sy=t.clientY; dx=0; },{passive:true});
-  document.addEventListener("touchmove",e=>{ if(!on) return; const t=e.touches[0]; dx=t.clientX-sx; const dy=Math.abs(t.clientY-sy);
-    if(dy>40 && dy>dx){ on=false; ind.style.opacity=0; return; }
-    const p=Math.max(0,Math.min(1,dx/90)); ind.style.opacity=p; ind.style.transform="translate("+(Math.min(dx,90)-40)+"px,-50%) scale("+(0.6+0.4*p)+")"; },{passive:true});
-  document.addEventListener("touchend",()=>{ if(on && dx>80) goBack(); on=false; ind.style.opacity=0; ind.style.transform="translate(-40px,-50%) scale(.6)"; });
+  let sx=0, sy=0, on=false, dx=0, el=null, decided=false;
+  const pageEl=()=>{ const b=document.body.classList; if(sheetOpen) return null; if(b.contains("in-set")) return $("setView"); if(b.contains("in-noti")) return $("notiView"); if(b.contains("in-hub")) return null; return $("appView"); };
+  document.addEventListener("touchstart",e=>{ const t=e.touches[0]; on = t.clientX<28 && !document.body.classList.contains("in-hub"); sx=t.clientX; sy=t.clientY; dx=0; decided=false; el=on?pageEl():null; },{passive:true});
+  document.addEventListener("touchmove",e=>{ if(!on) return; const t=e.touches[0]; dx=Math.max(0,t.clientX-sx); const dy=Math.abs(t.clientY-sy);
+    if(!decided){ if(dy>12 && dy>dx){ on=false; return; } if(dx>8){ decided=true; if(el){ el.classList.add("dragging"); } } }
+    if(decided && el){ el.style.transform="translate3d("+dx+"px,0,0)"; }
+  },{passive:true});
+  document.addEventListener("touchend",()=>{
+    if(!on){ return; } on=false;
+    if(!el){ if(dx>80) goBack(); return; }
+    const W=window.innerWidth, go=dx>W*0.28;
+    el.classList.remove("dragging"); el.classList.add("snap");
+    el.style.transform = go ? "translate3d("+W+"px,0,0)" : "translate3d(0,0,0)";
+    const done=()=>{ el.removeEventListener("transitionend",done); el.classList.remove("snap"); el.style.transform="";
+      if(go) goBack(); };
+    el.addEventListener("transitionend",done); setTimeout(()=>{ if(el.classList.contains("snap")) done(); },320);
+  });
 })();
 let hiddenAt=0;
 function freshStart(){
