@@ -95,6 +95,23 @@ button:active{transform:scale(.98)}
 .hc-accts div{white-space:nowrap;font-size:12px;font-weight:800;color:var(--on-lime);background:rgba(18,20,13,.09);border-radius:999px;padding:6px 10px}
 .updb{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:55;border:0;border-radius:999px;
   background:var(--lime);color:var(--on-lime);padding:12px 18px;font-weight:700;font-size:14px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);white-space:nowrap}
+.accrow{width:100%;background:none;border:0;text-align:left;color:inherit}
+.setbal{font-size:13px;font-weight:800;color:var(--lime)}
+:root[data-theme="light"] .setbal{color:#4F7A0E}
+.trk{font-style:normal;font-size:11px;font-weight:800;background:var(--card2);border-radius:999px;padding:2px 7px;margin-left:4px}
+.hc-bals{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.hc-bal2{border:0;text-align:left;background:var(--on-lime);color:#F3F5EE;border-radius:var(--r-md);padding:11px 12px;min-width:0}
+.hc-bal2 .bn{display:block;font-size:12px;font-weight:700;color:#A2A79B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc-bal2 b{display:block;font-size:clamp(15px,4.6vw,19px);font-weight:800;color:var(--lime);white-space:nowrap;letter-spacing:-.02em;margin:2px 0}
+.hc-bal2 .bs{display:block;font-size:11px;font-weight:600;color:#8A8F84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc-bal2.set b{color:#F3F5EE;font-size:15px}
+.topbox{background:var(--card2);border-radius:var(--r-md);padding:12px;margin:12px 0}
+.topbox .tq{font-size:13px;font-weight:700;color:var(--soft);margin-bottom:8px}
+.topb{display:block;width:100%;border:2px solid var(--line);background:var(--card);border-radius:999px;padding:11px 14px;font-weight:800;text-align:left;margin-top:6px}
+.topb.on{border-color:var(--lime);background:var(--lime);color:var(--on-lime)}
+.from{display:inline-flex;align-items:center;gap:8px;background:var(--lime);color:var(--on-lime);border-radius:999px;padding:7px 14px;margin:8px 0 6px;font-size:14px}
+.from span{font-weight:600;opacity:.7}
+.from b{font-weight:800}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -417,10 +434,9 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
       <div class="hc-amt num"><small>Rs</small><span id="cVal">0</span></div>
       <div class="hc-sub" id="cSub"></div>
       <div class="hc-flow">
-        <div><span>Balance</span><b class="num pos" id="balNow">—</b></div>
         <div><span>Came in</span><b class="num" id="inc">0</b></div>
-        <div id="fFdRow"><span>To FD</span><b class="num" id="fFd">0</b></div>
       </div>
+      <div class="hc-bals" id="hcBals"></div>
       <div class="hc-accts" id="balAccts"></div>
     </div>
 
@@ -444,6 +460,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
       <div class="trend" id="trend"></div>
     </div>
     <div class="search"><input id="q" type="search" placeholder="Search" aria-label="Search"></div>
+    <div class="chips" id="achips" style="margin-bottom:8px"></div>
     <div class="chips" id="fchips"></div>
     <div id="allList"></div>
   </section>
@@ -462,6 +479,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
       <h3>All my money</h3>
       <div class="bal"><span class="k">In bank accounts</span><span class="num" id="nwBank">Rs 0</span></div>
       <div id="nwAccts"></div>
+      <button class="btn soft full" id="addAcc" style="margin:8px 0 6px">＋ Add account</button>
       <div class="bal"><span class="k">In fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
       <div class="fl tot" style="margin-top:4px"><span>Total</span><b class="num" id="nw">Rs 0</b></div>
       <p class="note" style="margin-bottom:0">Fixed deposit money has already left your bank balance, so nothing is counted twice.</p>
@@ -498,7 +516,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.8.1";
+const APP_VERSION = "5.11.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -598,7 +616,7 @@ function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
   return blank();
 }
-function blank(){ return {notiRead:{}, name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
+function blank(){ return {tracked:{}, topupRules:{}, notiRead:{}, name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
 const live = o => o && !o.del;
 
@@ -611,7 +629,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 8;
+const PARSER_VERSION = 10;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -710,15 +728,18 @@ function parseSms(raw){
   if(am){ const t=am[1].match(/(\d{2})$/); if(t) acct=t[1]; }
   if(!acct){ const cm=s.match(/card(?:\s*(?:no|ending|number|ending with))?[^0-9]{0,14}\d{2}(\d{2})\b/i); if(cm) acct=cm[1]; }
 
-  // bank
+  // bank — decided from the hotline / sender text, never from the Reason or Location (e.g. a transfer TO ComBank)
   let bank="";
-  if(/combank|commercial bank|\bcbc\b/i.test(s)) bank="ComBank";
-  else if(/sampath/i.test(s)) bank="Sampath";
-  else if(/\bhnb\b|hatton/i.test(s)) bank="HNB";
-  else if(/\bboc\b|bank of ceylon/i.test(s)) bank="BOC";
-  else if(/^dear cardholder,.*has been authori[sz]ed on your (debit|credit) card ending/i.test(s)) bank="ComBank";
-  else if(/commbank|commonwealth|\bcba\b/i.test(s)) bank="CommBank AU";
-  if(!bank){ const digits=s.replace(/[^\d]/g,""); for(const k in HOTLINES) if(digits.includes(k)){ bank=HOTLINES[k]; break; } }
+  { const digits=s.replace(/[^\d]/g,""); for(const k in HOTLINES) if(digits.includes(k)){ bank=HOTLINES[k]; break; } }
+  const own=s.replace(/\breason\s*[:\-].*?(?=\s+(?:bal|avl|av\.|available|protect|hotline|call|do not)\b|$)/i," ").replace(/\blocation\s*:[^,]*/i," ").replace(/\bpurchase at .*? for /i," ");
+  if(!bank){
+    if(/combank|commercial bank|\bcbc\b/i.test(own)) bank="ComBank";
+    else if(/sampath/i.test(own)) bank="Sampath";
+    else if(/\bhnb\b|hatton/i.test(own)) bank="HNB";
+    else if(/\bboc\b|bank of ceylon/i.test(own)) bank="BOC";
+    else if(/commbank|commonwealth|\bcba\b/i.test(own)) bank="CommBank AU";
+    else if(/^dear cardholder,.*has been authori[sz]ed on your (debit|credit) card ending/i.test(s)) bank="ComBank";
+  }
   if(!bank && acct && S.bankByAcct && S.bankByAcct[acct]) bank=S.bankByAcct[acct];
   if(!bank) bank="Bank";
   else if(acct && S.bankByAcct) S.bankByAcct[acct]=S.bankByAcct[acct]||bank;
@@ -733,8 +754,9 @@ function guessCat(t){
   if(t.isFd) return "Fixed deposit";
   const key=t.merchant.toLowerCase();
   if(S.rules[key]) return S.rules[key];
-  if(t.type==="in"){ if(/own ?a\/?c|own account/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
+  if(t.type==="in"){ if(/own ?a\/?c|own account|\bfcy\b|conversion/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
   if(t.isTransfer) return "Transfers";
+  if(/\bfcy\b|conversion|currency exch|foreign exch/i.test(t.where||"")) return "Transfers";
   const hay=(t.merchant+" "+(t.where||"")).toLowerCase();
   if(/uber ?eats|pickme ?food/.test(hay)) return "Eating out";
   for(const n of MATCH_ORDER) if(CAT_RE[n] && CAT_RE[n].test(hay)) return n;
@@ -753,6 +775,7 @@ function ingest(raw){
   }
   if(S.tx[p.id] && live(S.tx[p.id])) return {r:"dup",p};
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
+  const tk=topupFor(p); if(tk){ p.topup=tk; p.cat="Transfers"; const [tb,ta]=tk.split("|"); p.merchant="Top-up to "+tb+(ta?" ••"+ta:""); p.nameSet=true; }
   put("tx",p);
   if(p.isFd && p.type==="out"){
     put("fd",{id:"f"+p.id, bank:p.bank, amount:p.amount, cur:p.cur, rate:0, start:ymd(p.ts), months:12, note:"From SMS"});
@@ -800,6 +823,7 @@ async function sync(manual){
     const inbox=await sbf("inbox?select=id,raw&order=id.asc&limit=500");
     if(inbox&&inbox.length){
       for(const r of inbox){ if(ingest(r.raw).r==="added") added++; }
+      if(added) linkOwnTransfers();
       await sbf("inbox?id=lte."+inbox[inbox.length-1].id,{method:"DELETE"});
     }
     // 2. pull changes from other devices
@@ -815,6 +839,7 @@ async function sync(manual){
     }
     S.lastPull=maxT;
     if(live(S.cfg.profile) && S.cfg.profile.name) S.name=S.cfg.profile.name;
+    if(live(S.cfg.accounts)){ S.tracked=Object.assign({},S.cfg.accounts.tracked||{}); S.topupRules=Object.assign({},S.cfg.accounts.topupRules||{}); }
     if(live(S.cfg.noti)) S.notiRead=Object.assign({},S.notiRead||{},S.cfg.noti.read||{});
     if(live(S.cfg.rules)){ Object.assign(S.rules,S.cfg.rules.map||{}); Object.assign(S.bankByAcct,S.cfg.rules.acct||{}); }
     // 3. push local changes
@@ -859,9 +884,32 @@ function reparseAll(force){
     if(!live(S.tx[p.id])){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
     S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1;
   });
-  S.pv=PARSER_VERSION; persist(); render(); queueSync();
+  S.pv=PARSER_VERSION; persist(); linkOwnTransfers(); render(); queueSync();
   if(force||rescued) toast(rescued?"Recovered "+rescued+" message"+(rescued>1?"s":""):"Messages re-read");
   return {fixed,rescued};
+}
+
+
+/* =============== own-account transfers (e.g. AUD ••15 -> LKR ••19) =============== */
+function ownAccounts(){ const k=new Set(); txList().forEach(t=>{ if(t.src==="sms"&&t.bank&&t.bank!=="Bank"&&t.acct) k.add(accKey(t)); }); Object.keys(S.tracked||{}).forEach(x=>{ if(!S.tracked[x].del) k.add(x); }); return k; }
+function linkOwnTransfers(){
+  const own=ownAccounts(), all=txList().filter(t=>t.src==="sms"&&own.has(accKey(t)));
+  const outs=all.filter(t=>t.type==="out"&&t.cat!=="Fixed deposit"&&!t.topup), ins=all.filter(t=>t.type==="in");
+  const used=new Set(); let n=0;
+  ins.forEach(i=>{
+    if(i.catSet && i.cat!=="Transfers") return;
+    // a debit from a DIFFERENT own account within 30 minutes
+    const o=outs.filter(o=>!used.has(o.id) && accKey(o)!==accKey(i) && Math.abs(o.ts-i.ts)<=30*60000 && !(o.catSet&&o.cat!=="Transfers"))
+               .sort((a,b)=>Math.abs(a.ts-i.ts)-Math.abs(b.ts-i.ts))[0];
+    if(!o) return; used.add(o.id);
+    const nm=t=>t.bank+(t.acct?" ••"+t.acct:"")+(t.cur!=="LKR"?" ("+t.cur+")":"");
+    const ni=Object.assign({},i,{cat:"Transfers",own:true}), no=Object.assign({},o,{cat:"Transfers",own:true});
+    if(!i.nameSet) ni.merchant="Transfer from "+nm(o);
+    if(!o.nameSet) no.merchant="Transfer to "+nm(i);
+    if(JSON.stringify(ni)!==JSON.stringify(i)){ put("tx",ni); n++; }
+    if(JSON.stringify(no)!==JSON.stringify(o)){ put("tx",no); n++; }
+  });
+  return n;
 }
 
 /* =============== link intake (#sms=…) =============== */
@@ -882,7 +930,7 @@ function checkHash(){
 
 /* =============== view state =============== */
 let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
-let focusCat=null, filter="All";
+let focusCat=null, filter="All", accFilter="all";
 const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
 function renderSms(){ const sk=Object.values(S.skip).filter(live).length; $("skipRow").hidden=!sk; $("skipD").textContent=sk+" SMS couldn’t be read. Send one to Claude to improve reading."; }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
@@ -934,15 +982,15 @@ function renderHome(){
   $("cSub").textContent=out.length?out.length+" payments · "+(back?"friends paid back "+rs(back):rs(net/days)+" a day"):"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
   $("insBadge").textContent=badge;
-  const bals=balances(), lk=bals.filter(b=>b.cur==="LKR"), fx=bals.filter(b=>b.cur!=="LKR");
-  $("balNow").textContent = lk.length ? fmt(lk.reduce((a,b)=>a+b.balance,0)) : "—";
+  const fx=balances().filter(b=>b.cur!=="LKR"), accs=mainAccounts();
   $("inc").textContent=fmt(Math.round(inc));
-  $("fFd").textContent=fmt(Math.round(fdOut)); $("fFdRow").hidden=!fdOut;
-  document.querySelector(".hc-flow").style.gridTemplateColumns=fdOut?"repeat(3,1fr)":"repeat(2,1fr)";
-  const newest=bals.reduce((a,b)=>!a||b.ts>a.ts?b:a,null);
-  $("balAccts").innerHTML = (newest?'<div>Balance updated '+new Date(newest.ts).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+'</div>':'')
-    + fx.map(b=>'<div>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' · '+esc(b.cur)+' '+fmt(b.balance,2)+'</div>').join("");
-  $("balAccts").hidden=!bals.length;
+  document.querySelector(".hc-flow").style.gridTemplateColumns="1fr";
+  $("hcBals").innerHTML=accs.map(accTile).join("");
+  $("hcBals").style.gridTemplateColumns=accs.length>1?"1fr 1fr":"1fr";
+  $("hcBals").hidden=!accs.length;
+  $("hcBals").querySelectorAll("[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
+  $("balAccts").innerHTML=fx.map(b=>'<div>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' · '+esc(b.cur)+' '+fmt(b.balance,2)+'</div>').join("");
+  $("balAccts").hidden=!fx.length;
 
   // donut + colourful bars
   $("whereCard").hidden=$("whereHead").hidden=!rows.length;
@@ -960,10 +1008,74 @@ function renderHome(){
   $("legend").querySelectorAll(".pb").forEach(b=>b.onclick=()=>openCat(b.dataset.c));
 
 }
+function accKey(t){ return t.bank+"|"+(t.acct||""); }
+function trackedBalance(key){
+  const tr=(S.tracked||{})[key]; if(!tr||tr.del) return null;
+  let bal=tr.amount, last=tr.at;
+  txList().forEach(t=>{ if(t.ts<=tr.at) return;
+    if(accKey(t)===key && t.balance==null){ bal += (t.type==="in"?1:-1)*lkrOf(t); last=Math.max(last,t.ts); }
+    if(t.topup===key){ bal += lkrOf(t); last=Math.max(last,t.ts); } });
+  return {bal,last};
+}
 function balances(){
   const map={};
   txList().forEach(t=>{ if(t.balance==null) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
-  return Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")})).sort((a,b)=>b.lkr-a.lkr);
+  const out=Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")}));
+  Object.keys(S.tracked||{}).forEach(k=>{ const r=trackedBalance(k); if(!r) return; const [bank,acct]=k.split("|");
+    out.push({bank,acct,cur:"LKR",balance:r.bal,ts:r.last,lkr:r.bal,tracked:true,key:k}); });
+  return out.sort((a,b)=>b.lkr-a.lkr);
+}
+function mainAccounts(){
+  const b=balances().filter(x=>x.cur==="LKR").sort((a,c)=>(a.tracked?1:0)-(c.tracked?1:0)||c.lkr-a.lkr);
+  const u=untrackedAccounts().map(a=>({bank:a.bank,acct:a.acct,key:a.key,unset:true}));
+  return b.concat(u);
+}
+function accTile(a){
+  const nm=esc(a.bank)+(a.acct?' ••'+esc(a.acct):'');
+  if(a.unset) return '<button class="hc-bal2 set" data-key="'+esc(a.key)+'"><span class="bn">'+nm+'</span><b>Set balance</b><span class="bs">Tap once to start</span></button>';
+  const when=new Date(a.ts).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+  return '<button class="hc-bal2"'+(a.tracked?' data-key="'+esc(a.key)+'"':'')+'><span class="bn">'+nm+'</span><b class="num">Rs '+fmt(a.balance)+'</b><span class="bs">'+(a.tracked?'Estimated · tap to fix':when)+'</span></button>';
+}
+/* card-only accounts (no "Bal" in their SMS) that are not tracked yet */
+function untrackedAccounts(){
+  const withBal=new Set(), seen={};
+  txList().forEach(t=>{ if(t.src!=="sms"||!t.bank||t.bank==="Bank") return; const k=accKey(t); if(t.balance!=null) withBal.add(k); else seen[k]=t; });
+  return Object.keys(seen).filter(k=>!withBal.has(k) && !(S.tracked&&S.tracked[k]&&!S.tracked[k].del)).map(k=>({key:k,bank:seen[k].bank,acct:seen[k].acct}));
+}
+function saveAccounts(){ persist(); put("cfg",{id:"accounts",tracked:Object.assign({},S.tracked),topupRules:Object.assign({},S.topupRules)}); }
+function openSetBal(key){
+  const [bank,acct]=key.split("|"), cur=trackedBalance(key);
+  openSheet('<h2>'+esc(bank)+(acct?' ••'+esc(acct):'')+' balance</h2>'+
+    '<p class="note">This bank’s SMS don’t show a balance. Enter what’s in the account now. After that, card payments are taken off and top-ups from your main account are added automatically.</p>'+
+    '<label class="field"><span>Balance now (Rs)</span><input id="tbal" inputmode="decimal" class="num" value="'+(cur?Math.round(cur.bal*100)/100:"")+'" placeholder="0.00"></label>'+
+    '<div class="btns"><button class="btn" id="tbSave" style="flex:1">Save</button>'+(cur?'<button class="btn soft" id="tbOff">Stop tracking</button>':'')+'</div>');
+  $("tbSave").onclick=()=>{ const v=parseFloat(String($("tbal").value).replace(/,/g,"")); if(!(v>=0)) return toast("Enter the balance");
+    S.tracked[key]={amount:v,at:Date.now()}; saveAccounts(); closeSheet(); render(); toast("Balance set"); };
+  if($("tbOff")) $("tbOff").onclick=()=>{ S.tracked[key]={del:true}; saveAccounts(); closeSheet(); render(); };
+}
+function openAddAcc(){
+  openSheet('<h2>Add account</h2><p class="note">For an account whose SMS don’t show a balance, like your ComBank card account. Enter the balance from its banking app once. After that, card payments are taken off and top-ups added automatically.</p>'+
+    '<label class="field"><span>Bank</span><select id="aaBank"><option>ComBank</option><option>Sampath</option><option>BOC</option><option>HNB</option><option>Other</option></select></label>'+
+    '<label class="field"><span>Last 2 digits of the card or account</span><input id="aaNo" inputmode="numeric" maxlength="4" class="num" value="41" placeholder="41"></label>'+
+    '<label class="field"><span>Balance now (Rs)</span><input id="aaBal" inputmode="decimal" class="num" placeholder="0.00"></label>'+
+    '<button class="btn full" id="aaSave">Save</button>');
+  $("aaSave").onclick=()=>{
+    const bank=$("aaBank").value, no=String($("aaNo").value).replace(/\D/g,"").slice(-2), v=parseFloat(String($("aaBal").value).replace(/,/g,""));
+    if(!(v>=0)) return toast("Enter the balance");
+    const key=bank+"|"+no; S.tracked[key]={amount:v,at:Date.now()}; if(no) S.bankByAcct[no]=S.bankByAcct[no]||bank;
+    saveAccounts(); saveRules(); closeSheet(); render(); toast(bank+(no?" ••"+no:"")+" added");
+  };
+}
+/* is this HNB debit a top-up to a tracked side account? */
+function topupFor(t){
+  if(t.type!=="out" || t.balance==null) return "";
+  const keys=Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del); if(!keys.length) return "";
+  const r=(S.topupRules||{})[t.merchant.toLowerCase()]; if(r && keys.includes(r)) return r;
+  const raw=(t.raw||"")+" "+(t.where||"");
+  for(const k of keys){ const b=k.split("|")[0];
+    if(b==="ComBank" && /combank|commercial|\bcmb\b|\bcbc\b/i.test(raw)) return k;
+    if(b!=="ComBank" && new RegExp("\\b"+b+"\\b","i").test(raw)) return k; }
+  return "";
 }
 function timeAgo(ts){ const d=Math.floor((Date.now()-ts)/864e5); return d<=0?"Today":d===1?"Yesterday":d+" days ago"; }
 
@@ -995,11 +1107,21 @@ function renderActivity(){
   $("trend").innerHTML=ms.map((x,i)=>'<button class="tb'+(i===5?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
   $("trend").querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const d=ms[+b.dataset.i].d; month=new Date(d.getFullYear(),d.getMonth(),1); render(); });
 
+  // accounts used this month, with what was spent from each
+  const mtx=txList().filter(inMonth), accs={};
+  mtx.forEach(t=>{ if(!t.bank||t.bank==="Bank"||t.bank==="Manual") return; const k=accKey(t); accs[k]=accs[k]||{k,name:t.bank+(t.acct?" ••"+t.acct:""),out:0};
+    if(t.type==="out"&&!NOT_SPENDING.has(t.cat)) accs[k].out+=lkrOf(t); });
+  const al=Object.values(accs).sort((a,b)=>b.out-a.out);
+  if(accFilter!=="all" && !accs[accFilter]) accFilter="all";
+  $("achips").hidden=al.length<2;
+  $("achips").innerHTML='<button class="chip'+(accFilter==="all"?' on':'')+'" data-a="all">All accounts</button>'+al.map(a=>'<button class="chip'+(accFilter===a.k?' on':'')+'" data-a="'+esc(a.k)+'">'+esc(a.name)+' · '+rs(a.out)+'</button>').join("");
+  $("achips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ accFilter=b.dataset.a; renderActivity(); });
   const opts=["All","Spending","Income","Paid back","Fixed deposit"];
   $("fchips").innerHTML=opts.map(o=>'<button class="chip'+(o===filter?' on':'')+'" data-f="'+esc(o)+'">'+esc(o)+'</button>').join("");
   $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
   const q=$("q").value.trim().toLowerCase();
   let list=txList().filter(inMonth);
+  if(accFilter!=="all") list=list.filter(t=>accKey(t)===accFilter);
   if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
   else if(filter==="Paid back") list=list.filter(t=>t.cat==="Paid back");
@@ -1021,7 +1143,9 @@ function renderSavings(){
   const fds=Object.values(S.fd).filter(live).sort((a,b)=>fdValue(a).end-fdValue(b).end);
   const bank=balances().reduce((s,b)=>s+b.lkr,0), fdt=fds.reduce((s,f)=>s+fdValue(f).p,0);
   $("nw").textContent=rs(bank+fdt); $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
-  $("nwAccts").innerHTML=balances().map(b=>'<div class="bal" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+'</span><span class="num note" style="margin:0">'+(b.cur==="LKR"?"Rs "+fmt(b.balance):esc(b.cur)+" "+fmt(b.balance,2)+" ≈ "+rs(b.lkr))+'</span></div>').join("");
+  $("nwAccts").innerHTML=balances().map(b=>'<'+(b.tracked?'button data-key="'+esc(b.key)+'" ':'div ')+'class="bal accrow" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+(b.tracked?' <i class="trk">tracked</i>':'')+'</span><span class="num note" style="margin:0">'+(b.cur==="LKR"?"Rs "+fmt(b.balance):esc(b.cur)+" "+fmt(b.balance,2)+" ≈ "+rs(b.lkr))+'</span></'+(b.tracked?'button':'div')+'>').join("")
+    + untrackedAccounts().map(a=>'<button class="bal accrow" data-key="'+esc(a.key)+'" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><span class="setbal">Set balance ›</span></button>').join("");
+  $("nwAccts").querySelectorAll("button[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
   $("fdCount").textContent=fds.length?fds.length+" active":"";
   $("fdList").innerHTML = fds.length ? fds.map(f=>{ const v=fdValue(f);
     return '<button class="fd" data-id="'+esc(f.id)+'"><div class="top"><span>'+esc(f.bank)+(f.note&&f.note!=="From SMS"?' · '+esc(f.note):'')+'</span><span class="num">'+rs(v.p)+'</span></div>'+
@@ -1077,24 +1201,38 @@ function openCat(c){
   el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
 }
 
+function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
 function openTx(id){
   const t=S.tx[id]; if(!t) return; let cat=t.cat;
+  const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
+  let topSel=t.topup||"";
   const cats = t.type==="in"?["Income","Paid back","Transfers","Other"]:[...SPEND,"Fixed deposit"];
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
-  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+(t.acct?' · ••'+esc(t.acct):'')+'</div>'+
+  const accName=(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
+  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
     '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
+    (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
+  document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
+    document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
+    if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); } });
   $("tsave").onclick=()=>{
     const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
     const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
     if(name!==t.merchant) n.nameSet=true;
+    let askBal="";
+    if(topOpts.length){
+      if(topSel){ n.topup=topSel; n.cat="Transfers"; n.catSet=true; S.topupRules[t.merchant.toLowerCase()]=topSel;
+        if(!S.tracked[topSel] || S.tracked[topSel].del) askBal=topSel; }
+      else if(t.topup){ delete n.topup; delete S.topupRules[t.merchant.toLowerCase()]; }
+      saveAccounts(); }
     if(bank!==t.bank){ n.bank=bank; n.bankSet=true;
       if(t.acct){ S.bankByAcct[t.acct]=bank; saveRules(); Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.acct===t.acct&&!o.bankSet&&o.bank!==bank).forEach(o=>put("tx",Object.assign({},o,{bank}))); } }
     put("tx",n);
@@ -1104,6 +1242,7 @@ function openTx(id){
     }
     if($("rem")&&$("rem").checked){ const k=name.toLowerCase(); S.rules[k]=cat; saveRules();
       Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
+    if(askBal){ toast("Saved. Now set the "+askBal.split("|")[0]+" balance"); setTimeout(()=>openSetBal(askBal),350); return; }
     closeSheet(); toast("Saved");
   };
   $("tdel").onclick=()=>{ remove("tx",t.id); if(live(S.fd["f"+t.id])) remove("fd","f"+t.id); closeSheet(); toast("Deleted"); };
@@ -1181,7 +1320,7 @@ function openPaste(){
   $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
     const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
     parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
-    closeSheet(); toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
+    linkOwnTransfers(); closeSheet(); toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
 }
 
 $("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
@@ -1272,6 +1411,7 @@ function addToCalendar(x){
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
 $("subAdd").onclick=()=>openSub();
+$("addAcc").onclick=openAddAcc;
 
 
 /* =============== notifications (subscriptions + FD maturities) =============== */
@@ -1334,7 +1474,8 @@ function renderHub(){
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
   $("hFeat").innerHTML = feat ? '<button class="h-feat" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
-    (feat.id==="pocket"?'<div class="h-stats"><div><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div><div><span>Balance now</span><b class="num">'+(bals.length?rs(bal):"—")+'</b></div></div>':'')+'</button>' : "";
+    (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num">'+(a.unset?'—':rs(a.balance))+'</b></div>'));
+      return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</button>' : "";
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
