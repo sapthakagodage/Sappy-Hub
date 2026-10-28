@@ -151,13 +151,24 @@ button:active{transform:scale(.98)}
   background:var(--lime);color:var(--on-lime);display:grid;place-items:center;box-shadow:0 12px 28px -8px rgba(0,0,0,.6),0 0 0 4px var(--bg);transition:transform .2s var(--ease)}
 .fabfloat svg{width:26px;height:26px}
 .fabfloat:active{transform:scale(.94)}
-body.in-hub .fabfloat, body.in-set .fabfloat, body.in-noti .fabfloat, body.typing .fabfloat{display:none}
+body.in-hub .fabfloat, body.in-set .fabfloat, body.in-noti .fabfloat, body.typing .fabfloat, body.on-savings .fabfloat{display:none}
 @media (min-width:560px){.fabfloat{right:calc(50% - 250px)}}
 .wrap{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))!important}
 /* no visible scroll bars (scrolling still works) */
 html,body,.sheet,.raw,textarea,.chips,.insights,.accs{scrollbar-width:none;-ms-overflow-style:none}
 html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar,.raw::-webkit-scrollbar,textarea::-webkit-scrollbar,*::-webkit-scrollbar{display:none;width:0;height:0;background:transparent}
 .sheet{overflow-x:hidden;border-top-left-radius:32px;border-top-right-radius:32px;-webkit-mask-image:-webkit-radial-gradient(white,black)}
+/* Savings section heads + highlighted totals */
+.shead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.shead h3{margin:0}
+.shead .cnt{font-size:13px;font-weight:600;color:var(--faint);margin-left:6px}
+.addbtn{width:36px;height:36px;border-radius:50%;border:0;background:var(--lime);color:var(--on-lime);display:grid;place-items:center;flex:none}
+.addbtn svg{width:18px;height:18px}
+.addbtn:active{transform:scale(.92)}
+.sumtile{background:var(--on-lime);border-radius:var(--r-md);padding:12px 14px;margin-bottom:6px}
+.sumtile span{display:block;font-size:12px;font-weight:700;color:#A2A79B}
+.sumtile b{display:block;font-size:24px;font-weight:800;color:var(--lime);letter-spacing:-.02em;margin-top:2px}
+:root[data-theme="light"] .sumtile{background:#12140D}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -522,21 +533,19 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 
   <section id="v-savings" hidden>
     <div class="card">
-      <h3>Bank accounts</h3>
-      <div class="bal"><span class="k">Total in banks</span><span class="num" id="nwBank">Rs 0</span></div>
+      <div class="shead"><h3>Bank accounts</h3><button class="addbtn" id="addAcc" aria-label="Add account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div class="sumtile"><span>Total in banks</span><b class="num" id="nwBank">Rs 0</b></div>
       <div id="nwAccts"></div>
-      <button class="btn soft full" id="addAcc" style="margin:8px 0 6px">＋ Add account</button>
     </div>
     <div class="card">
-      <h3>Subscriptions <span class="r num" id="subTotal"></span></h3>
+      <div class="shead"><h3>Subscriptions</h3><button class="addbtn" id="subAdd" aria-label="Add subscription"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div class="sumtile" id="subTile"><span>Per month</span><b class="num" id="subTotal">Rs 0</b></div>
       <div id="subList"></div>
-      <button class="btn soft full" id="subAdd" style="margin-top:12px">Add subscription</button>
     </div>
     <div class="card">
-      <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
-      <div class="bal" style="padding-top:0"><span class="k">Total in fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
+      <div class="shead"><h3>Fixed deposits <span class="cnt" id="fdCount"></span></h3><button class="addbtn" id="fdAddPast" aria-label="Add a past fixed deposit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div class="sumtile"><span>Total in fixed deposits</span><b class="num" id="nwFd">Rs 0</b></div>
       <div id="fdList"></div>
-      <button class="btn soft full" id="fdAddPast" style="margin-top:12px">＋ Add a past fixed deposit</button>
     </div>
   </section>
 
@@ -562,7 +571,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.17.1";
+const APP_VERSION = "5.18.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1234,10 +1243,11 @@ function renderSavings(){
   const fds=Object.values(S.fd).filter(live).sort((a,b)=>fdValue(a).end-fdValue(b).end);
   const bank=balances().reduce((s,b)=>s+b.lkr,0), fdt=fds.reduce((s,f)=>s+fdValue(f).p,0);
   $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
+  $("nwBank").dataset.count=Math.round(bank); $("nwBank").dataset.prefix="Rs "; $("nwFd").dataset.count=Math.round(fdt); $("nwFd").dataset.prefix="Rs ";
   $("nwAccts").innerHTML=balances().map(b=>'<'+(b.tracked?'button data-key="'+esc(b.key)+'" ':'div ')+'class="bal accrow" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+(b.tracked?' <i class="trk">tracked</i>':'')+'</span><span class="num note" style="margin:0">'+(b.cur==="LKR"?"Rs "+fmt(b.balance):esc(b.cur)+" "+fmt(b.balance,2)+" ≈ "+rs(b.lkr))+'</span></'+(b.tracked?'button':'div')+'>').join("")
     + untrackedAccounts().map(a=>'<button class="bal accrow" data-key="'+esc(a.key)+'" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><span class="setbal">Set balance ›</span></button>').join("");
   $("nwAccts").querySelectorAll("button[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
-  $("fdCount").textContent=fds.length?fds.length+" active":"";
+  $("fdCount").textContent=fds.length?"· "+fds.length:"";
   $("fdList").innerHTML = fds.length ? fds.map(f=>{ const v=fdValue(f);
     return '<button class="fd" data-id="'+esc(f.id)+'"><div class="top"><span>'+esc(f.bank)+(f.note&&f.note!=="From SMS"?' · '+esc(f.note):'')+'</span><span class="num">'+rs(v.p)+'</span></div>'+
       '<div class="sub"><span>'+(f.maturity?(+f.rate?f.rate+'% · ':'')+'matures '+new Date(v.end).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):'<b style="color:var(--lime)">Tap to add maturity date</b>')+'</span><span class="num">→ '+rs(v.maturity)+'</span></div>'+
@@ -1389,7 +1399,7 @@ function openFd(id){
 let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("on"),2600); }
 
 /* =============== wiring =============== */
-function go(v){ if(sheetOpen) closeSheet(); view=v; document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
+function go(v){ if(sheetOpen) closeSheet(); view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("fab").onclick=openAdd;
@@ -1455,7 +1465,7 @@ function renderSubAlert(){
 function renderSubs(){
   const list=subsSorted();
   const perMonth=list.reduce((a,o)=>a+subLkr(o.x)/(o.x.cycle==="yearly"?12:1),0);
-  $("subTotal").textContent=list.length?rs(perMonth)+" / month":"";
+  $("subTotal").textContent=rs(perMonth); $("subTotal").dataset.count=Math.round(perMonth); $("subTotal").dataset.prefix="Rs "; $("subTile").hidden=!list.length;
   $("subList").innerHTML=list.length?list.map(o=>{ const dd=daysUntil(o.n);
     return '<button class="sub'+(dd<=1?' due':'')+'" data-id="'+esc(o.x.id)+'"><span class="si">'+esc(o.x.name.trim().charAt(0).toUpperCase())+'</span><span class="sm"><div class="sn">'+esc(o.x.name)+'</div><div class="sd">'+(o.x.cycle==="yearly"?"Yearly":"Monthly")+' · renews '+(w=>/^\d/.test(w)?w:w.toLowerCase())(whenText(o.n))+'</div></span><span class="sa num">'+subMoney(o.x)+(o.x.cur!=="LKR"?'<small>≈ '+rs(subLkr(o.x))+'</small>':'')+'</span></button>'; }).join("")
     :'<div class="note">Add Google, CapCut and others. You’ll get a reminder the day before they renew.</div>';
@@ -1676,7 +1686,7 @@ function freshStart(){
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-set","in-noti");
   month=new Date(); month.setDate(1); month.setHours(0,0,0,0); focusCat=null; filter="All"; accFilter="all";
-  view="home"; ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!=="home");
+  view="home"; document.body.classList.remove("on-savings"); ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!=="home");
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v==="home"?"true":"false"));
   showHub();
 }
