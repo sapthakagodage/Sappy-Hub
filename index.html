@@ -112,6 +112,8 @@ button:active{transform:scale(.98)}
 .from{display:inline-flex;align-items:center;gap:8px;background:var(--lime);color:var(--on-lime);border-radius:999px;padding:7px 14px;margin:8px 0 6px;font-size:14px}
 .from span{font-weight:600;opacity:.7}
 .from b{font-weight:800}
+.swipeback{position:fixed;left:0;top:50%;transform:translate(-40px,-50%) scale(.6);width:44px;height:44px;border-radius:50%;background:var(--lime);color:var(--on-lime);
+  display:grid;place-items:center;font-size:26px;font-weight:800;opacity:0;pointer-events:none;z-index:70;transition:opacity .15s}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -324,7 +326,7 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 .h-feat::after{content:"";position:absolute;right:-50px;top:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.45),rgba(255,255,255,0) 65%)}
 .h-feat .row1{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
 .h-feat .ico{width:48px;height:48px;border-radius:16px;background:rgba(18,20,13,.1);display:grid;place-items:center}
-.h-feat .go{width:40px;height:40px;border-radius:50%;background:var(--on-lime);color:var(--lime);display:grid;place-items:center;font-size:20px;font-weight:800}
+.h-feat .go{border:0;cursor:pointer;width:46px;height:46px;font-size:24px!important;border-radius:50%;background:var(--on-lime);color:var(--lime);display:grid;place-items:center;font-size:20px;font-weight:800}
 .h-feat .nm{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:18px 0 2px;position:relative;z-index:1}
 .h-feat .tg{font-size:14px;font-weight:600;opacity:.65;position:relative;z-index:1}
 .h-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;position:relative;z-index:1}
@@ -413,7 +415,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 
     <h2>App</h2>
     <div class="card">
-      <div class="row" style="padding-top:0;border-top:0"><div><div class="k">Version</div><div class="d">Sappy Hub <span id="ver"></span></div></div><button class="btn soft" id="updBtn">Check now</button></div>
+      <div class="row" style="padding-top:0;border-top:0"><div><div class="k">Version</div><div class="d">Sappy Hub <span id="ver"></span><span id="verLatest"></span></div></div><button class="btn soft" id="updBtn">Check now</button></div>
     </div>
   </section>
 </div>
@@ -515,7 +517,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.11.2";
+const APP_VERSION = "5.13.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -527,13 +529,13 @@ async function checkUpdate(VKEY, CUR, VURL, manual){
     // retry at most once a minute (GitHub may still be publishing), always with a brand-new address
     let last={}; try{ last=JSON.parse(localStorage.getItem("sappy.upd")||"{}"); }catch(e){}
     const recent = last.v===want && Date.now()-(last.at||0) < 60000;
-    if(recent && !manual){ showUpdBanner(want); return true; }
+    if(recent && !manual){ return true; }   // tried a moment ago; try again next launch, no banner
     localStorage.setItem("sappy.upd",JSON.stringify({v:want,at:Date.now()}));
     location.replace(location.pathname+"?v="+encodeURIComponent(want)+"&t="+Date.now()+location.hash);
     return true;
   }catch(e){ return null; }
 }
-function showUpdBanner(v){
+function showUpdBanner_unused(v){
   if(document.getElementById("updBanner")) return;
   const b=document.createElement("button"); b.id="updBanner"; b.className="updb";
   b.innerHTML='<b>Update ready (v'+v+')</b> · tap to update';
@@ -1161,6 +1163,7 @@ function renderSavings(){
 
 /* ---------- settings ---------- */
 function renderSettings(){
+  showLatest();
   $("ver").textContent="v"+APP_VERSION;
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
   if(document.activeElement!==$("uname")) $("uname").value=S.name||"";
@@ -1315,6 +1318,7 @@ $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value
   ["tx","fd","sub","cfg"].forEach(kind=>Object.values(S[kind]||{}).forEach(o=>{ if(o&&o.id) S.dirty[kind+":"+o.id]=1; }));
   persist(); renderSettings(); sync(true); };
 $("sbSync").onclick=()=>sync(true);
+async function showLatest(){ try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); const v=(await r.json()).app; $("verLatest").textContent=v&&v!==APP_VERSION?" · latest on GitHub: v"+v:" · up to date"; }catch(e){ $("verLatest").textContent=""; } }
 $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("app",APP_VERSION,"version.json",true); if(r===false) toast("You have the latest version"); else if(r===null) toast("Couldn’t check. Are you online?"); };
 $("skipRetry").onclick=()=>{ reparseAll(true); render(); };
 $("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
@@ -1479,9 +1483,9 @@ function renderHub(){
   $("hVer").textContent = APP_VERSION;
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
-  $("hFeat").innerHTML = feat ? '<button class="h-feat" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
+  $("hFeat").innerHTML = feat ? '<div class="h-feat" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><button class="go" data-app="'+feat.id+'" aria-label="Open '+esc(feat.name)+'">›</button></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
     (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num">'+(a.unset?'—':rs(a.balance))+'</b></div>'));
-      return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</button>' : "";
+      return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</div>' : "";
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
@@ -1508,6 +1512,25 @@ $("uname").onchange=()=>{ S.name=$("uname").value.trim(); persist(); put("cfg",{
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate("app",APP_VERSION,"version.json"); });
+/* ===== swipe from the left edge = back (like iPhone apps) ===== */
+function goBack(){
+  if(sheetOpen){ closeSheet(); return; }
+  const b=document.body.classList;
+  if(b.contains("in-set")){ closeSettings(); return; }
+  if(b.contains("in-noti")){ closeNoti(); return; }
+  if(b.contains("in-hub")) return;
+  if(view!=="home"){ go("home"); return; }
+  showHub();
+}
+(function(){
+  let sx=0, sy=0, on=false, dx=0;
+  const ind=document.createElement("div"); ind.className="swipeback"; ind.textContent="‹"; document.body.appendChild(ind);
+  document.addEventListener("touchstart",e=>{ const t=e.touches[0]; on = t.clientX<28 && !document.body.classList.contains("in-hub"); sx=t.clientX; sy=t.clientY; dx=0; },{passive:true});
+  document.addEventListener("touchmove",e=>{ if(!on) return; const t=e.touches[0]; dx=t.clientX-sx; const dy=Math.abs(t.clientY-sy);
+    if(dy>40 && dy>dx){ on=false; ind.style.opacity=0; return; }
+    const p=Math.max(0,Math.min(1,dx/90)); ind.style.opacity=p; ind.style.transform="translate("+(Math.min(dx,90)-40)+"px,-50%) scale("+(0.6+0.4*p)+")"; },{passive:true});
+  document.addEventListener("touchend",()=>{ if(on && dx>80) goBack(); on=false; ind.style.opacity=0; ind.style.transform="translate(-40px,-50%) scale(.6)"; });
+})();
 let hiddenAt=0;
 function freshStart(){
   if(sheetOpen) closeSheet();
