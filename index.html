@@ -132,6 +132,19 @@ button:active{transform:scale(.98)}
 @keyframes quickin{from{opacity:.4;transform:translateX(-18px)}to{opacity:1;transform:none}}
 .quickin{animation:quickin .2s var(--ease) both}
 @media (prefers-reduced-motion: reduce){.rise,.grow,.barup,.fadein{animation:none!important}.donut-wrap .seg,.snap{transition:none!important}}
+.fl2{display:block;margin:0 0 12px}
+.fl2 span{display:block;font-size:13px;color:var(--soft);margin-bottom:6px;font-weight:600}
+.inp{display:block;box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:14px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--card2);color:var(--ink);font:inherit;font-size:16px;line-height:1.3;-webkit-appearance:none;appearance:none}
+.soon{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:11px 14px;margin-bottom:8px;box-shadow:var(--shadow);border-left:4px solid var(--violet)}
+.soon.isfd{border-left-color:#7FD6FF}
+.soon.today{border-left-color:var(--lime)}
+.soon .si2{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none;font-weight:800;color:#12140D}
+.soon .tx2{flex:1;min-width:0}
+.soon .tx2 b{display:block;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.soon .tx2 span{font-size:12px;color:var(--soft);font-weight:600}
+.soon .wn{font-size:12px;font-weight:800;white-space:nowrap;background:var(--card2);border-radius:999px;padding:5px 9px}
+.soon.today .wn,.soon.tom .wn{background:var(--lime);color:#12140D}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -413,13 +426,13 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
     <h2>Cloud sync</h2>
     <div class="card">
       <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
-      <details id="sbBox">
-        <summary>Connect Supabase (free)</summary>
-        <p class="note">Keeps every record safe in the cloud.</p>
-        <label class="field"><span>Project URL</span><input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
-        <label class="field"><span>API key (anon or publishable)</span><input id="sbKey" placeholder="eyJ… or sb_publishable_…" autocomplete="off" autocapitalize="off"></label>
-        <div class="btns"><button class="btn" id="sbSave">Connect</button><button class="btn soft" id="sbSync">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
-      </details>
+      <div class="row" style="border-top:1px solid var(--line)"><div><div class="k">Supabase connection</div><div class="d">Project URL and API key</div></div><button class="btn soft" id="sbOpen">Edit</button></div>
+      <div id="sbHolder" hidden><div id="sbForm">
+        <label class="fl2"><span>Project URL</span><input class="inp" id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+        <label class="fl2"><span>API key (anon or publishable)</span><input class="inp" id="sbKey" placeholder="eyJ… or sb_publishable_…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+        <button class="btn full" id="sbSave" style="margin-top:6px">Connect</button>
+        <div class="btns"><button class="btn soft" id="sbSync" style="flex:1">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
+      </div></div>
     </div>
 
     <h2>Backup</h2>
@@ -448,6 +461,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 
   <!-- HOME -->
   <section id="v-home">
+    <div id="soonBox"></div>
     <div class="hero-card">
       <div class="hc-top"><span class="hc-label" id="spLabel">Spent this month</span><span class="hc-badge" id="insBadge"></span></div>
       <div class="hc-amt num"><small>Rs</small><span id="cVal">0</span></div>
@@ -533,7 +547,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.14.1";
+const APP_VERSION = "5.15.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -848,7 +862,8 @@ async function sync(manual){
     step="downloading your records";
     let q="items?select=id,kind,data,updated_at&order=updated_at.asc&limit=5000";
     if(S.lastPull){ const t=new Date(new Date(S.lastPull).getTime()-5000).toISOString(); q+="&updated_at=gt."+encodeURIComponent(t); }
-    const rows=await sbf(q)||[];
+    let rows=[];
+    for(let off=0; off<200000; off+=1000){ const part=await sbf(q.replace("limit=5000","limit=1000")+"&offset="+off)||[]; rows=rows.concat(part); if(part.length<1000) break; }
     let maxT=S.lastPull, changed=false;
     for(const r of rows){
       if(!r || !r.data || typeof r.data!=="object" || !r.data.id || !S[r.kind]) continue;
@@ -982,7 +997,18 @@ function monthSpend(y,m){
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
+function renderSoon(){
+  const it=notiItems().filter(i=>i.d<=7);
+  const show=it.slice(0,3);
+  $("soonBox").innerHTML=show.map(i=>'<button class="soon'+(i.kind==="fd"?' isfd':'')+(i.d===0?' today':i.d===1?' tom':'')+'" data-k="'+i.kind+'" data-id="'+esc(i.id)+'">'+
+    '<span class="si2" style="background:'+(i.kind==="fd"?CATS["Fixed deposit"].c:"var(--violet)")+'">'+(i.kind==="fd"?icon("Fixed deposit",18):esc(i.letter))+'</span>'+
+    '<span class="tx2"><b>'+esc(i.title)+'</b><span>'+esc(i.line)+'</span></span><span class="wn">'+(i.d===0?"Today":i.d===1?"Tomorrow":"In "+i.d+" days")+'</span></button>').join("")+
+    (it.length>3?'<button class="link" id="soonMore" style="margin:-2px 4px 10px">+'+(it.length-3)+' more in Notifications</button>':'');
+  $("soonBox").querySelectorAll(".soon").forEach(b=>b.onclick=()=>{ if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
+  if($("soonMore")) $("soonMore").onclick=()=>{ document.body.classList.add("in-hub"); openNoti(); };
+}
 function renderHome(){
+  renderSoon();
   const all=txList(), mt=all.filter(inMonth);
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
@@ -1190,13 +1216,16 @@ function renderSettings(){
 
 /* =============== sheets =============== */
 let sheetOpen=false, lockY=0;
+function rescueSb(){ const f=$("sbForm"), h=$("sbHolder"); if(f&&h&&!h.contains(f)) h.appendChild(f); }
 function openSheet(html){
+  rescueSb();
   $("sheetBody").innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html; $("sx").onclick=closeSheet;
   $("sheet").scrollTop=0;
   if(!sheetOpen){ lockY=window.scrollY; Object.assign(document.body.style,{position:"fixed",top:(-lockY)+"px",left:"0",right:"0"}); sheetOpen=true; }
   $("scrim").classList.add("on"); $("sheet").classList.add("on");
 }
 function closeSheet(){
+  setTimeout(rescueSb,350);
   $("scrim").classList.remove("on"); $("sheet").classList.remove("on");
   if(sheetOpen){ Object.assign(document.body.style,{position:"",top:"",left:"",right:""}); window.scrollTo(0,lockY); sheetOpen=false; }
 }
@@ -1334,7 +1363,8 @@ $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value
   if(S.sb.url===u && S.sb.key===k){ sync(true); return; }
   S.sb={url:u,key:k}; S.lastPull="";
   ["tx","fd","sub","cfg"].forEach(kind=>Object.values(S[kind]||{}).forEach(o=>{ if(o&&o.id) S.dirty[kind+":"+o.id]=1; }));
-  persist(); renderSettings(); sync(true); };
+  persist(); renderSettings(); if(sheetOpen) closeSheet(); sync(true); };
+$("sbOpen").onclick=()=>{ openSheet('<h2>Cloud sync</h2><p class="note">From Supabase → Project Settings → Data API. The URL ends with .supabase.co</p><div id="sbSlot"></div>'); $("sbSlot").appendChild($("sbForm")); };
 $("sbSync").onclick=()=>sync(true);
 async function showLatest(){ try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); const v=(await r.json()).app; $("verLatest").textContent=v&&v!==APP_VERSION?" · latest on GitHub: v"+v:" · up to date"; }catch(e){ $("verLatest").textContent=""; } }
 $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("app",APP_VERSION,"version.json",true); if(r===false) toast("You have the latest version"); else if(r===null) toast("Couldn’t check. Are you online?"); };
