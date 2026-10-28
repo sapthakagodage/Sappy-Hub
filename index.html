@@ -272,6 +272,13 @@ body:not(.in-travel) .tfab{display:none}
 .fm-t span{font-size:12px;color:var(--soft);font-weight:600}
 .fm-go{border:0;background:var(--card2);color:var(--ink);width:34px;height:34px;border-radius:50%;font-size:20px;font-weight:800;flex:none}
 #tMap{cursor:zoom-in}
+/* toast: completely hidden when not showing */
+.toast{transform:translate(-50%,calc(-100% - 120px))!important;opacity:0;visibility:hidden;box-shadow:none;
+  transition:transform .35s var(--ease),opacity .25s var(--ease),visibility 0s .35s!important}
+.toast.on{transform:translate(-50%,0)!important;opacity:1;visibility:visible;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);
+  transition:transform .35s var(--ease),opacity .2s var(--ease),visibility 0s!important}
+/* drawer: no shadow or edge left behind when closed */
+.sheet:not(.on){box-shadow:none}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1360,7 +1367,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.3.0";
+const APP_VERSION = "6.3.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
