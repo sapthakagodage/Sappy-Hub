@@ -476,13 +476,10 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 
   <section id="v-savings" hidden>
     <div class="card">
-      <h3>All my money</h3>
-      <div class="bal"><span class="k">In bank accounts</span><span class="num" id="nwBank">Rs 0</span></div>
+      <h3>Bank accounts</h3>
+      <div class="bal"><span class="k">Total in banks</span><span class="num" id="nwBank">Rs 0</span></div>
       <div id="nwAccts"></div>
       <button class="btn soft full" id="addAcc" style="margin:8px 0 6px">＋ Add account</button>
-      <div class="bal"><span class="k">In fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
-      <div class="fl tot" style="margin-top:4px"><span>Total</span><b class="num" id="nw">Rs 0</b></div>
-      <p class="note" style="margin-bottom:0">Fixed deposit money has already left your bank balance, so nothing is counted twice.</p>
     </div>
     <div class="card">
       <h3>Subscriptions <span class="r num" id="subTotal"></span></h3>
@@ -491,6 +488,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
     </div>
     <div class="card">
       <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
+      <div class="bal" style="padding-top:0"><span class="k">Total in fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
       <div id="fdList"></div>
     </div>
   </section>
@@ -516,7 +514,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.11.0";
+const APP_VERSION = "5.11.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1017,9 +1015,10 @@ function trackedBalance(key){
     if(t.topup===key){ bal += lkrOf(t); last=Math.max(last,t.ts); } });
   return {bal,last};
 }
+function fdAccounts(){ const a=new Set(); txList().forEach(t=>{ if(t.cat==="Fixed deposit"){ const m=(t.merchant||"").match(/••\s?(\d{2})/); if(m) a.add(m[1]); } }); return a; }
 function balances(){
-  const map={};
-  txList().forEach(t=>{ if(t.balance==null) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
+  const map={}, fdA=fdAccounts();
+  txList().forEach(t=>{ if(t.balance==null || (t.acct && fdA.has(t.acct))) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
   const out=Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")}));
   Object.keys(S.tracked||{}).forEach(k=>{ const r=trackedBalance(k); if(!r) return; const [bank,acct]=k.split("|");
     out.push({bank,acct,cur:"LKR",balance:r.bal,ts:r.last,lkr:r.bal,tracked:true,key:k}); });
@@ -1040,7 +1039,8 @@ function accTile(a){
 function untrackedAccounts(){
   const withBal=new Set(), seen={};
   txList().forEach(t=>{ if(t.src!=="sms"||!t.bank||t.bank==="Bank") return; const k=accKey(t); if(t.balance!=null) withBal.add(k); else seen[k]=t; });
-  return Object.keys(seen).filter(k=>!withBal.has(k) && !(S.tracked&&S.tracked[k]&&!S.tracked[k].del)).map(k=>({key:k,bank:seen[k].bank,acct:seen[k].acct}));
+  const fdA=fdAccounts();
+  return Object.keys(seen).filter(k=>!fdA.has(k.split("|")[1]) && !withBal.has(k) && !(S.tracked&&S.tracked[k]&&!S.tracked[k].del)).map(k=>({key:k,bank:seen[k].bank,acct:seen[k].acct}));
 }
 function saveAccounts(){ persist(); put("cfg",{id:"accounts",tracked:Object.assign({},S.tracked),topupRules:Object.assign({},S.topupRules)}); }
 function openSetBal(key){
@@ -1142,7 +1142,7 @@ function renderSavings(){
   renderSubs();
   const fds=Object.values(S.fd).filter(live).sort((a,b)=>fdValue(a).end-fdValue(b).end);
   const bank=balances().reduce((s,b)=>s+b.lkr,0), fdt=fds.reduce((s,f)=>s+fdValue(f).p,0);
-  $("nw").textContent=rs(bank+fdt); $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
+  $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
   $("nwAccts").innerHTML=balances().map(b=>'<'+(b.tracked?'button data-key="'+esc(b.key)+'" ':'div ')+'class="bal accrow" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+(b.tracked?' <i class="trk">tracked</i>':'')+'</span><span class="num note" style="margin:0">'+(b.cur==="LKR"?"Rs "+fmt(b.balance):esc(b.cur)+" "+fmt(b.balance,2)+" ≈ "+rs(b.lkr))+'</span></'+(b.tracked?'button':'div')+'>').join("")
     + untrackedAccounts().map(a=>'<button class="bal accrow" data-key="'+esc(a.key)+'" style="padding:6px 0 6px 14px;border-top:0"><span class="note" style="margin:0">'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><span class="setbal">Set balance ›</span></button>').join("");
   $("nwAccts").querySelectorAll("button[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
