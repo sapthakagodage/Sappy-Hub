@@ -93,6 +93,21 @@ button:active{transform:scale(.98)}
 .hc-bal b{display:block;font-size:22px;font-weight:800;color:var(--lime);letter-spacing:-.02em;white-space:nowrap}
 .hc-accts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .hc-accts div{white-space:nowrap;font-size:12px;font-weight:800;color:var(--on-lime);background:rgba(18,20,13,.09);border-radius:999px;padding:6px 10px}
+.updb{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:55;border:0;border-radius:999px;
+  background:var(--lime);color:var(--on-lime);padding:12px 18px;font-weight:700;font-size:14px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);white-space:nowrap}
+/* subscriptions */
+.alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
+.alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
+.alert b{display:block;font-size:15px;font-weight:800}
+.alert span{font-size:13px;font-weight:600;opacity:.75}
+.sub{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card2);border-radius:var(--r-md);padding:12px 14px;margin-top:8px}
+.sub .si{width:40px;height:40px;border-radius:13px;background:var(--violet);display:grid;place-items:center;flex:none;font-weight:800;color:var(--on-violet);font-size:16px}
+.sub .sm{flex:1;min-width:0}
+.sub .sn{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub .sd{font-size:13px;color:var(--soft);font-weight:600}
+.sub .sa{text-align:right;font-weight:800;white-space:nowrap}
+.sub .sa small{display:block;font-size:12px;color:var(--faint);font-weight:600}
+.sub.due .sd{color:var(--violet)}
 /* insight chips */
 .insights{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 14px;padding:2px 0}
 .insights::-webkit-scrollbar{display:none}
@@ -253,6 +268,9 @@ body.typing .tabs{display:none}
 .pick button{border:2px solid transparent;background:var(--card2);border-radius:var(--r-md);padding:10px 4px;font-size:12px;font-weight:700;display:grid;justify-items:center;gap:6px}
 .pick button.on{border-color:var(--lime)}
 .pick button em{font-style:normal;width:36px;height:36px;border-radius:12px;display:grid;place-items:center}
+.smsbox{display:block;box-sizing:border-box;width:100%;max-width:100%;min-height:150px;margin:14px 0 12px;padding:14px;
+  border:1px solid var(--line);border-radius:var(--r-md);background:var(--card2);color:var(--ink);
+  font:inherit;font-size:16px;line-height:1.45;resize:none;-webkit-appearance:none;appearance:none}
 .amt{display:flex;gap:8px}
 .amt select{width:96px;flex:none}
 .chk{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:8px 0}
@@ -274,7 +292,7 @@ body.typing .tabs{display:none}
 
 /* ===== Sappy Hub screen ===== */
 .hubv{max-width:520px;margin:0 auto;padding:14px 18px 40px;display:none}
-body.in-hub .hubv{display:block}
+body.in-hub #hubView{display:block}
 body.in-hub #appView, body.in-hub .tabs{display:none!important}
 .h-top{display:flex;align-items:center;justify-content:space-between;padding:6px 0 26px}
 .h-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
@@ -303,6 +321,13 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 .h-tile.soon{opacity:.75;cursor:default}
 .h-tile.soon:active{transform:none}
 .h-badge{position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;background:var(--card2);color:var(--soft);border-radius:999px;padding:5px 9px}
+body.in-set #setView{display:block}
+body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!important}
+.backbtn{font-size:26px;font-weight:700;line-height:1}
+.setlink{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;border:0;color:var(--ink)}
+.setlink b{display:block;font-size:16px;font-weight:800}
+.setlink span span{font-size:13px;color:var(--soft);font-weight:600}
+.setlink .chev{font-size:24px;color:var(--soft)}
 .h-sec{font-size:13px;font-weight:700;color:var(--faint);margin:26px 4px 10px}
 .h-foot{text-align:center;font-size:12px;color:var(--faint);margin-top:30px;font-weight:600}
 </style>
@@ -311,7 +336,7 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 <div id="hubView" class="hubv">
   <header class="h-top">
     <div class="h-brand"><span class="h-mark">S</span>Sappy Hub</div>
-    <div class="h-date" id="hDate"></div>
+    <div style="display:flex;gap:8px;align-items:center"><div class="h-date" id="hDate"></div><button class="hub" id="hubSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button></div>
   </header>
   <div class="h-hello" id="hHello">Hello</div>
   <h1 class="h-title">All my records,<br><em>in one place.</em></h1>
@@ -319,6 +344,37 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
   <div class="h-sec">My apps</div>
   <div class="h-grid" id="hGrid"></div>
   <p class="h-foot">Sappy Hub v<span id="hVer"></span></p>
+</div>
+<div id="setView" class="hubv setv">
+  <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
+  <section class="set">
+    <h2 style="margin-top:0">Look · all apps</h2>
+    <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+
+    <h2>Cloud sync</h2>
+    <div class="card">
+      <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
+      <details id="sbBox">
+        <summary>Connect Supabase (free)</summary>
+        <p class="note">Keeps every record safe in the cloud.</p>
+        <label class="field"><span>Project URL</span><input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
+        <label class="field"><span>API key (anon or publishable)</span><input id="sbKey" placeholder="eyJ… or sb_publishable_…" autocomplete="off" autocapitalize="off"></label>
+        <div class="btns"><button class="btn" id="sbSave">Connect</button><button class="btn soft" id="sbSync">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
+      </details>
+    </div>
+
+    <h2>Backup</h2>
+    <div class="card">
+      <p class="note" style="margin-top:0">Download a full copy of your records. Keep one even with cloud sync.</p>
+      <div class="btns"><button class="btn" id="exp">Download backup</button><button class="btn soft" id="impBtn">Restore</button></div>
+      <input type="file" id="imp" accept="application/json" hidden>
+    </div>
+
+    <h2>App</h2>
+    <div class="card">
+      <div class="row" style="padding-top:0;border-top:0"><div><div class="k">Version</div><div class="d">Sappy Hub <span id="ver"></span></div></div><button class="btn soft" id="updBtn">Check now</button></div>
+    </div>
+  </section>
 </div>
 <div class="wrap" id="appView">
 
@@ -333,6 +389,7 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 
   <!-- HOME -->
   <section id="v-home">
+    <div id="subAlert"></div>
     <div class="hero-card">
       <div class="hc-top"><span class="hc-label" id="spLabel">Spent this month</span><span class="hc-badge" id="insBadge"></span></div>
       <div class="hc-amt num"><small>Rs</small><span id="cVal">0</span></div>
@@ -380,6 +437,11 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
       <p class="note" style="margin-bottom:0">Fixed deposit money has already left your bank balance, so nothing is counted twice.</p>
     </div>
     <div class="card">
+      <h3>Subscriptions <span class="r num" id="subTotal"></span></h3>
+      <div id="subList"></div>
+      <button class="btn soft full" id="subAdd" style="margin-top:12px">Add subscription</button>
+    </div>
+    <div class="card">
       <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
       <div id="fdList"></div>
     </div>
@@ -387,41 +449,13 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 
   <!-- SETTINGS -->
   <section id="v-settings" class="set" hidden>
-    <h2>Cloud sync</h2>
-    <div class="card">
-      <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
-      <details id="sbBox">
-        <summary>Connect Supabase (free)</summary>
-        <p class="note">Keeps every record safe in the cloud.</p>
-        <label class="field"><span>Project URL</span><input id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" autocapitalize="off"></label>
-        <label class="field"><span>API key (anon or publishable)</span><input id="sbKey" placeholder="eyJ… or sb_publishable_…" autocomplete="off" autocapitalize="off"></label>
-        <div class="btns"><button class="btn" id="sbSave">Connect</button><button class="btn soft" id="sbSync">Sync now</button><button class="btn warn" id="sbOff">Disconnect</button></div>
-      </details>
-    </div>
-
+    <button class="card setlink" id="openSet2"><span><b>General settings</b><span>Look, cloud sync, backup, updates</span></span><span class="chev">›</span></button>
     <h2>Missed messages</h2>
     <div class="card">
-      <details>
-        <summary>Add an SMS that didn’t come through</summary>
-        <p class="note">Copy it from Messages and paste here. Already-added ones are ignored.</p>
-        <label class="field"><textarea id="paste" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea></label>
-        <div class="btns"><button class="btn" id="pasteAdd">Add messages</button></div>
-      </details>
+      <div class="row" style="padding-top:0;border-top:0"><div><div class="k">Add an SMS</div><div class="d">For a message that didn’t come through</div></div><button class="btn" id="pasteOpen">Add</button></div>
       <div class="row" id="skipRow" style="margin-top:12px"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div>
     </div>
 
-    <h2>Backup</h2>
-    <div class="card">
-      <p class="note" style="margin-top:0">Download a full copy of your records. Keep one even with cloud sync.</p>
-      <div class="btns"><button class="btn" id="exp">Download backup</button><button class="btn soft" id="impBtn">Restore</button></div>
-      <input type="file" id="imp" accept="application/json" hidden>
-    </div>
-
-    <h2>Look</h2>
-    <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
-
-    <p class="note" style="text-align:center;margin-top:24px">Sappy Pocket <span id="ver"></span></p>
-    <p style="text-align:center"><button class="btn soft" id="updBtn">Check for updates</button></p>
   </section>
 </div>
 
@@ -443,7 +477,7 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.2.0";
+const APP_VERSION = "5.5.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -451,15 +485,22 @@ async function checkUpdate(VKEY, CUR, VURL, manual){
   try{
     const r=await fetch(VURL+"?t="+Date.now(),{cache:"no-store"}); if(!r.ok) throw 0;
     const want=(await r.json())[VKEY];
-    if(want && want!==CUR){
-      const k="upd-"+VKEY+"-"+want;
-      if(sessionStorage.getItem(k) && !manual) return;   // avoid reload loops while GitHub is still publishing
-      sessionStorage.setItem(k,"1");
-      location.replace(location.pathname+"?v="+encodeURIComponent(want)+location.hash);
-      return true;
-    }
-    return false;
+    if(!want || want===CUR){ const b=document.getElementById("updBanner"); if(b) b.remove(); return false; }
+    // retry at most once a minute (GitHub may still be publishing), always with a brand-new address
+    let last={}; try{ last=JSON.parse(localStorage.getItem("sappy.upd")||"{}"); }catch(e){}
+    const recent = last.v===want && Date.now()-(last.at||0) < 60000;
+    if(recent && !manual){ showUpdBanner(want); return true; }
+    localStorage.setItem("sappy.upd",JSON.stringify({v:want,at:Date.now()}));
+    location.replace(location.pathname+"?v="+encodeURIComponent(want)+"&t="+Date.now()+location.hash);
+    return true;
   }catch(e){ return null; }
+}
+function showUpdBanner(v){
+  if(document.getElementById("updBanner")) return;
+  const b=document.createElement("button"); b.id="updBanner"; b.className="updb";
+  b.innerHTML='<b>Update ready (v'+v+')</b> · tap to update';
+  b.onclick=()=>{ localStorage.removeItem("sappy.upd"); location.replace(location.pathname+"?v="+encodeURIComponent(v)+"&t="+Date.now()+location.hash); };
+  document.body.appendChild(b);
 }
 
 /* =============== categories =============== */
@@ -481,7 +522,8 @@ const ICON = {
   dots:'<circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/>',
   income:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   bank:'<path d="M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
-  home:'<path d="M4 11 12 4l8 7v9H4zM10 20v-5h4v5"/>'
+  home:'<path d="M4 11 12 4l8 7v9H4zM10 20v-5h4v5"/>',
+  back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'
 };
 function icon(cat, size){
   const c=CATS[cat]||CATS.Other;
@@ -503,11 +545,12 @@ const CATS = {
   "Cash":         {i:"cash",  c:"#D9DBD2", k:["atm","cash withdrawal","withdrawal","cdm","crm"]},
   "Transfers":    {i:"swap",  c:"#C2C7BB", k:["transfer","ceft","slips","fund tr","lankapay","justpay","own account"]},
   "Other":        {i:"dots",  c:"#9DA297", k:[]},
+  "Paid back":    {i:"back",  c:"#9EE6C6", k:[]},
   "Income":       {i:"income",c:"#CDF46A", k:[]},
   "Fixed deposit":{i:"bank",  c:"#7FD6FF", k:[]}
 };
 const SPEND = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Subscriptions","Bills","Health","Education","Cash","Transfers","Other"];
-const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income"]);
+const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back"]);
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
 const MATCH_ORDER=["Subscriptions","Fuel","Eating out","Groceries","Fitness","Day out","Fun","Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
@@ -534,7 +577,7 @@ function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
   return blank();
 }
-function blank(){ return {tx:{}, fd:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
+function blank(){ return {tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
 const live = o => o && !o.del;
 
@@ -547,7 +590,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 7;
+const PARSER_VERSION = 8;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -659,13 +702,17 @@ function parseSms(raw){
   if(!bank) bank="Bank";
   else if(acct && S.bankByAcct) S.bankByAcct[acct]=S.bankByAcct[acct]||bank;
 
-  return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, where, ts, bank, acct, balance, isFd, isTransfer};
+  const COMPANY=/\b(pty|ltd|lt|pvt|plc|limited|inc|llc|technolog|solutions|services|holdings|company|corp|bank|group|enterprises|trading|international|lanka|institute|university|insurance|assurance|finance|leasing|gov|ministry|dept|salary|sal|refund|reversal|interest|dividend|cashback)\b/i;
+  const nm=merchant.trim(), wc=nm.split(/\s+/).length;
+  const isPerson = type==="in" && !isFd && !!rm && merchant!=="Salary" && !/own ?a\/?c|own account|fund ?tr/i.test(s) &&
+    /^[A-Za-z.' ]+$/.test(nm) && wc>=2 && wc<=4 && !COMPANY.test(nm+" "+where);
+  return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, where, ts, bank, acct, balance, isFd, isTransfer, isPerson};
 }
 function guessCat(t){
   if(t.isFd) return "Fixed deposit";
   const key=t.merchant.toLowerCase();
   if(S.rules[key]) return S.rules[key];
-  if(t.type==="in") return /own ?a\/?c|own account/i.test(t.raw||"")?"Transfers":"Income";
+  if(t.type==="in"){ if(/own ?a\/?c|own account/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
   if(t.isTransfer) return "Transfers";
   const hay=(t.merchant+" "+(t.where||"")).toLowerCase();
   if(/uber ?eats|pickme ?food/.test(hay)) return "Eating out";
@@ -775,7 +822,7 @@ function reparseAll(force){
   Object.values(S.tx).forEach(t=>{
     if(!live(t) || t.src!=="sms" || !t.raw) return;
     const p=parseSms(t.raw); if(!p) return;
-    const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer,where:p.where});
+    const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer,isPerson:p.isPerson,where:p.where});
     if(!t.nameSet) n.merchant=p.merchant;
     if(!t.bankSet) n.bank=p.bank;
     if(!t.catSet) n.cat=guessCat(n);
@@ -831,16 +878,22 @@ function render(){
 /* ---------- home ---------- */
 function monthSpend(y,m){
   let total=0; const by={};
-  Object.values(S.tx).forEach(t=>{ if(!live(t)||t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return; const v=lkrOf(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
-  return {total,by};
+  let back=0;
+  Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
+    if(t.type==="in"&&t.cat==="Paid back"){ back+=lkrOf(t); return; }
+    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=lkrOf(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
+  return {total:Math.max(0,total-back),gross:total,back,by};
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
 function renderHome(){
+  renderSubAlert();
   const all=txList(), mt=all.filter(inMonth);
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
   const spent=out.reduce((s,t)=>s+lkrOf(t),0);
+  const backs=mt.filter(t=>t.type==="in"&&t.cat==="Paid back"), back=backs.reduce((s,t)=>s+lkrOf(t),0);
+  const net=Math.max(0,spent-back);
   const fdOut=mt.filter(t=>t.type==="out"&&t.cat==="Fixed deposit").reduce((s,t)=>s+lkrOf(t),0);
   const left=inc-spent-fdOut;
   const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+lkrOf(t));
@@ -852,9 +905,9 @@ function renderHome(){
 
   // lime hero: spent on top, balance + came in below
   $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"});
-  $("cVal").textContent=fmt(Math.round(spent));
-  $("cSub").textContent=out.length?out.length+" payments · "+rs(spent/days)+" a day":"No spending yet";
-  let badge=""; if(spent&&pv){ const d=Math.round((spent-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
+  $("cVal").textContent=fmt(Math.round(net));
+  $("cSub").textContent=out.length?out.length+" payments · "+(back?"friends paid back "+rs(back):rs(net/days)+" a day"):"No spending yet";
+  let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
   $("insBadge").textContent=badge;
   const bals=balances(), lk=bals.filter(b=>b.cur==="LKR"), fx=bals.filter(b=>b.cur!=="LKR");
   $("balNow").textContent = lk.length ? fmt(lk.reduce((a,b)=>a+b.balance,0)) : "—";
@@ -872,12 +925,13 @@ function renderHome(){
   const gap=rows.length>1?7:0;
   rows.forEach(([c,v])=>{ const len=Math.max(.5,(v/spent)*C-gap);
     svg+='<circle class="seg" cx="60" cy="60" r="46" stroke="'+CATS[c].c+'" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'"/>'; off+=(v/spent)*C; });
-  $("donut").innerHTML=svg; $("dVal").textContent=short(spent);
+  $("donut").innerHTML=svg; $("dVal").textContent=short(net);
   if(rows.length){ const [c,v]=rows[0];
     $("dSide").innerHTML='<div class="top">Top category<b>'+esc(c)+'</b></div><div class="top">That’s<b>'+Math.round(v/spent*100)+'% of spending</b></div><div class="tip">'+rows.length+' categor'+(rows.length>1?'ies':'y')+' this month</div>'; }
   const maxP=rows.length?rows[0][1]/spent:1;
   $("legend").innerHTML=rows.map(([c,v])=>{ const p=v/spent, w=60+Math.round((p/maxP)*16);
     return '<button class="pb" data-c="'+esc(c)+'"><span class="bar3" style="width:'+w+'%;background:'+CATS[c].c+'"><span class="ii">'+icon(c,16)+'</span><span class="nm">'+esc(c)+'</span><span class="pc">'+Math.round(p*100)+'%</span></span><span class="amt2 num">'+rs(v)+'</span></button>'; }).join("");
+  if(back) $("legend").insertAdjacentHTML("beforeend",'<button class="pb pbback" data-c="Paid back"><span class="bar3" style="width:60%;background:transparent;border:2px dashed '+CATS["Paid back"].c+';color:var(--ink)"><span class="ii" style="background:'+CATS["Paid back"].c+'">'+icon("Paid back",16)+'</span><span class="nm">Friends paid back</span></span><span class="amt2 num" style="color:var(--pos)">−'+rs(back)+'</span></button>');
   $("legend").querySelectorAll(".pb").forEach(b=>b.onclick=()=>openCat(b.dataset.c));
 
 }
@@ -915,13 +969,14 @@ function renderActivity(){
   $("trend").innerHTML=ms.map((x,i)=>'<button class="tb'+(i===5?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
   $("trend").querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const d=ms[+b.dataset.i].d; month=new Date(d.getFullYear(),d.getMonth(),1); render(); });
 
-  const opts=["All","Spending","Income","Fixed deposit"];
+  const opts=["All","Spending","Income","Paid back","Fixed deposit"];
   $("fchips").innerHTML=opts.map(o=>'<button class="chip'+(o===filter?' on':'')+'" data-f="'+esc(o)+'">'+esc(o)+'</button>').join("");
   $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
   const q=$("q").value.trim().toLowerCase();
   let list=txList().filter(inMonth);
   if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
-  else if(filter==="Income") list=list.filter(t=>t.type==="in");
+  else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
+  else if(filter==="Paid back") list=list.filter(t=>t.cat==="Paid back");
   else if(filter==="Fixed deposit") list=list.filter(t=>t.cat==="Fixed deposit");
   if(q) list=list.filter(t=>(t.merchant+" "+(t.note||"")+" "+t.bank+" "+t.cat).toLowerCase().includes(q));
   listInto($("allList"), list, "Nothing for this month yet.");
@@ -935,6 +990,7 @@ function fdValue(f){
   return {p, maturity:p*(1+(+f.rate||0)/100*days/365), end:end.getTime(), done};
 }
 function renderSavings(){
+  renderSubs();
   const fds=Object.values(S.fd).filter(live).sort((a,b)=>fdValue(a).end-fdValue(b).end);
   const bank=balances().reduce((s,b)=>s+b.lkr,0), fdt=fds.reduce((s,f)=>s+fdValue(f).p,0);
   $("nw").textContent=rs(bank+fdt); $("nwBank").textContent=rs(bank); $("nwFd").textContent=rs(fdt);
@@ -981,6 +1037,9 @@ function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").for
 
 function openCat(c){
   const list=txList().filter(t=>inMonth(t)&&t.cat===c);
+  if(c==="Paid back"){ const tot=list.reduce((a,t)=>a+lkrOf(t),0);
+    openSheet('<div class="catHead"><span class="ic" style="background:'+CATS[c].c+'">'+icon(c,26)+'</span><div><h2>Friends paid back</h2><div class="note" style="margin:0">'+month.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+' · '+rs(tot)+'</div></div></div><p class="note">Taken off your spending. Not counted as income.</p><div class="list" id="catList"></div>');
+    const el=$("catList"); el.innerHTML=list.map(txHtml).join(""); el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id)); return; }
   const tot=list.reduce((a,t)=>a+lkrOf(t),0);
   const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).by[c]||0})), mx=Math.max(1,...ms.map(x=>x.t));
   const avg=ms.slice(0,5).filter(x=>x.t).reduce((a,x,_,arr)=>a+x.t/arr.length,0);
@@ -994,7 +1053,7 @@ function openCat(c){
 
 function openTx(id){
   const t=S.tx[id]; if(!t) return; let cat=t.cat;
-  const cats = t.type==="in"?["Income","Transfers","Other"]:[...SPEND,"Fixed deposit"];
+  const cats = t.type==="in"?["Income","Paid back","Transfers","Other"]:[...SPEND,"Fixed deposit"];
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+(t.acct?' · ••'+esc(t.acct):'')+'</div>'+
@@ -1027,7 +1086,7 @@ function openTx(id){
 function openAdd(){
   let type="out", cat="Other";
   const draw=()=>{
-    const cats = type==="in"?["Income","Transfers","Other"]:SPEND;
+    const cats = type==="in"?["Income","Paid back","Transfers","Other"]:SPEND;
     if(!cats.includes(cat)) cat=type==="in"?"Income":"Other";
     openSheet('<h2>Add entry</h2><div class="note">For cash or anything without an SMS.</div><div style="height:12px"></div>'+
       '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Income</button></div>'+
@@ -1091,10 +1150,15 @@ $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("
 $("skipRetry").onclick=()=>{ reparseAll(true); renderSettings(); };
 $("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
 
-$("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
-  const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
-  parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
-  $("paste").value=""; toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
+$("pasteOpen").onclick=()=>{
+  openSheet('<h2>Add an SMS</h2><div class="note">Copy it from Messages and paste below. Already-added ones are ignored.</div>'+
+    '<textarea id="paste" class="smsbox" rows="7" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea>'+
+    '<button class="btn full" id="pasteAdd">Add messages</button>');
+  $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
+    const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
+    parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
+    closeSheet(); toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
+};
 
 $("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"application/json"})); a.download="sappy-pocket-"+ymd(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
@@ -1106,6 +1170,73 @@ $("imp").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ cons
 document.querySelectorAll("#theme button").forEach(b=>b.onclick=()=>{ S.theme=b.dataset.t; persist(); applyTheme(); renderSettings(); });
 function applyTheme(){ document.documentElement.setAttribute("data-theme",S.theme||"dark"); }
 
+
+
+/* =============== subscriptions =============== */
+function subNext(sub){
+  const st=fromYmd(sub.start); const d=new Date(st); const today=new Date(); today.setHours(0,0,0,0);
+  let guard=0;
+  while(d<today && guard++<600){ if(sub.cycle==="yearly") d.setFullYear(d.getFullYear()+1); else d.setMonth(d.getMonth()+1); }
+  d.setHours(12,0,0,0); return d;
+}
+function daysUntil(d){ const t=new Date(); t.setHours(0,0,0,0); const x=new Date(d); x.setHours(0,0,0,0); return Math.round((x-t)/864e5); }
+function subMoney(sub){ return (sub.cur==="LKR"?"Rs ":sub.cur+" ")+fmt(sub.amount,sub.cur==="LKR"?0:2); }
+function subLkr(sub){ return sub.amount*rateFor(sub.cur||"LKR"); }
+function subsSorted(){ return Object.values(S.sub).filter(live).map(x=>({x,n:subNext(x)})).sort((a,b)=>a.n-b.n); }
+function whenText(n){ const d=daysUntil(n); return d===0?"Today":d===1?"Tomorrow":d<7?"In "+d+" days":n.toLocaleDateString("en-GB",{day:"numeric",month:"short"}); }
+
+function renderSubAlert(){
+  const due=subsSorted().filter(o=>daysUntil(o.n)<=1);
+  $("subAlert").innerHTML=due.map(o=>'<button class="alert" data-id="'+esc(o.x.id)+'"><span class="ai">🔔</span><div><b>'+whenText(o.n)+': '+esc(o.x.name)+' renews</b><span>'+subMoney(o.x)+(o.x.cur!=="LKR"?' ≈ '+rs(subLkr(o.x)):'')+'</span></div></button>').join("");
+  $("subAlert").querySelectorAll(".alert").forEach(b=>b.onclick=()=>openSub(b.dataset.id));
+}
+function renderSubs(){
+  const list=subsSorted();
+  const perMonth=list.reduce((a,o)=>a+subLkr(o.x)/(o.x.cycle==="yearly"?12:1),0);
+  $("subTotal").textContent=list.length?rs(perMonth)+" / month":"";
+  $("subList").innerHTML=list.length?list.map(o=>{ const dd=daysUntil(o.n);
+    return '<button class="sub'+(dd<=1?' due':'')+'" data-id="'+esc(o.x.id)+'"><span class="si">'+esc(o.x.name.trim().charAt(0).toUpperCase())+'</span><span class="sm"><div class="sn">'+esc(o.x.name)+'</div><div class="sd">'+(o.x.cycle==="yearly"?"Yearly":"Monthly")+' · renews '+(w=>/^\d/.test(w)?w:w.toLowerCase())(whenText(o.n))+'</div></span><span class="sa num">'+subMoney(o.x)+(o.x.cur!=="LKR"?'<small>≈ '+rs(subLkr(o.x))+'</small>':'')+'</span></button>'; }).join("")
+    :'<div class="note">Add Google, CapCut and others. You’ll get a reminder the day before they renew.</div>';
+  $("subList").querySelectorAll(".sub").forEach(b=>b.onclick=()=>openSub(b.dataset.id));
+}
+function openSub(id){
+  const x=id?S.sub[id]:{id:"u"+uid(),name:"",amount:"",cur:"USD",cycle:"monthly",start:ymd(Date.now())};
+  let cyc=x.cycle;
+  openSheet('<h2>'+(id?esc(x.name):"Add subscription")+'</h2>'+
+    '<label class="field"><span>Name</span><input id="sname" value="'+esc(x.name)+'" placeholder="Google One"></label>'+
+    '<label class="field"><span>Amount</span><div class="amt"><select id="scur"><option>USD</option><option>LKR</option><option>AUD</option></select><input id="samt" inputmode="decimal" class="num" value="'+esc(x.amount)+'" placeholder="0.00"></div></label>'+
+    '<div class="seg" id="scyc" style="margin:12px 0"><button data-c="monthly" class="'+(cyc==="monthly"?"on":"")+'">Monthly</button><button data-c="yearly" class="'+(cyc==="yearly"?"on":"")+'">Yearly</button></div>'+
+    '<label class="field"><span>Next renewal date</span><input id="sdate" type="date" value="'+esc(id?ymd(subNext(x).getTime()):x.start)+'"></label>'+
+    '<div class="btns"><button class="btn" id="ssave" style="flex:1">Save</button>'+(id?'<button class="btn soft" id="scal">Add to Calendar</button><button class="btn soft" id="sdel">Delete</button>':'')+'</div>'+
+    (id?'<p class="note">Add to Calendar puts a repeating reminder on your iPhone, the day before it renews.</p>':''));
+  $("scur").value=x.cur||"USD";
+  $("scyc").querySelectorAll("button").forEach(b=>b.onclick=()=>{ cyc=b.dataset.c; $("scyc").querySelectorAll("button").forEach(z=>z.classList.toggle("on",z===b)); });
+  $("ssave").onclick=()=>{
+    const amount=parseFloat(String($("samt").value).replace(/,/g,"")), name=$("sname").value.trim();
+    if(!name) return toast("Add a name"); if(!(amount>0)) return toast("Enter an amount");
+    const n=Object.assign({},x,{name,amount,cur:$("scur").value,cycle:cyc,start:$("sdate").value||ymd(Date.now())});
+    put("sub",n); closeSheet(); toast("Saved");
+    if(!id) setTimeout(()=>openSub(n.id),350);   // straight to "Add to Calendar"
+  };
+  if(id){ $("sdel").onclick=()=>{ remove("sub",id); closeSheet(); toast("Deleted"); }; $("scal").onclick=()=>addToCalendar(S.sub[id]); }
+}
+function addToCalendar(x){
+  const n=subNext(x), d=k=>{ const t=new Date(n); t.setDate(t.getDate()+k); return t.getFullYear()+String(t.getMonth()+1).padStart(2,"0")+String(t.getDate()).padStart(2,"0"); };
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const money=subMoney(x)+(x.cur!=="LKR"?" (≈ "+rs(subLkr(x))+")":"");
+  const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Sappy Hub//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT",
+    "UID:"+x.id+"@sappyhub","DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+d(0),"DTEND;VALUE=DATE:"+d(1),
+    "RRULE:FREQ="+(x.cycle==="yearly"?"YEARLY":"MONTHLY"),
+    "SUMMARY:"+x.name+" renews – "+money,"DESCRIPTION:Subscription renewal (Sappy Pocket)",
+    "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+x.name+" renews tomorrow – "+money,"TRIGGER:-PT15H","END:VALARM",
+    "END:VEVENT","END:VCALENDAR"].join("\r\n");
+  const name=x.name.replace(/[^a-z0-9]+/gi,"-")+".ics";
+  const file=new File([ics],name,{type:"text/calendar"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ navigator.share({files:[file],title:x.name+" renewal"}).catch(()=>{}); return; }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+$("subAdd").onclick=()=>openSub();
 
 /* =============== Sappy Hub =============== */
 /* APP LIST — add a line here for each new app. view: the screen it opens. ready:false = "Coming soon". */
@@ -1130,6 +1261,9 @@ function renderHub(){
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
   $("hFeat").innerHTML = feat ? '<button class="h-feat" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
     (feat.id==="pocket"?'<div class="h-stats"><div><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div><div><span>Balance now</span><b class="num">'+(bals.length?rs(bal):"—")+'</b></div></div>':'')+'</button>' : "";
+  const due=subsSorted().filter(o=>daysUntil(o.n)<=1);
+  if(due.length) $("hFeat").insertAdjacentHTML("beforeend", due.map(o=>'<button class="alert" data-sub="'+esc(o.x.id)+'"><span class="ai">🔔</span><div><b>'+whenText(o.n)+': '+esc(o.x.name)+' renews</b><span>'+subMoney(o.x)+(o.x.cur!=="LKR"?' ≈ '+rs(subLkr(o.x)):'')+'</span></div></button>').join(""));
+  $("hFeat").querySelectorAll("[data-sub]").forEach(b=>b.onclick=()=>{ openApp("pocket"); setTimeout(()=>openSub(b.dataset.sub),200); });
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
@@ -1138,6 +1272,18 @@ function openApp(id){
   if(id==="pocket"){ document.body.classList.remove("in-hub"); go("home"); }
 }
 $("toHub").onclick=showHub;
+let setFrom="hub";
+function openSettings(){
+  if(sheetOpen) closeSheet();
+  setFrom=document.body.classList.contains("in-hub")?"hub":"app";
+  document.body.classList.remove("in-hub"); document.body.classList.add("in-set");
+  renderSettings(); window.scrollTo(0,0);
+}
+function closeSettings(){
+  document.body.classList.remove("in-set");
+  if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); }
+}
+$("hubSet").onclick=openSettings; $("openSet2").onclick=openSettings; $("setBack").onclick=closeSettings;
 
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
