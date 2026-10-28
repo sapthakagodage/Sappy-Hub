@@ -27,3 +27,9 @@ drop policy if exists "app inbox" on inbox;
 create policy "app inbox" on inbox for all to anon using (true) with check (true);
 drop policy if exists "app items" on items;
 create policy "app items" on items for all to anon using (true) with check (true);
+
+-- Make sure the app can reach the tables (needed on newer projects)
+grant usage on schema public to anon;
+grant select, insert, update, delete on table inbox, items to anon;
+grant usage, select on all sequences in schema public to anon;
+notify pgrst, 'reload schema';

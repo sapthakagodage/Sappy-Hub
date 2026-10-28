@@ -1,31 +1,47 @@
-# Pocket Ledger
+# Sappy Hub
 
-Personal expense tracker that reads bank SMS (ComBank, Sampath, HNB) automatically.
-Free to run: **GitHub Pages** (the app) + **Supabase** (your records) + **iPhone Shortcuts** (SMS capture).
+My personal records app. One launcher, many apps.
 
 ```
-Bank SMS ──► iPhone Shortcut ──► Supabase (cloud inbox) ──► Pocket Ledger app
+Sappy Hub  (main page)
+├── Sappy Pocket   → money & expenses   (pocket/)
+├── Sappy Travel   → coming soon        (travel/)
+└── Sappy Fitness  → coming soon        (fitness/)
 ```
 
-Total setup time: about 25 minutes, once.
+Free to run: **GitHub Pages** (the apps) + **Supabase** (records) + **iPhone Shortcuts** (bank SMS).
 
 ---
 
-## Part 1 — Put the app on GitHub (10 min)
+## Files
 
-1. Go to **github.com** → **+** (top right) → **New repository**.
-2. Name: `pocket-ledger`. Choose **Public** (free GitHub Pages needs public).
-   Your money data is NOT in the repo. Only the app code is.
-3. Click **Create repository**.
-4. Click **uploading an existing file**. Drag in all files from this folder:
-   `index.html`, `manifest.json`, `icon-180.png`, `icon-512.png`, `CHANGELOG.md`, `README.md`, `supabase-setup.sql`
-5. Commit message: `v2.0.0` → **Commit changes**.
-6. Go to **Settings** → **Pages** (left menu).
-7. Source: **Deploy from a branch**. Branch: **main**, folder **/ (root)** → **Save**.
-8. Wait 1–2 minutes. Your app link is:
-   `https://YOUR-GITHUB-NAME.github.io/pocket-ledger/`
-9. Open it on your iPhone in **Safari** → Share → **Add to Home Screen**.
-   Now it opens like a real app.
+```
+index.html          ← Sappy Hub (launcher)
+manifest.json       ← Home Screen app info
+icon-180.png, icon-512.png
+supabase-setup.sql
+CHANGELOG.md, README.md
+pocket/index.html   ← Sappy Pocket
+```
+
+---
+
+## Part 1 — Upload to GitHub
+
+1. Open your repo on **github.com** on a computer.
+2. **Add file** → **Upload files**.
+3. Unzip `sappy-hub-v4.0.0.zip`. Open the `sappy-hub` folder and drag **everything inside it** onto the page,
+   including the `pocket` folder.
+4. Commit message: `v4.0.0 – Sappy Hub` → **Commit changes**.
+5. Wait 1–2 minutes. Open your link. You'll see Sappy Hub.
+
+Your old link now opens the Hub. Tap **Sappy Pocket** to get to your expenses.
+
+**Optional — rename the repo to `sappy-hub`:** repo → **Settings** → Repository name.
+Your link becomes `https://YOUR-NAME.github.io/sappy-hub/`. Your data stays (same phone, same cloud).
+Then delete the old Home Screen icon and add the new link to your Home Screen again.
+
+**Home Screen icon:** open the link in Safari → Share → **Add to Home Screen**. The icon is a green "S".
 
 ---
 
@@ -45,9 +61,9 @@ This keeps every record safe forever, on any device.
 6. Left menu → **Project Settings** → **API Keys**.
    - Copy the **Project URL** (looks like `https://abcd1234.supabase.co`).
      If it's not on that page, it's under **Project Settings → Data API**.
-   - Copy the **anon** key that starts with `eyJ…`.
-     If you see "Publishable key" first, open the **Legacy API keys** tab and copy **anon** from there.
-7. Open Pocket Ledger on your phone → **Settings** → **Cloud sync** → **Connect Supabase**.
+   - Copy the **Publishable key** (starts with `sb_publishable_`) or the legacy **anon** key (starts with `eyJ`). Either works.
+   - Never use the **secret** / **service_role** key.
+7. Open Sappy Pocket on your phone → **Settings** → **Cloud sync** → **Connect Supabase**.
    Paste the URL and key → **Connect**. Status should turn **On**.
 
 > Keep the key private. Never put it in a GitHub file. It only goes in the app settings and the Shortcut.
@@ -67,8 +83,8 @@ This keeps every record safe forever, on any device.
 8. Tap the **›** arrow on the action to expand it:
    - **Method**: `POST`
    - **Headers** → Add new header:
-     - Key `apikey` → Value: your anon key
-     - Key `Authorization` → Value: `Bearer ` + your anon key (one space after Bearer)
+     - Key `apikey` → Value: your key
+     - Only if your key starts with `eyJ`: also add Key `Authorization` → Value: `Bearer ` + your key (one space after Bearer)
    - **Request Body**: `JSON`
      - Add new field → **Text** → Key: `raw` → Value: tap it → choose **Shortcut Input**
 9. Tap **Done**.
@@ -81,48 +97,33 @@ Nothing pops up when an SMS arrives. It goes quietly to the cloud inbox and appe
 
 ---
 
-## How to use
+## Adding a new app later (Travel, Fitness, anything)
 
-- **Overview**: pie chart of spending. Tap a category to highlight it. Bank balances from the latest SMS.
-- **Activity**: every entry. Search and filter. Tap any entry to change category or add a note.
-  Tick "Always use this for…" and that shop is sorted the same way next time.
-- **＋ button**: add things with no SMS — AUD salary, cash, fixed deposits.
-- **Savings**: fixed deposits with interest and maturity date, plus your net worth.
-- **Settings**: cloud sync, exchange rates, backup, light/dark.
+1. Ask Claude to build it. You'll get a folder, for example `travel/index.html`.
+2. Upload the folder to GitHub (same way as Part 1).
+3. In the Hub's `index.html`, find the **APP LIST** near the bottom and change that app's `ready:false` to `ready:true`.
+   For a brand new app, add one line to the list.
 
-Transfers and fixed deposits are not counted as spending.
+That's it. The Hub shows it automatically.
 
 ---
 
-## Part 4 — Updating the app (new versions)
+## Updating (new versions)
 
-Your data is never touched by updates. It lives in Supabase.
+Your data is never touched by updates. It lives in Supabase, not in the app files.
 
-1. Tell Claude what you want changed. You'll get a new `index.html` (and a `CHANGELOG.md` line).
-2. Go to your repo on GitHub → **Add file** → **Upload files**.
-3. Drag in the new `index.html` (and `CHANGELOG.md`). It replaces the old ones.
-4. Commit message: the new version, e.g. `v2.1.0 – budget alerts` → **Commit changes**.
-5. Wait 1–2 minutes. Open the app → pull down to refresh.
-   If you still see the old one, close the app fully and open it again.
-6. Check **Settings** → bottom of the page shows the version number.
+1. Ask Claude for the change. You get updated files.
+2. GitHub → **Add file** → **Upload files** → drag them in (keep folder names the same).
+3. Commit message with the version, e.g. `Pocket v4.1.0`.
+4. Wait 1–2 minutes, close the app, open it again.
 
-**Version history:** every upload is saved under **Commits** in your repo.
-**Go back to an old version:** open that commit → open `index.html` → **Download raw file** → upload it again.
-**Optional:** on the repo page, **Releases** → **Create a new release** → tag `v2.0.0`. Gives a clean list of versions.
+Every version is saved under **Commits**, so you can always go back.
 
 ---
 
-## Keep it rock solid
+## Keep it safe
 
-- **Monthly backup:** Settings → **Download backup**. Save it to iCloud Drive.
-- **Supabase free tier** pauses if unused for 7 days. Your daily SMS keeps it awake.
-  If it ever pauses: log in to supabase.com and click **Restore project**.
-- **New phone?** Open the app link → Settings → connect Supabase again. Everything comes back.
-- **An SMS read wrong?** Tap it, fix the category, and send Claude the SMS text (hide account numbers) to improve the reader.
-
-## Free limits (more than enough)
-
-| Service | Free limit | Your use |
-|---|---|---|
-| GitHub Pages | 1 GB site, 100 GB/month | ~50 KB |
-| Supabase | 500 MB database | ~5 MB per 10 years of SMS |
+- Monthly: Sappy Pocket → Settings → **Download backup**. Save to iCloud Drive.
+- Never put your Supabase key in GitHub files.
+- Supabase free projects pause after 7 days with no activity. Daily SMS keeps it awake.
+  If it pauses: log in to supabase.com → **Restore project**.
