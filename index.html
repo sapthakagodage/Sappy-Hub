@@ -328,6 +328,23 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 .setlink b{display:block;font-size:16px;font-weight:800}
 .setlink span span{font-size:13px;color:var(--soft);font-weight:600}
 .setlink .chev{font-size:24px;color:var(--soft)}
+body.in-noti #notiView{display:block}
+body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #setView{display:none!important}
+.bell{position:relative}
+.bellb{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:#FF6B5A;color:#fff;font-size:11px;font-weight:800;font-style:normal;display:grid;place-items:center;padding:0 4px;border:2px solid var(--bg)}
+.nh{font-size:13px;font-weight:700;color:var(--faint);margin:18px 6px 8px}
+.nrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+.nrow.hot{outline:2px solid var(--lime);position:relative}
+.nrow.hot::after{content:"";position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:#FF6B5A}
+.nhead{display:flex;justify-content:space-between;align-items:center;margin:18px 6px 8px}
+.nhead .nh{margin:0}
+.nrow .ni{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--on-violet)}
+.nrow .nm2{flex:1;min-width:0}
+.nrow .nm2 b{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nrow .nm2 span{font-size:13px;color:var(--soft);font-weight:600}
+.nrow .nw{font-size:13px;font-weight:800;white-space:nowrap}
+.nrow.hot .nw{color:var(--lime)}
+:root[data-theme="light"] .nrow.hot .nw{color:#4F7A0E}
 .h-sec{font-size:13px;font-weight:700;color:var(--faint);margin:26px 4px 10px}
 .h-foot{text-align:center;font-size:12px;color:var(--faint);margin-top:30px;font-weight:600}
 </style>
@@ -336,7 +353,7 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 <div id="hubView" class="hubv">
   <header class="h-top">
     <div class="h-brand"><span class="h-mark">S</span>Sappy Hub</div>
-    <div style="display:flex;gap:8px;align-items:center"><div class="h-date" id="hDate"></div><button class="hub" id="hubSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button></div>
+    <div style="display:flex;gap:8px;align-items:center"><div class="h-date" id="hDate"></div><button class="hub bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><i class="bellb" hidden></i></button><button class="hub" id="hubSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button></div>
   </header>
   <div class="h-hello" id="hHello">Hello</div>
   <h1 class="h-title">All my records,<br><em>in one place.</em></h1>
@@ -344,6 +361,10 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
   <div class="h-sec">My apps</div>
   <div class="h-grid" id="hGrid"></div>
   <p class="h-foot">Sappy Hub v<span id="hVer"></span></p>
+</div>
+<div id="notiView" class="hubv">
+  <header class="h-top"><button class="hub backbtn" id="notiBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Notifications</div></header>
+  <div id="notiBody"></div>
 </div>
 <div id="setView" class="hubv setv">
   <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
@@ -391,7 +412,6 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 
   <!-- HOME -->
   <section id="v-home">
-    <div id="subAlert"></div>
     <div class="hero-card">
       <div class="hc-top"><span class="hc-label" id="spLabel">Spent this month</span><span class="hc-badge" id="insBadge"></span></div>
       <div class="hc-amt num"><small>Rs</small><span id="cVal">0</span></div>
@@ -478,7 +498,7 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.7.0";
+const APP_VERSION = "5.8.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -578,7 +598,7 @@ function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
   return blank();
 }
-function blank(){ return {name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
+function blank(){ return {notiRead:{}, name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
 const live = o => o && !o.del;
 
@@ -795,6 +815,7 @@ async function sync(manual){
     }
     S.lastPull=maxT;
     if(live(S.cfg.profile) && S.cfg.profile.name) S.name=S.cfg.profile.name;
+    if(live(S.cfg.noti)) S.notiRead=Object.assign({},S.notiRead||{},S.cfg.noti.read||{});
     if(live(S.cfg.rules)){ Object.assign(S.rules,S.cfg.rules.map||{}); Object.assign(S.bankByAcct,S.cfg.rules.acct||{}); }
     // 3. push local changes
     const keys=Object.keys(S.dirty);
@@ -868,6 +889,7 @@ const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.
 const inMonth = t => { const d=new Date(t.ts); return d.getFullYear()===month.getFullYear()&&d.getMonth()===month.getMonth(); };
 
 function render(){
+  paintBells();
   if(document.body.classList.contains("in-hub")){ renderHub(); }
   $("title").textContent=TITLES[view];
   $("mswitch").hidden = !(view==="home"||view==="activity");
@@ -891,7 +913,6 @@ function monthSpend(y,m){
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
 function renderHome(){
-  renderSubAlert();
   const all=txList(), mt=all.filter(inMonth);
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
@@ -988,9 +1009,10 @@ function renderActivity(){
 }
 
 /* ---------- savings ---------- */
+function fdEnd(f){ if(f.maturity) return fromYmd(f.maturity); const e=new Date(fromYmd(f.start)); e.setMonth(e.getMonth()+(+f.months||12)); return e.getTime(); }
 function fdValue(f){
   const p=f.amount*rateFor(f.cur||"LKR");
-  const start=fromYmd(f.start), end=new Date(start); end.setMonth(end.getMonth()+(+f.months||12));
+  const start=fromYmd(f.start), end=new Date(fdEnd(f));
   const days=(end-start)/864e5, done=Math.min(1,Math.max(0,(Date.now()-start)/(end-start)));
   return {p, maturity:p*(1+(+f.rate||0)/100*days/365), end:end.getTime(), done};
 }
@@ -1003,7 +1025,7 @@ function renderSavings(){
   $("fdCount").textContent=fds.length?fds.length+" active":"";
   $("fdList").innerHTML = fds.length ? fds.map(f=>{ const v=fdValue(f);
     return '<button class="fd" data-id="'+esc(f.id)+'"><div class="top"><span>'+esc(f.bank)+(f.note&&f.note!=="From SMS"?' · '+esc(f.note):'')+'</span><span class="num">'+rs(v.p)+'</span></div>'+
-      '<div class="sub"><span>'+(+f.rate?f.rate+'% · ':'Add rate · ')+'matures '+new Date(v.end).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</span><span class="num">→ '+rs(v.maturity)+'</span></div>'+
+      '<div class="sub"><span>'+(f.maturity?(+f.rate?f.rate+'% · ':'')+'matures '+new Date(v.end).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):'<b style="color:var(--lime)">Tap to add maturity date</b>')+'</span><span class="num">→ '+rs(v.maturity)+'</span></div>'+
       '<div class="prog"><i style="width:'+(v.done*100)+'%"></i></div></button>'; }).join("")
     : '<div class="empty" style="padding:12px 0"><b>No deposits yet</b>They appear here automatically when your bank SMS shows a fixed deposit.</div>';
   $("fdList").querySelectorAll(".fd").forEach(b=>b.onclick=()=>openFd(b.dataset.id));
@@ -1115,22 +1137,19 @@ function openAdd(){
 }
 
 function openFd(id){
-  const f=id?S.fd[id]:{id:"f"+uid(), bank:"", amount:"", cur:"LKR", rate:"", start:ymd(Date.now()), months:12, note:""};
-  openSheet('<h2>'+(id?"Fixed deposit":"Add fixed deposit")+'</h2>'+
-    '<label class="field"><span>Bank</span><input id="fbank" value="'+esc(f.bank)+'" placeholder="Sampath"></label>'+
-    '<label class="field"><span>Amount</span><div class="amt"><select id="fcur"><option>LKR</option><option>AUD</option><option>USD</option></select><input id="famt" inputmode="decimal" class="num" value="'+esc(f.amount)+'"></div></label>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="field"><span>Interest % a year</span><input id="frate" inputmode="decimal" value="'+esc(f.rate||"")+'" placeholder="9.5"></label>'+
-    '<label class="field"><span>Months</span><input id="fmon" inputmode="numeric" value="'+esc(f.months)+'"></label></div>'+
-    '<label class="field"><span>Start date</span><input id="fstart" type="date" value="'+esc(f.start)+'"></label>'+
-    '<label class="field"><span>Note</span><input id="fnote" value="'+esc(f.note&&f.note!=="From SMS"?f.note:"")+'" placeholder="Optional"></label>'+
-    '<div class="btns"><button class="btn" id="fsave" style="flex:1">Save</button>'+(id?'<button class="btn soft" id="fdel">Close deposit</button>':'')+'</div>');
-  $("fcur").value=f.cur||"LKR";
+  const f=S.fd[id]; if(!f) return;
+  openSheet('<h2>Fixed deposit</h2><div class="note num" style="margin-bottom:6px">'+esc(f.bank)+' · '+(f.cur==="LKR"?"Rs ":esc(f.cur)+" ")+fmt(f.amount)+' · started '+new Date(fromYmd(f.start)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</div>'+
+    '<label class="field"><span>Matures on</span><input id="fmat" type="date" value="'+esc(f.maturity||"")+'"></label>'+
+    '<label class="field"><span>Interest % a year (optional)</span><input id="frate" inputmode="decimal" value="'+esc(f.rate||"")+'" placeholder="e.g. 9.5"></label>'+
+    '<label class="field"><span>Note (optional)</span><input id="fnote" value="'+esc(f.note&&f.note!=="From SMS"?f.note:"")+'" placeholder="e.g. 1 year FD"></label>'+
+    '<div class="btns"><button class="btn" id="fsave" style="flex:1">Save</button>'+(f.maturity?'<button class="btn soft" id="fcal">Add to Calendar</button>':'')+'<button class="btn soft" id="fdel">Close</button></div>'+
+    (f.maturity?'<p class="note">Add to Calendar reminds you on your iPhone the day before it matures.</p>':''));
   $("fsave").onclick=()=>{
-    const amount=parseFloat(String($("famt").value).replace(/,/g,"")); if(!(amount>0)) return toast("Enter an amount");
-    put("fd",Object.assign({},f,{bank:$("fbank").value.trim()||"Bank", amount, cur:$("fcur").value, rate:parseFloat($("frate").value)||0, months:parseInt($("fmon").value)||12, start:$("fstart").value||ymd(Date.now()), note:$("fnote").value.trim()}));
-    closeSheet(); toast("Saved"); if(view!=="savings") go("savings");
+    put("fd",Object.assign({},f,{maturity:$("fmat").value||"", rate:parseFloat($("frate").value)||0, note:$("fnote").value.trim()||f.note||""}));
+    closeSheet(); toast("Saved"); render(); if(document.body.classList.contains("in-noti")) renderNoti();
   };
-  if(id) $("fdel").onclick=()=>{ remove("fd",id); closeSheet(); toast("Deposit closed"); };
+  if($("fcal")) $("fcal").onclick=()=>calFile({id:f.id, date:new Date(fdEnd(f)), title:esc2(f.bank)+" fixed deposit matures – "+rs(fdValue(f).maturity), alarm:esc2(f.bank)+" FD matures tomorrow", repeat:""});
+  $("fdel").onclick=()=>{ if(!confirm("Close this fixed deposit? (It matured or was withdrawn)")) return; remove("fd",f.id); closeSheet(); toast("Deposit closed"); };
 }
 
 /* =============== toast =============== */
@@ -1225,6 +1244,17 @@ function openSub(id){
   };
   if(id){ $("sdel").onclick=()=>{ remove("sub",id); closeSheet(); toast("Deleted"); }; $("scal").onclick=()=>addToCalendar(S.sub[id]); }
 }
+const esc2=s=>String(s||"").replace(/[\r\n,;]/g," ");
+function calFile(o){
+  const d=k=>{ const t=new Date(o.date); t.setDate(t.getDate()+k); return t.getFullYear()+String(t.getMonth()+1).padStart(2,"0")+String(t.getDate()).padStart(2,"0"); };
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Sappy Hub//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:"+o.id+"@sappyhub","DTSTAMP:"+stamp,
+    "DTSTART;VALUE=DATE:"+d(0),"DTEND;VALUE=DATE:"+d(1)].concat(o.repeat?["RRULE:FREQ="+o.repeat]:[]).concat(["SUMMARY:"+o.title,
+    "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+o.alarm,"TRIGGER:-PT15H","END:VALARM","END:VEVENT","END:VCALENDAR"]).join("\r\n");
+  const name=o.title.replace(/[^a-z0-9]+/gi,"-").slice(0,40)+".ics", file=new File([ics],name,{type:"text/calendar"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ navigator.share({files:[file],title:o.title}).catch(()=>{}); return; }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(file); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
 function addToCalendar(x){
   const n=subNext(x), d=k=>{ const t=new Date(n); t.setDate(t.getDate()+k); return t.getFullYear()+String(t.getMonth()+1).padStart(2,"0")+String(t.getDate()).padStart(2,"0"); };
   const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
@@ -1243,6 +1273,44 @@ function addToCalendar(x){
 }
 $("subAdd").onclick=()=>openSub();
 
+
+/* =============== notifications (subscriptions + FD maturities) =============== */
+function notiItems(){
+  const items=[];
+  subsSorted().forEach(o=>{ const d=daysUntil(o.n); if(d>=0&&d<=30) items.push({kind:"sub",id:o.x.id,d,date:o.n,title:o.x.name+" renews",line:subMoney(o.x)+(o.x.cur!=="LKR"?" ≈ "+rs(subLkr(o.x)):""),letter:o.x.name.trim().charAt(0).toUpperCase()}); });
+  Object.values(S.fd).filter(live).forEach(f=>{ if(!f.maturity) return; const e=new Date(fdEnd(f)), d=daysUntil(e); if(d>=0&&d<=60) items.push({kind:"fd",id:f.id,d,date:e,title:f.bank+" FD matures",line:rs(fdValue(f).p)+(+f.rate?" → "+rs(fdValue(f).maturity):"")}); });
+  return items.sort((a,b)=>a.d-b.d);
+}
+const notiKey=i=>i.kind+":"+i.id+":"+ymd(i.date.getTime());
+function notiUnread(){ S.notiRead=S.notiRead||{}; return notiItems().filter(i=>i.d<=1 && !S.notiRead[notiKey(i)]); }
+function notiCount(){ return notiUnread().length; }
+function markRead(list){ S.notiRead=S.notiRead||{}; list.forEach(i=>S.notiRead[notiKey(i)]=1);
+  // keep the list small: forget keys older than 60 days
+  const cut=Date.now()-60*864e5; Object.keys(S.notiRead).forEach(k=>{ const d=k.split(":").pop(); if(fromYmd(d)<cut) delete S.notiRead[k]; });
+  persist(); put("cfg",{id:"noti",read:Object.assign({},S.notiRead)}); paintBells(); }
+function paintBells(){ const n=notiCount(); document.querySelectorAll(".bellb").forEach(b=>{ b.textContent=n||""; b.hidden=!n; }); }
+let notiFrom="hub";
+function openNoti(){
+  if(sheetOpen) closeSheet();
+  notiFrom=document.body.classList.contains("in-hub")?"hub":"app";
+  document.body.classList.remove("in-hub","in-set"); document.body.classList.add("in-noti"); renderNoti(); window.scrollTo(0,0);
+}
+function closeNoti(){ document.body.classList.remove("in-noti"); showHub(); }
+function renderNoti(){
+  const it=notiItems(), now=it.filter(i=>i.d<=1), soon=it.filter(i=>i.d>1), unread=notiUnread();
+  const isNew=i=>i.d<=1 && !S.notiRead[notiKey(i)];
+  const row=i=>'<button class="nrow'+(isNew(i)?' hot':'')+'" data-k="'+i.kind+'" data-id="'+esc(i.id)+'"><span class="ni" style="background:'+(i.kind==="fd"?CATS["Fixed deposit"].c:"var(--violet)")+'">'+(i.kind==="fd"?icon("Fixed deposit",20):'<b>'+esc(i.letter)+'</b>')+'</span><span class="nm2"><b>'+esc(i.title)+'</b><span>'+esc(i.line)+'</span></span><span class="nw">'+whenText(i.date)+'</span></button>';
+  const missing=Object.values(S.fd).filter(f=>live(f)&&!f.maturity).length;
+  $("notiBody").innerHTML=
+    (now.length?'<div class="nhead"><h2 class="nh">Now</h2>'+(unread.length?'<button class="link" id="readAll">Mark all read</button>':'')+'</div>'+now.map(row).join(""):'')+
+    (soon.length?'<h2 class="nh">Coming up</h2>'+soon.map(row).join(""):'')+
+    (!it.length?'<div class="empty"><b>All clear</b>Nothing renewing or maturing soon.</div>':'')+
+    (missing?'<button class="card setlink" id="fixMat" style="margin-top:16px"><span><b>'+missing+' fixed deposit'+(missing>1?'s':'')+' without a maturity date</b><span>Add it to get a reminder</span></span><span class="chev">›</span></button>':'');
+  $("notiBody").querySelectorAll(".nrow").forEach((b,ix)=>b.onclick=()=>{ const i=it.find(x=>x.kind===b.dataset.k&&x.id===b.dataset.id); if(i&&i.d<=1) markRead([i]); renderNoti(); if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
+  if($("readAll")) $("readAll").onclick=()=>{ markRead(unread); renderNoti(); toast("All read"); };
+  if($("fixMat")) $("fixMat").onclick=()=>{ document.body.classList.remove("in-noti"); openApp("pocket"); go("savings"); };
+}
+
 /* =============== Sappy Hub =============== */
 /* APP LIST — add a line here for each new app. view: the screen it opens. ready:false = "Coming soon". */
 const APPS = [
@@ -1258,6 +1326,7 @@ const HUB_ICONS = {
 const hsvg = n => '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#12140D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(HUB_ICONS[n]||"")+'</svg>';
 
 function renderHub(){
+  paintBells();
   const h=new Date().getHours();
   $("hHello").textContent = (h<12?"Good morning":h<17?"Good afternoon":"Good evening")+(S.name?", "+S.name:"");
   $("hDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
@@ -1266,9 +1335,6 @@ function renderHub(){
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
   $("hFeat").innerHTML = feat ? '<button class="h-feat" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
     (feat.id==="pocket"?'<div class="h-stats"><div><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div><div><span>Balance now</span><b class="num">'+(bals.length?rs(bal):"—")+'</b></div></div>':'')+'</button>' : "";
-  const due=subsSorted().filter(o=>daysUntil(o.n)<=1);
-  if(due.length) $("hFeat").insertAdjacentHTML("beforeend", due.map(o=>'<button class="alert" data-sub="'+esc(o.x.id)+'"><span class="ai">🔔</span><div><b>'+whenText(o.n)+': '+esc(o.x.name)+' renews</b><span>'+subMoney(o.x)+(o.x.cur!=="LKR"?' ≈ '+rs(subLkr(o.x)):'')+'</span></div></button>').join(""));
-  $("hFeat").querySelectorAll("[data-sub]").forEach(b=>b.onclick=()=>{ openApp("pocket"); setTimeout(()=>openSub(b.dataset.sub),200); });
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
@@ -1289,6 +1355,7 @@ function closeSettings(){
   if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); }
 }
 $("hubSet").onclick=openSettings;
+document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=closeNoti;
 $("uname").onchange=()=>{ S.name=$("uname").value.trim(); persist(); put("cfg",{id:"profile",name:S.name}); toast("Saved"); }; $("setBack").onclick=closeSettings;
 
 window.addEventListener("hashchange",checkHash);
