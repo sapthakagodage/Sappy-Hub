@@ -145,6 +145,10 @@ button:active{transform:scale(.98)}
 .soon .tx2 span{font-size:12px;color:var(--soft);font-weight:600}
 .soon .wn{font-size:12px;font-weight:800;white-space:nowrap;background:var(--card2);border-radius:999px;padding:5px 9px}
 .soon.today .wn,.soon.tom .wn{background:var(--lime);color:#12140D}
+.tabs .in{max-width:430px}
+.tab{width:46px;height:46px}
+.hubtab{color:var(--lime)!important;background:#2C2F27}
+.tsep{width:1px;height:26px;background:rgba(255,255,255,.1);flex:none}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -451,7 +455,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <div class="wrap" id="appView">
 
   <header class="bar">
-    <h1><button class="hub" id="toHub" aria-label="Back to Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg></button><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
+    <h1><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
     <div class="mswitch" id="mswitch">
       <button id="prev" aria-label="Previous month">‹</button>
       <span id="mlabel"></span>
@@ -523,6 +527,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
       <h3>Fixed deposits <span class="r" id="fdCount"></span></h3>
       <div class="bal" style="padding-top:0"><span class="k">Total in fixed deposits</span><span class="num" id="nwFd">Rs 0</span></div>
       <div id="fdList"></div>
+      <button class="btn soft full" id="fdAddPast" style="margin-top:12px">＋ Add a past fixed deposit</button>
     </div>
   </section>
 
@@ -532,6 +537,8 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <!-- tab bar -->
 <nav class="tabs" aria-label="Main">
   <div class="in">
+    <button class="tab hubtab" id="toHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
+    <i class="tsep" aria-hidden="true"></i>
     <button class="tab" data-v="home" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg><span>Overview</span></button>
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Activity</span></button>
     <button class="fab" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -547,7 +554,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.15.0";
+const APP_VERSION = "5.16.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -929,6 +936,13 @@ function reparseAll(force){
 
 /* =============== own-account transfers (e.g. AUD ••15 -> LKR ••19) =============== */
 function ownAccounts(){ const k=new Set(); txList().forEach(t=>{ if(t.src==="sms"&&t.bank&&t.bank!=="Bank"&&t.acct) k.add(accKey(t)); }); Object.keys(S.tracked||{}).forEach(x=>{ if(!S.tracked[x].del) k.add(x); }); return k; }
+function applyRealRate(cur, rate, at){
+  rate=Math.round(rate*100)/100;
+  // income in that currency, received up to this conversion, not yet valued at a real bank rate
+  txList().filter(t=>t.type==="in"&&t.cat==="Income"&&t.cur===cur&&!t.fxReal&&t.ts<=at+60000).forEach(t=>{
+    put("tx",Object.assign({},t,{lkr:t.amount*rate, fx:rate, fxReal:true}));
+  });
+}
 function linkOwnTransfers(){
   const own=ownAccounts(), all=txList().filter(t=>t.src==="sms"&&own.has(accKey(t)));
   const outs=all.filter(t=>t.type==="out"&&t.cat!=="Fixed deposit"&&!t.topup), ins=all.filter(t=>t.type==="in");
@@ -944,6 +958,8 @@ function linkOwnTransfers(){
     if(!i.nameSet) ni.merchant="Transfer from "+nm(o);
     if(!o.nameSet) no.merchant="Transfer to "+nm(i);
     if(JSON.stringify(ni)!==JSON.stringify(i)){ put("tx",ni); n++; }
+    // AUD -> LKR: the real bank rate is LKR received / AUD sent
+    if(o.cur!=="LKR" && i.cur==="LKR" && o.amount>0){ applyRealRate(o.cur, i.amount/o.amount, o.ts); }
     if(JSON.stringify(no)!==JSON.stringify(o)){ put("tx",no); n++; }
   });
   return n;
@@ -1116,6 +1132,23 @@ function openAddAcc(){
     saveAccounts(); saveRules(); closeSheet(); render(); toast(bank+(no?" ••"+no:"")+" added");
   };
 }
+function openNewFd(){
+  openSheet('<h2>Add a past fixed deposit</h2><p class="note">For FDs made before the app. New ones are still added automatically from SMS.</p>'+
+    '<label class="fl2"><span>Bank</span><input class="inp" id="nfBank" value="HNB"></label>'+
+    '<label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="nfAmt" inputmode="decimal" placeholder="500000"></label>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Started on</span><input class="inp" id="nfStart" type="date"></label>'+
+    '<label class="fl2"><span>Matures on</span><input class="inp" id="nfMat" type="date"></label></div>'+
+    '<label class="fl2"><span>Interest % a year (optional)</span><input class="inp" id="nfRate" inputmode="decimal" placeholder="e.g. 9.5"></label>'+
+    '<label class="fl2"><span>Note (optional)</span><input class="inp" id="nfNote" placeholder="e.g. 1 year FD"></label>'+
+    '<button class="btn full" id="nfSave">Save</button>');
+  $("nfSave").onclick=()=>{
+    const amount=parseFloat(String($("nfAmt").value).replace(/,/g,""));
+    if(!(amount>0)) return toast("Enter the amount"); if(!$("nfMat").value) return toast("Add the maturity date");
+    const start=$("nfStart").value||ymd(Date.now());
+    put("fd",{id:"f"+uid(), bank:$("nfBank").value.trim()||"Bank", amount, cur:"LKR", rate:parseFloat($("nfRate").value)||0, start, maturity:$("nfMat").value, months:12, note:$("nfNote").value.trim()||"Added by hand"});
+    closeSheet(); toast("Fixed deposit added"); render();
+  };
+}
 /* is this HNB debit a top-up to a tracked side account? */
 function topupFor(t){
   if(t.type!=="out" || t.balance==null) return "";
@@ -1263,7 +1296,7 @@ function openTx(id){
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
-  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?' ≈ '+rs(lkrOf(t)):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
+  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -1470,6 +1503,7 @@ function addToCalendar(x){
 }
 $("subAdd").onclick=()=>openSub();
 $("addAcc").onclick=openAddAcc;
+$("fdAddPast").onclick=openNewFd;
 
 
 /* =============== notifications (subscriptions + FD maturities) =============== */
