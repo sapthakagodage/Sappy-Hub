@@ -145,10 +145,19 @@ button:active{transform:scale(.98)}
 .soon .tx2 span{font-size:12px;color:var(--soft);font-weight:600}
 .soon .wn{font-size:12px;font-weight:800;white-space:nowrap;background:var(--card2);border-radius:999px;padding:5px 9px}
 .soon.today .wn,.soon.tom .wn{background:var(--lime);color:#12140D}
-.tabs .in{max-width:430px}
-.tab{width:46px;height:46px}
-.hubtab{color:var(--lime)!important;background:#2C2F27}
-.tsep{width:1px;height:26px;background:rgba(255,255,255,.1);flex:none}
+.hubfab svg{width:24px;height:24px}
+.hubfab span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.fabfloat{position:fixed;right:18px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:56px;height:56px;border-radius:50%;border:0;
+  background:var(--lime);color:var(--on-lime);display:grid;place-items:center;box-shadow:0 12px 28px -8px rgba(0,0,0,.6),0 0 0 4px var(--bg);transition:transform .2s var(--ease)}
+.fabfloat svg{width:26px;height:26px}
+.fabfloat:active{transform:scale(.94)}
+body.in-hub .fabfloat, body.in-set .fabfloat, body.in-noti .fabfloat, body.typing .fabfloat{display:none}
+@media (min-width:560px){.fabfloat{right:calc(50% - 250px)}}
+.wrap{padding-bottom:calc(170px + env(safe-area-inset-bottom,0px))!important}
+/* no visible scroll bars (scrolling still works) */
+html,body,.sheet,.raw,textarea,.chips,.insights,.accs{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar,.raw::-webkit-scrollbar,textarea::-webkit-scrollbar,*::-webkit-scrollbar{display:none;width:0;height:0;background:transparent}
+.sheet{overflow-x:hidden;border-top-left-radius:32px;border-top-right-radius:32px;-webkit-mask-image:-webkit-radial-gradient(white,black)}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -537,16 +546,15 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <!-- tab bar -->
 <nav class="tabs" aria-label="Main">
   <div class="in">
-    <button class="tab hubtab" id="toHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
-    <i class="tsep" aria-hidden="true"></i>
     <button class="tab" data-v="home" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg><span>Overview</span></button>
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Activity</span></button>
-    <button class="fab" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="fab hubfab" id="toHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
     <button class="tab" data-v="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v9H4zM4 10l8-5 8 5M8 13v3M12 13v3M16 13v3"/></svg><span>Savings</span></button>
     <button class="tab" data-v="sms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/></svg><span>Add SMS</span></button>
   </div>
 </nav>
 
+<button class="fabfloat" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -554,7 +562,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.16.0";
+const APP_VERSION = "5.17.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
