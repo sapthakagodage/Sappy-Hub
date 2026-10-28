@@ -348,7 +348,9 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 <div id="setView" class="hubv setv">
   <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
-    <h2 style="margin-top:0">Look · all apps</h2>
+    <h2 style="margin-top:0">You</h2>
+    <div class="card"><label class="field" style="margin:0"><span>Your name</span><input id="uname" autocomplete="off" placeholder="Your name"></label></div>
+    <h2>Look · all apps</h2>
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
 
     <h2>Cloud sync</h2>
@@ -427,6 +429,14 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
   </section>
 
   <!-- SAVINGS -->
+  <section id="v-sms" hidden>
+    <div class="card">
+      <div class="row" style="padding:0;border:0"><div><div class="k">Add an SMS</div><div class="d">For a bank message that didn’t come through</div></div><button class="btn" id="pasteOpen">Add</button></div>
+    </div>
+    <div class="card" id="skipRow" hidden><div class="row" style="padding:0;border:0"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div></div>
+    <p class="note" style="margin:14px 6px">New bank SMS are added automatically. Use this only if one was missed. Messages already added are ignored.</p>
+  </section>
+
   <section id="v-savings" hidden>
     <div class="card">
       <h3>All my money</h3>
@@ -448,15 +458,6 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
   </section>
 
   <!-- SETTINGS -->
-  <section id="v-settings" class="set" hidden>
-    <button class="card setlink" id="openSet2"><span><b>General settings</b><span>Look, cloud sync, backup, updates</span></span><span class="chev">›</span></button>
-    <h2>Missed messages</h2>
-    <div class="card">
-      <div class="row" style="padding-top:0;border-top:0"><div><div class="k">Add an SMS</div><div class="d">For a message that didn’t come through</div></div><button class="btn" id="pasteOpen">Add</button></div>
-      <div class="row" id="skipRow" style="margin-top:12px"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div>
-    </div>
-
-  </section>
 </div>
 
 <!-- tab bar -->
@@ -466,7 +467,7 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Activity</span></button>
     <button class="fab" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <button class="tab" data-v="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v9H4zM4 10l8-5 8 5M8 13v3M12 13v3M16 13v3"/></svg><span>Savings</span></button>
-    <button class="tab" data-v="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg><span>Settings</span></button>
+    <button class="tab" data-v="sms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/></svg><span>Add SMS</span></button>
   </div>
 </nav>
 
@@ -477,7 +478,7 @@ body.in-set #appView, body.in-set .tabs, body.in-set #hubView{display:none!impor
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.5.0";
+const APP_VERSION = "5.7.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -577,7 +578,7 @@ function load(){
   try{ const s=JSON.parse(localStorage.getItem(KEY)||"null"); if(s&&s.tx) return Object.assign(blank(), s); }catch(e){}
   return blank();
 }
-function blank(){ return {tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
+function blank(){ return {name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
 function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
 const live = o => o && !o.del;
 
@@ -793,6 +794,7 @@ async function sync(manual){
       if(!maxT||r.updated_at>maxT) maxT=r.updated_at;
     }
     S.lastPull=maxT;
+    if(live(S.cfg.profile) && S.cfg.profile.name) S.name=S.cfg.profile.name;
     if(live(S.cfg.rules)){ Object.assign(S.rules,S.cfg.rules.map||{}); Object.assign(S.bankByAcct,S.cfg.rules.acct||{}); }
     // 3. push local changes
     const keys=Object.keys(S.dirty);
@@ -860,7 +862,8 @@ function checkHash(){
 /* =============== view state =============== */
 let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
 let focusCat=null, filter="All";
-const TITLES={home:"Overview",activity:"Activity",savings:"Savings",settings:"Settings"};
+const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
+function renderSms(){ const sk=Object.values(S.skip).filter(live).length; $("skipRow").hidden=!sk; $("skipD").textContent=sk+" SMS couldn’t be read. Send one to Claude to improve reading."; }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
 const inMonth = t => { const d=new Date(t.ts); return d.getFullYear()===month.getFullYear()&&d.getMonth()===month.getMonth(); };
 
@@ -872,7 +875,8 @@ function render(){
   if(view==="home") renderHome();
   if(view==="activity") renderActivity();
   if(view==="savings") renderSavings();
-  if(view==="settings") renderSettings();
+  if(view==="sms") renderSms();
+  if(document.body.classList.contains("in-set")) renderSettings();
 }
 
 /* ---------- home ---------- */
@@ -963,6 +967,7 @@ function listInto(el, list, emptyMsg, flat){
 
 /* ---------- activity ---------- */
 function renderActivity(){
+
   const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).total}));
   const mx=Math.max(1,...ms.map(x=>x.t));
   $("trendCard").hidden=!ms.some(x=>x.t);
@@ -1007,9 +1012,8 @@ function renderSavings(){
 /* ---------- settings ---------- */
 function renderSettings(){
   $("ver").textContent="v"+APP_VERSION;
-  const sk=Object.values(S.skip).filter(live).length;
-  $("skipRow").hidden=!sk; $("skipD").textContent=sk+" message"+(sk>1?"s":"")+" kept. Send one to Claude to improve reading.";
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
+  if(document.activeElement!==$("uname")) $("uname").value=S.name||"";
   document.querySelectorAll("#theme button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.theme));
   setPill(sbOn()?"ok":"off");
 }
@@ -1088,7 +1092,8 @@ function openAdd(){
   const draw=()=>{
     const cats = type==="in"?["Income","Paid back","Transfers","Other"]:SPEND;
     if(!cats.includes(cat)) cat=type==="in"?"Income":"Other";
-    openSheet('<h2>Add entry</h2><div class="note">For cash or anything without an SMS.</div><div style="height:12px"></div>'+
+    openSheet('<h2>Add entry</h2><div class="note">For cash or anything without an SMS.</div>'+
+      '<div style="height:12px"></div>'+
       '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Income</button></div>'+
       '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option'+(type==="in"?' selected':'')+'>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num"></div></label>'+
       '<label class="field"><span>'+(type==="in"?"From":"Where")+'</span><input id="aname" placeholder="'+(type==="in"?"Salary":"Shop or place")+'"></label>'+
@@ -1133,8 +1138,8 @@ let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add(
 
 /* =============== wiring =============== */
 function go(v){ if(sheetOpen) closeSheet(); view=v; document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
-  ["home","activity","savings","settings"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); }
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>go(b.dataset.v));
+  ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); }
+document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("fab").onclick=openAdd;
 $("prev").onclick=()=>{ month.setMonth(month.getMonth()-1); focusCat=null; render(); };
 $("next").onclick=()=>{ month.setMonth(month.getMonth()+1); focusCat=null; render(); };
@@ -1147,10 +1152,10 @@ $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value
   persist(); renderSettings(); sync(true); };
 $("sbSync").onclick=()=>sync(true);
 $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("app",APP_VERSION,"version.json",true); if(r===false) toast("You have the latest version"); else if(r===null) toast("Couldn’t check. Are you online?"); };
-$("skipRetry").onclick=()=>{ reparseAll(true); renderSettings(); };
+$("skipRetry").onclick=()=>{ reparseAll(true); render(); };
 $("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
 
-$("pasteOpen").onclick=()=>{
+function openPaste(){
   openSheet('<h2>Add an SMS</h2><div class="note">Copy it from Messages and paste below. Already-added ones are ignored.</div>'+
     '<textarea id="paste" class="smsbox" rows="7" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea>'+
     '<button class="btn full" id="pasteAdd">Add messages</button>');
@@ -1158,7 +1163,7 @@ $("pasteOpen").onclick=()=>{
     const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
     parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
     closeSheet(); toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
-};
+}
 
 $("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"application/json"})); a.download="sappy-pocket-"+ymd(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
@@ -1254,7 +1259,7 @@ const hsvg = n => '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" s
 
 function renderHub(){
   const h=new Date().getHours();
-  $("hHello").textContent = h<12?"Good morning":h<17?"Good afternoon":"Good evening";
+  $("hHello").textContent = (h<12?"Good morning":h<17?"Good afternoon":"Good evening")+(S.name?", "+S.name:"");
   $("hDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
   $("hVer").textContent = APP_VERSION;
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
@@ -1271,7 +1276,7 @@ function showHub(){ if(sheetOpen) closeSheet(); document.body.classList.add("in-
 function openApp(id){
   if(id==="pocket"){ document.body.classList.remove("in-hub"); go("home"); }
 }
-$("toHub").onclick=showHub;
+$("toHub").onclick=showHub; $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
   if(sheetOpen) closeSheet();
@@ -1283,13 +1288,15 @@ function closeSettings(){
   document.body.classList.remove("in-set");
   if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); }
 }
-$("hubSet").onclick=openSettings; $("openSet2").onclick=openSettings; $("setBack").onclick=closeSettings;
+$("hubSet").onclick=openSettings;
+$("uname").onchange=()=>{ S.name=$("uname").value.trim(); persist(); put("cfg",{id:"profile",name:S.name}); toast("Saved"); }; $("setBack").onclick=closeSettings;
 
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate("app",APP_VERSION,"version.json"); });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ sync(); checkHash(); } });
 if(!S.look3){ S.theme="dark"; S.look3=1; persist(); }
+if(S.name===undefined){ S.name="Sapthaka"; persist(); }
 applyTheme(); render(); if(S.pv<PARSER_VERSION) reparseAll(); checkHash(); sync(); setInterval(()=>sync(),60000);
 if(Date.now()-(S.rate.at||0)>864e5) fetch("https://open.er-api.com/v6/latest/LKR").then(r=>r.json()).then(r=>{ if(r.rates&&r.rates.AUD){ S.rate.AUD=+(1/r.rates.AUD).toFixed(2); S.rate.USD=+(1/r.rates.USD).toFixed(2); S.rate.at=Date.now(); persist(); render(); } }).catch(()=>{});
 })();
