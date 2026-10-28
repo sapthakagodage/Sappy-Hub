@@ -128,7 +128,9 @@ button:active{transform:scale(.98)}
 .tab{transition:background .25s var(--ease),color .25s var(--ease)}
 .chip{transition:background .2s var(--ease),color .2s var(--ease)}
 .dragging{transition:none!important;will-change:transform;box-shadow:-18px 0 40px -12px rgba(0,0,0,.55)}
-.snap{transition:transform .26s var(--ease)!important}
+.snap{transition:transform .18s cubic-bezier(.3,.7,.3,1)!important}
+@keyframes quickin{from{opacity:.4;transform:translateX(-18px)}to{opacity:1;transform:none}}
+.quickin{animation:quickin .2s var(--ease) both}
 @media (prefers-reduced-motion: reduce){.rise,.grow,.barup,.fadein{animation:none!important}.donut-wrap .seg,.snap{transition:none!important}}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
@@ -405,9 +407,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <div id="setView" class="hubv setv">
   <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
-    <h2 style="margin-top:0">You</h2>
-    <div class="card"><label class="field" style="margin:0"><span>Your name</span><input id="uname" autocomplete="off" placeholder="Your name"></label></div>
-    <h2>Look · all apps</h2>
+    <h2 style="margin-top:0">Look · all apps</h2>
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
 
     <h2>Cloud sync</h2>
@@ -533,7 +533,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.14.0";
+const APP_VERSION = "5.14.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -825,6 +825,7 @@ async function sbf(path, opt={}){
     const body=(await res.text()).slice(0,300); let msg=body;
     try{ const j=JSON.parse(body); msg=j.message||j.msg||j.error||body; }catch(e){}
     if(res.status===401||/jwt|api key|apikey/i.test(msg)) throw new Error("Key not accepted. Copy the anon or publishable key again.");
+    if(/<!doctype html|<html/i.test(body)) throw new Error("The Project URL is not your Supabase address (it opened a web page, not the database). Use the URL from Supabase → Project Settings → Data API. It looks like https://abcd1234.supabase.co");
     if(/does not exist|PGRST205|PGRST202|42P01|schema cache/i.test(body)) throw new Error("Tables not found. Run supabase-setup.sql again.");
     if(res.status===403||/permission denied|row-level security/i.test(msg)) throw new Error("No permission. Run supabase-setup.sql again.");
     throw new Error("Error "+res.status+": "+String(msg).slice(0,90));
@@ -880,7 +881,8 @@ function setPill(st,msg){
   const dot=$("syncDot"); if(dot) dot.className="sync"+(!sbOn()?"":st==="ok"?" ok":st==="err"?" err":st==="busy"?" busy":"");
   const p=$("syncPill"); p.className="pill"+(st==="ok"?" ok":st==="err"?" err":"");
   p.querySelector("span").textContent= !sbOn()?"Off": st==="ok"?"On": st==="err"?"Error":"Syncing";
-  $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): st==="busy"?"Syncing…": S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected";
+  const hostTxt=sbOn()?" · "+cleanUrl(S.sb.url).replace(/^https:\/\//,""):"";
+  $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): st==="busy"?"Syncing…": (S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected")+hostTxt;
 }
 
 
@@ -1182,7 +1184,6 @@ function renderSettings(){
   showLatest();
   $("ver").textContent="v"+APP_VERSION;
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
-  if(document.activeElement!==$("uname")) $("uname").value=S.name||"";
   document.querySelectorAll("#theme button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.theme));
   setPill(!sbOn()?"off":(S.sb.err?"err":"ok"), S.sb.err);
 }
@@ -1328,6 +1329,7 @@ $("q").oninput=renderActivity;
 
 $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
   if(!/^https:\/\/.+\..+/.test(u)) return toast("Check the Project URL");
+  if(/github\.io|github\.com|claude\.ai/i.test(u) || !/supabase\.(co|in|net)/i.test(u)){ toast("That’s not a Supabase URL. It should end with .supabase.co"); return; }
   if(k.length<20) return toast("Paste the full key");
   if(S.sb.url===u && S.sb.key===k){ sync(true); return; }
   S.sb={url:u,key:k}; S.lastPull="";
@@ -1497,9 +1499,11 @@ function countUp(el){
   (function step(now){ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
     el.textContent=pre+fmt(to*e,dec); if(k<1) requestAnimationFrame(step); })(t0);
 }
+let quickBack=false;
 function enterScreen(){
   if(REDUCED) return;
   const root=screenRoot(); if(!root) return;
+  if(quickBack){ playClass(root,"quickin",0); root.querySelectorAll("[data-count]").forEach(el=>{ const v=parseFloat(el.dataset.count); if(isFinite(v)) el.textContent=(el.dataset.prefix||"")+fmt(v,+(el.dataset.dec||0)); }); return; }
   const items=[...root.children].filter(x=>!x.hidden && x.offsetParent!==null);
   // header of the app too
   if(!document.body.classList.contains("in-hub")&&!document.body.classList.contains("in-set")&&!document.body.classList.contains("in-noti")) playClass(document.querySelector(".bar"),"fadein",0);
@@ -1532,7 +1536,7 @@ const hsvg = n => '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" s
 function renderHub(){
   paintBells();
   const h=new Date().getHours();
-  $("hHello").textContent = (h<12?"Good morning":h<17?"Good afternoon":"Good evening")+(S.name?", "+S.name:"");
+  $("hHello").textContent = (h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", Sapthaka";
   $("hDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
   $("hVer").textContent = APP_VERSION;
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
@@ -1561,7 +1565,7 @@ function closeSettings(){
 }
 $("hubSet").onclick=openSettings;
 document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=closeNoti;
-$("uname").onchange=()=>{ S.name=$("uname").value.trim(); persist(); put("cfg",{id:"profile",name:S.name}); toast("Saved"); }; $("setBack").onclick=closeSettings;
+$("setBack").onclick=closeSettings;
 
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
@@ -1586,13 +1590,13 @@ function goBack(){
   },{passive:true});
   document.addEventListener("touchend",()=>{
     if(!on){ return; } on=false;
-    if(!el){ if(dx>80) goBack(); return; }
+    if(!el){ if(dx>80){ quickBack=true; goBack(); quickBack=false; } return; }
     const W=window.innerWidth, go=dx>W*0.28;
     el.classList.remove("dragging"); el.classList.add("snap");
     el.style.transform = go ? "translate3d("+W+"px,0,0)" : "translate3d(0,0,0)";
     const done=()=>{ el.removeEventListener("transitionend",done); el.classList.remove("snap"); el.style.transform="";
-      if(go) goBack(); };
-    el.addEventListener("transitionend",done); setTimeout(()=>{ if(el.classList.contains("snap")) done(); },320);
+      if(go){ quickBack=true; goBack(); quickBack=false; } };
+    el.addEventListener("transitionend",done); setTimeout(()=>{ if(el.classList.contains("snap")) done(); },200);
   });
 })();
 let hiddenAt=0;
