@@ -250,6 +250,28 @@ body:not(.in-travel) .tfab{display:none}
 .pin2.plan{border-style:dashed}
 .leaflet-tooltip.plab{background:#12140D;color:#F3F5EE;border:0;border-radius:999px;padding:4px 9px;font:800 11px/1.2 "Manrope",system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.35)}
 .leaflet-tooltip.plab::before{display:none}
+/* numbered pins */
+.npin{position:relative;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);border:2.5px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.45);margin-top:2px}
+.npin b{position:absolute;inset:0;display:grid;place-items:center;transform:rotate(45deg);color:#12140D;font:800 12px/1 "Manrope",system-ui,sans-serif}
+.npin.big{width:38px;height:38px;border-width:3px}
+.npin.big b{font-size:15px}
+.bump .npin{animation:bump .5s var(--ease)}
+@keyframes bump{50%{transform:rotate(-45deg) scale(1.3)}}
+/* full screen map */
+.fullmap{position:fixed;inset:0;z-index:90;background:var(--bg);display:none;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.fullmap.on{display:flex;animation:fadein .25s var(--ease)}
+.fm-top{display:flex;align-items:center;gap:10px;padding:10px 14px}
+.fm-top b{flex:1;font-size:18px;font-weight:800}
+#fmMap{flex:1 1 60%;min-height:300px}
+.fm-list{flex:0 1 40%;overflow-y:auto;padding:10px 14px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.fm-row{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;cursor:pointer}
+.fm-row.sel{background:var(--card2)}
+.fm-n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#12140D;flex:none}
+.fm-t{flex:1;min-width:0}
+.fm-t b{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fm-t span{font-size:12px;color:var(--soft);font-weight:600}
+.fm-go{border:0;background:var(--card2);color:var(--ink);width:34px;height:34px;border-radius:50%;font-size:20px;font-weight:800;flex:none}
+#tMap{cursor:zoom-in}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1192,7 +1214,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <header class="h-top"><button class="hub backbtn" id="trBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Sappy Travel</div></header>
   <div class="tr-stats" id="trStats"></div>
   <div class="mapcard"><div id="tMap"></div>
-    <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
+    <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trFull" aria-label="Full screen map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
     <div class="years chips" id="trYears"></div></div>
   <div id="trSeed"><button class="card setlink" id="seedBtn"><span><b>Add my recent places</b><span>Bible Rock, Pettigala, Ambuluwawa, Hatale Mini World’s End, Scotland</span></span><span class="chev">›</span></button></div>
   <div class="shead" style="margin:18px 4px 10px"><h3>Trips</h3></div>
@@ -1338,7 +1360,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.2.0";
+const APP_VERSION = "6.3.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2483,15 +2505,56 @@ function initMap(){
   if(LMAP && !document.getElementById("tMap").classList.contains("leaflet-container")) LMAP=null;
   if(LMAP){ [50,350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms)); return; }
   LMAP=L.map("tMap",{zoomControl:false,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(LMAP);
-  LLAYER=L.layerGroup().addTo(LMAP); LMAP.fitBounds(LK); [350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms));
+  LLAYER=L.layerGroup().addTo(LMAP); LMAP.fitBounds(LK); LMAP.on("click",openFullMap); [350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms));
 }
 function pinIcon(color,dashed){ return L.divIcon({className:"",html:'<div class="pin2'+(dashed?' plan':'')+'" style="--c:'+color+'"></div>',iconSize:[30,38],iconAnchor:[15,36],tooltipAnchor:[0,-34]}); }
+/* ===== numbered pins + full-screen map ===== */
+function mapList(){ return trips().filter(t=>(trYear==="all"||tYear(t)===+trYear) && isFinite(t.lat)); }
+function numIcon(n,color,big){ const s=big?38:28;
+  return L.divIcon({className:"",html:'<div class="npin'+(big?' big':'')+'" style="--c:'+color+'"><b>'+n+'</b></div>',iconSize:[s,s+8],iconAnchor:[s/2,s+6]}); }
+let FMAP=null, FLAYER=null, fScope="lk", fMarkers={};
+function openFullMap(){
+  if(!window.L) return;
+  let el=$("fullMap");
+  if(!el){ el=document.createElement("div"); el.id="fullMap"; el.className="fullmap";
+    el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All places</b>'+
+      '<div class="mseg" id="fmScope"><button data-s="lk">Sri Lanka</button><button data-s="world">World</button></div></div>'+
+      '<div id="fmMap"></div><div class="fm-list" id="fmList"></div>';
+    document.body.appendChild(el);
+    $("fmClose").onclick=closeFullMap;
+    $("fmScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ fScope=b.dataset.s; paintFull(true); });
+  }
+  fScope=trScope; el.classList.add("on"); document.body.classList.add("in-fullmap");
+  setTimeout(()=>{ if(!FMAP){ FMAP=L.map("fmMap",{zoomControl:true,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(FMAP); FLAYER=L.layerGroup().addTo(FMAP); }
+    FMAP.invalidateSize(); paintFull(true); },60);
+}
+function closeFullMap(){ const el=$("fullMap"); if(el) el.classList.remove("on"); document.body.classList.remove("in-fullmap"); }
+function paintFull(fit){
+  const list=mapList(); FLAYER.clearLayers(); fMarkers={};
+  $("fmScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.s===fScope));
+  const pts=[];
+  list.forEach((t,i)=>{ const c=(TYPES[t.type]||TYPES.place).c;
+    fMarkers[t.id]=L.marker([t.lat,t.lng],{icon:numIcon(i+1,c,true),zIndexOffset:100-i}).addTo(FLAYER).on("click",()=>focusRow(t.id)); pts.push([t.lat,t.lng]); });
+  $("fmList").innerHTML=list.length?list.map((t,i)=>{ const T=TYPES[t.type]||TYPES.place;
+    return '<div class="fm-row" data-id="'+esc(t.id)+'"><span class="fm-n" style="background:'+T.c+'">'+(i+1)+'</span><span class="fm-t"><b>'+esc(t.name)+'</b><span>'+esc([t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):(t.year||""),tripLoc(t)].filter(Boolean).join(" · "))+'</span></span><button class="fm-go" aria-label="Open">›</button></div>'; }).join("")
+    :'<div class="empty">No places for this year yet.</div>';
+  $("fmList").querySelectorAll(".fm-row").forEach(r=>{ r.onclick=e=>{ if(e.target.closest(".fm-go")) return; const t=S.trip[r.dataset.id]; FMAP.flyTo([t.lat,t.lng],Math.max(FMAP.getZoom(),11),{duration:.8}); focusRow(t.id,true); };
+    r.querySelector(".fm-go").onclick=()=>{ closeFullMap(); openTrip(r.dataset.id); }; });
+  if(fit){ const lk=pts.filter(x=>x[0]>5.8&&x[0]<9.9&&x[1]>79.5&&x[1]<82);
+    if(fScope==="lk") (lk.length>1?FMAP.fitBounds(L.latLngBounds(lk).pad(.25),{maxZoom:12}):FMAP.fitBounds(LK,{padding:[10,10]}));
+    else (pts.length?FMAP.fitBounds(L.latLngBounds(pts).pad(.3),{maxZoom:5}):FMAP.setView([25,20],2)); }
+}
+function focusRow(id,fromList){ document.querySelectorAll(".fm-row").forEach(r=>r.classList.toggle("sel",r.dataset.id===id));
+  const r=document.querySelector('.fm-row[data-id="'+id+'"]'); if(r&&!fromList) r.scrollIntoView({behavior:"smooth",block:"nearest"});
+  const m=fMarkers[id]; if(m){ const el=m.getElement(); if(el){ el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } } }
+
 function drawMap(fit){
   if(!LMAP) return; LLAYER.clearLayers();
-  const list=trips().filter(t=>trYear==="all"||tYear(t)===+trYear), b=[];
+  const list=trips().filter(t=>trYear==="all"||tYear(t)===+trYear), b=[], num={};
+  mapList().forEach((t,i)=>num[t.id]=i+1);
   list.forEach(t=>{ const c=(TYPES[t.type]||TYPES.place).c;
     if(t.track&&t.track.length>1){ const line=L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:4,opacity:.9}).addTo(LLAYER); line.on("click",()=>openTrip(t.id)); }
-    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:pinIcon(c)}).addTo(LLAYER).on("click",()=>openTrip(t.id)).bindTooltip(esc(t.name),{permanent:true,direction:"top",className:"plab"}); b.push([t.lat,t.lng]); } });
+    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:numIcon(num[t.id]||"",c),zIndexOffset:100-(num[t.id]||0)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
   plans().forEach(p=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:pinIcon("#BBA6FF",true)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
   if(fit!==false){
     if(trScope==="lk") LMAP.fitBounds(LK,{padding:[10,10]});
@@ -2744,7 +2807,7 @@ function openApp(id){
 }
 $("toHub").onclick=showHub;
 $("trBack").onclick=showHub; $("tripAdd").onclick=()=>openTripForm(); $("planAdd").onclick=()=>openAddPlace("plan");
-$("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
+$("trMe").onclick=()=>locateMe(true); $("trFull").onclick=openFullMap; $("seedBtn").onclick=seedPlaces;
 $("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); drawMap(); }); $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
@@ -2768,6 +2831,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpd
 /* ===== swipe from the left edge = back (like iPhone apps) ===== */
 function goBack(){
   if(sheetOpen){ closeSheet(); return; }
+  if(document.body.classList.contains("in-fullmap")){ closeFullMap(); return; }
   const b=document.body.classList;
   if(b.contains("in-set")){ closeSettings(); return; }
   if(b.contains("in-noti")){ closeNoti(); return; }
