@@ -246,6 +246,7 @@ code{background:var(--card2);border-radius:6px;padding:1px 6px;font-size:14px;wo
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--soft)}
 .pill i{width:8px;height:8px;border-radius:50%;background:var(--faint)}
 .pill.ok i{background:var(--pos)} .pill.err i{background:var(--neg)}
+#syncWhen{word-break:break-word;user-select:text;-webkit-user-select:text}
 .note{font-size:14px;color:var(--soft);margin:6px 0}
 details summary{cursor:pointer;font-weight:700;list-style:none;padding:4px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
 details summary::-webkit-details-marker{display:none}
@@ -514,7 +515,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.11.1";
+const APP_VERSION = "5.11.2";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -815,22 +816,23 @@ async function sbf(path, opt={}){
 function queueSync(){ if(!sbOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(sync,1500); }
 async function sync(manual){
   if(!sbOn()||syncing) return; syncing=true; setPill("busy");
-  let added=0;
+  let added=0, step="reading the SMS inbox";
   try{
     // 1. pull SMS inbox from the iPhone shortcut
     const inbox=await sbf("inbox?select=id,raw&order=id.asc&limit=500");
     if(inbox&&inbox.length){
-      for(const r of inbox){ if(ingest(r.raw).r==="added") added++; }
+      for(const r of inbox){ try{ if(r && typeof r.raw==="string" && ingest(r.raw).r==="added") added++; }catch(e){ console.warn("bad inbox row",r,e); } }
       if(added) linkOwnTransfers();
       await sbf("inbox?id=lte."+inbox[inbox.length-1].id,{method:"DELETE"});
     }
     // 2. pull changes from other devices
+    step="downloading your records";
     let q="items?select=id,kind,data,updated_at&order=updated_at.asc&limit=5000";
     if(S.lastPull){ const t=new Date(new Date(S.lastPull).getTime()-5000).toISOString(); q+="&updated_at=gt."+encodeURIComponent(t); }
     const rows=await sbf(q)||[];
     let maxT=S.lastPull, changed=false;
     for(const r of rows){
-      if(!S[r.kind]) continue;
+      if(!r || !r.data || typeof r.data!=="object" || !r.data.id || !S[r.kind]) continue;
       const loc=S[r.kind][r.data.id];
       if(!loc || (r.data.u||0)>(loc.u||0)){ S[r.kind][r.data.id]=r.data; changed=true; }
       if(!maxT||r.updated_at>maxT) maxT=r.updated_at;
@@ -841,24 +843,26 @@ async function sync(manual){
     if(live(S.cfg.noti)) S.notiRead=Object.assign({},S.notiRead||{},S.cfg.noti.read||{});
     if(live(S.cfg.rules)){ Object.assign(S.rules,S.cfg.rules.map||{}); Object.assign(S.bankByAcct,S.cfg.rules.acct||{}); }
     // 3. push local changes
+    step="uploading your changes";
     const keys=Object.keys(S.dirty);
     if(keys.length){
       const payload=keys.map(k=>{const [kind,id]=k.split(/:(.+)/); const d=S[kind]&&S[kind][id]; return d?{id:k,kind,data:d}:null;}).filter(Boolean);
-      for(let i=0;i<payload.length;i+=400)
-        await sbf("items",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload.slice(i,i+400))});
+      for(let i=0;i<payload.length;i+=100)
+        await sbf("items",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(payload.slice(i,i+100))});
       keys.forEach(k=>delete S.dirty[k]);
     }
-    S.sb.at=Date.now(); persist(); if(changed){ if(S.pv<PARSER_VERSION||Object.values(S.skip).some(live)) reparseAll(); else render(); } setPill("ok");
+    S.sb.at=Date.now(); S.sb.err=""; persist(); setPill("ok");
     if(added) toast("Added "+added+" new from your iPhone");
-    else if(manual) toast("Synced");
-  }catch(e){ console.warn(e); setPill("err", String(e.message||e)); if(manual) toast("Sync failed. Check URL and key."); }
+    else if(manual) toast("Synced ✓");
+    try{ if(changed){ if(S.pv<PARSER_VERSION||Object.values(S.skip).some(live)) reparseAll(); else render(); } }catch(e){ console.warn(e); }
+  }catch(e){ console.warn(e); const m="Failed while "+step+": "+String(e.message||e); S.sb.err=m; persist(); setPill("err", m); if(manual) toast("Sync failed. Details in Settings."); }
   finally{ syncing=false; }
 }
 function setPill(st,msg){
   const dot=$("syncDot"); if(dot) dot.className="sync"+(!sbOn()?"":st==="ok"?" ok":st==="err"?" err":st==="busy"?" busy":"");
   const p=$("syncPill"); p.className="pill"+(st==="ok"?" ok":st==="err"?" err":"");
   p.querySelector("span").textContent= !sbOn()?"Off": st==="ok"?"On": st==="err"?"Error":"Syncing";
-  $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected";
+  $("syncWhen").textContent = !sbOn()?"Not connected": st==="err"?(msg||"Error"): st==="busy"?"Syncing…": S.sb.at?"Last synced "+new Date(S.sb.at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"Connected";
 }
 
 
@@ -1161,7 +1165,7 @@ function renderSettings(){
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
   if(document.activeElement!==$("uname")) $("uname").value=S.name||"";
   document.querySelectorAll("#theme button").forEach(b=>b.classList.toggle("on",b.dataset.t===S.theme));
-  setPill(sbOn()?"ok":"off");
+  setPill(!sbOn()?"off":(S.sb.err?"err":"ok"), S.sb.err);
 }
 
 /* =============== sheets =============== */
@@ -1306,7 +1310,9 @@ $("q").oninput=renderActivity;
 $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
   if(!/^https:\/\/.+\..+/.test(u)) return toast("Check the Project URL");
   if(k.length<20) return toast("Paste the full key");
-  S.sb={url:u,key:k}; S.lastPull=""; Object.values(S.tx).forEach(t=>S.dirty["tx:"+t.id]=1); Object.values(S.fd).forEach(f=>S.dirty["fd:"+f.id]=1);
+  if(S.sb.url===u && S.sb.key===k){ sync(true); return; }
+  S.sb={url:u,key:k}; S.lastPull="";
+  ["tx","fd","sub","cfg"].forEach(kind=>Object.values(S[kind]||{}).forEach(o=>{ if(o&&o.id) S.dirty[kind+":"+o.id]=1; }));
   persist(); renderSettings(); sync(true); };
 $("sbSync").onclick=()=>sync(true);
 $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("app",APP_VERSION,"version.json",true); if(r===false) toast("You have the latest version"); else if(r===null) toast("Couldn’t check. Are you online?"); };
@@ -1502,7 +1508,21 @@ $("uname").onchange=()=>{ S.name=$("uname").value.trim(); persist(); put("cfg",{
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate("app",APP_VERSION,"version.json"); });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ sync(); checkHash(); } });
+let hiddenAt=0;
+function freshStart(){
+  if(sheetOpen) closeSheet();
+  document.body.classList.remove("in-set","in-noti");
+  month=new Date(); month.setDate(1); month.setHours(0,0,0,0); focusCat=null; filter="All"; accFilter="all";
+  view="home"; ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!=="home");
+  document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v==="home"?"true":"false"));
+  showHub();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ hiddenAt=Date.now(); return; }
+  if(hiddenAt && Date.now()-hiddenAt>15000) freshStart();   // away more than 15 s = start fresh on the Hub
+  sync(); checkHash();
+});
+window.addEventListener("pageshow",e=>{ if(e.persisted) freshStart(); });
 if(!S.look3){ S.theme="dark"; S.look3=1; persist(); }
 if(S.name===undefined){ S.name="Sapthaka"; persist(); }
 applyTheme(); render(); if(S.pv<PARSER_VERSION) reparseAll(); checkHash(); sync(); setInterval(()=>sync(),60000);
