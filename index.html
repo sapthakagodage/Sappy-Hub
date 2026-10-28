@@ -381,7 +381,9 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 .h-feat::after{content:"";position:absolute;right:-50px;top:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.45),rgba(255,255,255,0) 65%)}
 .h-feat .row1{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
 .h-feat .ico{width:48px;height:48px;border-radius:16px;background:rgba(18,20,13,.1);display:grid;place-items:center}
-.h-feat .go{border:0;cursor:pointer;width:46px;height:46px;font-size:24px!important;border-radius:50%;background:var(--on-lime);color:var(--lime);display:grid;place-items:center;font-size:20px;font-weight:800}
+.h-feat{cursor:pointer;transition:transform .15s var(--ease)}
+.h-feat:active{transform:scale(.985)}
+.h-feat .go{border:0;width:46px;height:46px;font-size:24px!important;border-radius:50%;background:var(--on-lime);color:var(--lime);display:grid;place-items:center;font-size:20px;font-weight:800}
 .h-feat .nm{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:18px 0 2px;position:relative;z-index:1}
 .h-feat .tg{font-size:14px;font-weight:600;opacity:.65;position:relative;z-index:1}
 .h-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;position:relative;z-index:1}
@@ -571,7 +573,7 @@ body.in-noti #appView, body.in-noti .tabs, body.in-noti #hubView, body.in-noti #
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "5.18.0";
+const APP_VERSION = "5.18.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1152,10 +1154,10 @@ function openAddAcc(){
 function openNewFd(){
   openSheet('<h2>Add a past fixed deposit</h2><p class="note">For FDs made before the app. New ones are still added automatically from SMS.</p>'+
     '<label class="fl2"><span>Bank</span><input class="inp" id="nfBank" value="HNB"></label>'+
-    '<label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="nfAmt" inputmode="decimal" placeholder="500000"></label>'+
+    '<label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="nfAmt" inputmode="decimal" placeholder="500,000"></label>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Started on</span><input class="inp" id="nfStart" type="date"></label>'+
     '<label class="fl2"><span>Matures on</span><input class="inp" id="nfMat" type="date"></label></div>'+
-    '<label class="fl2"><span>Interest % a year (optional)</span><input class="inp" id="nfRate" inputmode="decimal" placeholder="e.g. 9.5"></label>'+
+    '<label class="fl2"><span>Interest % a year (optional)</span><input class="inp" id="nfRate" data-plain="1" inputmode="decimal" placeholder="e.g. 9.5"></label>'+
     '<label class="fl2"><span>Note (optional)</span><input class="inp" id="nfNote" placeholder="e.g. 1 year FD"></label>'+
     '<button class="btn full" id="nfSave">Save</button>');
   $("nfSave").onclick=()=>{
@@ -1265,11 +1267,31 @@ function renderSettings(){
   setPill(!sbOn()?"off":(S.sb.err?"err":"ok"), S.sb.err);
 }
 
+
+/* =============== amounts: 10000 -> 10,000 while typing =============== */
+function fmtAmountStr(v){
+  v=String(v).replace(/[^\d.]/g,""); const dot=v.indexOf(".");
+  let ip=dot<0?v:v.slice(0,dot), dp=dot<0?null:v.slice(dot+1).replace(/\./g,"").slice(0,2);
+  ip=ip.replace(/^0+(?=\d)/,""); ip=ip.replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  return dp===null?ip:(ip||"0")+"."+dp;
+}
+function isAmountInput(el){ return el && el.tagName==="INPUT" && el.getAttribute("inputmode")==="decimal" && !el.dataset.plain; }
+document.addEventListener("input",e=>{
+  const el=e.target; if(!isAmountInput(el)) return;
+  const pos=el.selectionStart||0, before=el.value.slice(0,pos).replace(/[^\d.]/g,"").length;
+  const out=fmtAmountStr(el.value); if(out===el.value) return;
+  el.value=out;
+  let n=0,i=0; while(i<out.length && n<before){ if(/[\d.]/.test(out[i])) n++; i++; }
+  try{ el.setSelectionRange(i,i); }catch(_){}
+});
+function fmtAmountsIn(root){ (root||document).querySelectorAll('input[inputmode="decimal"]').forEach(el=>{ if(isAmountInput(el)&&el.value) el.value=fmtAmountStr(el.value); }); }
+
 /* =============== sheets =============== */
 let sheetOpen=false, lockY=0;
 function rescueSb(){ const f=$("sbForm"), h=$("sbHolder"); if(f&&h&&!h.contains(f)) h.appendChild(f); }
 function openSheet(html){
   rescueSb();
+  setTimeout(()=>fmtAmountsIn($("sheetBody")),0);
   $("sheetBody").innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html; $("sx").onclick=closeSheet;
   $("sheet").scrollTop=0;
   if(!sheetOpen){ lockY=window.scrollY; Object.assign(document.body.style,{position:"fixed",top:(-lockY)+"px",left:"0",right:"0"}); sheetOpen=true; }
@@ -1383,7 +1405,7 @@ function openFd(id){
   const f=S.fd[id]; if(!f) return;
   openSheet('<h2>Fixed deposit</h2><div class="note num" style="margin-bottom:6px">'+esc(f.bank)+' · '+(f.cur==="LKR"?"Rs ":esc(f.cur)+" ")+fmt(f.amount)+' · started '+new Date(fromYmd(f.start)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})+'</div>'+
     '<label class="field"><span>Matures on</span><input id="fmat" type="date" value="'+esc(f.maturity||"")+'"></label>'+
-    '<label class="field"><span>Interest % a year (optional)</span><input id="frate" inputmode="decimal" value="'+esc(f.rate||"")+'" placeholder="e.g. 9.5"></label>'+
+    '<label class="field"><span>Interest % a year (optional)</span><input id="frate" data-plain="1" inputmode="decimal" value="'+esc(f.rate||"")+'" placeholder="e.g. 9.5"></label>'+
     '<label class="field"><span>Note (optional)</span><input id="fnote" value="'+esc(f.note&&f.note!=="From SMS"?f.note:"")+'" placeholder="e.g. 1 year FD"></label>'+
     '<div class="btns"><button class="btn" id="fsave" style="flex:1">Save</button>'+(f.maturity?'<button class="btn soft" id="fcal">Add to Calendar</button>':'')+'<button class="btn soft" id="fdel">Close</button></div>'+
     (f.maturity?'<p class="note">Add to Calendar reminds you on your iPhone the day before it matures.</p>':''));
@@ -1623,7 +1645,7 @@ function renderHub(){
   $("hVer").textContent = APP_VERSION;
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
   const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
-  $("hFeat").innerHTML = feat ? '<div class="h-feat" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><button class="go" data-app="'+feat.id+'" aria-label="Open '+esc(feat.name)+'">›</button></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
+  $("hFeat").innerHTML = feat ? '<div class="h-feat" role="button" tabindex="0" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go" aria-hidden="true">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
     (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num" data-count="'+Math.round(sp)+'" data-prefix="Rs ">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num"'+(a.unset?'':' data-count="'+Math.round(a.balance)+'" data-prefix="Rs "')+'>'+(a.unset?'—':rs(a.balance))+'</b></div>'));
       return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</div>' : "";
   $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
