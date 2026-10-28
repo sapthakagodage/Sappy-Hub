@@ -22,6 +22,7 @@ icon-180.png, icon-512.png
 supabase-setup.sql
 CHANGELOG.md, README.md
 pocket/index.html   ← Sappy Pocket
+version.json        ← latest version numbers (the apps check this to update themselves)
 ```
 
 ---
@@ -112,10 +113,11 @@ That's it. The Hub shows it automatically.
 
 Your data is never touched by updates. It lives in Supabase, not in the app files.
 
-1. Ask Claude for the change. You get updated files.
+1. Ask Claude for the change. You get updated files, **always including `version.json`**.
 2. GitHub → **Add file** → **Upload files** → drag them in (keep folder names the same).
 3. Commit message with the version, e.g. `Pocket v4.1.0`.
-4. Wait 1–2 minutes, close the app, open it again.
+4. Wait 1–2 minutes, then open the app. It sees the new number in `version.json` and updates itself.
+   Or: Sappy Pocket → Settings → **Check for updates**.
 
 Every version is saved under **Commits**, so you can always go back.
 

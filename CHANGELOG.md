@@ -1,5 +1,9 @@
 # Changelog
 
+## Sappy Hub v1.0.1 / Sappy Pocket v4.0.1 — 2026-10-28
+- Auto-update: apps check version.json on every launch and reload themselves when there's a new version
+- Settings → "Check for updates" button
+
 ## Sappy Hub v1.0.0 / Sappy Pocket v4.0.0 — 2026-10-28
 - New Sappy Hub launcher: Sappy Pocket, Sappy Travel (soon), Sappy Fitness (soon)
 - Pocket Ledger is now Sappy Pocket, inside the pocket/ folder
