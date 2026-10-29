@@ -282,6 +282,53 @@ body:not(.in-travel) .tfab{display:none}
 /* solid pinned header on every screen, so the iPhone status bar area matches the page */
 .hubv .h-top{position:sticky;top:env(safe-area-inset-top,0px);z-index:12;background:var(--bg);margin:0 -18px 12px;padding:8px 18px 14px}
 .hubv .h-top::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:120px;background:var(--bg)}
+/* Travel footer (same panel as Pocket) */
+#travelTabs{display:none}
+body.in-travel nav#travelTabs.tabs{display:block!important}
+body.in-fullmap nav#travelTabs.tabs{display:none!important}
+.tfab{display:none!important}
+/* Travel summary card, like Pocket's lime card */
+.tr-hero{background:#8FDDFF;color:#12140D;border-radius:var(--r-xl);padding:16px;margin-bottom:12px;position:relative;overflow:hidden}
+.tr-hero::after{content:"";position:absolute;right:-60px;top:-70px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.5),rgba(255,255,255,0) 65%);pointer-events:none}
+.trh-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;position:relative;z-index:1}
+.trh-top span{font-size:14px;font-weight:700;background:rgba(18,20,13,.09);border-radius:999px;padding:6px 12px}
+.trh-top i{font-style:normal;font-size:12px;font-weight:800;background:#12140D;color:#8FDDFF;border-radius:999px;padding:6px 10px}
+.trh-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:relative;z-index:1}
+.trh-tiles div{background:#12140D;border-radius:var(--r-md);padding:11px 12px}
+.trh-tiles span{display:block;font-size:12px;font-weight:600;color:#A2A79B}
+.trh-tiles b{display:block;font-size:26px;font-weight:800;color:#8FDDFF;letter-spacing:-.02em}
+.tsoon{border-left-color:#8FDDFF}
+/* next visits */
+.pcard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
+.pcard .pi{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.pcard .pm{flex:1;min-width:0}
+.pcard .pm b{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .pm span{display:block;font-size:13px;color:var(--soft);font-weight:600}
+.pcard .pw{font-size:12px;font-weight:800;background:var(--card2);border-radius:999px;padding:5px 9px;white-space:nowrap}
+.pcard .pw.near{background:#8FDDFF;color:#12140D}
+/* calendar */
+.calhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.calhead b{font-size:17px;font-weight:800}
+.cnav{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:var(--ink);font-size:18px;font-weight:800}
+.cweek,.cgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cweek span{font-size:12px;font-weight:700;color:var(--faint);padding-bottom:4px}
+.cday{border:0;background:none;color:var(--ink);border-radius:12px;padding:6px 0 4px;display:grid;justify-items:center;gap:3px;min-height:46px}
+.cday i{font-style:normal;font-weight:700;font-size:14px}
+.cday.today i{color:#8FDDFF}
+.cday.sel{background:var(--card2);box-shadow:inset 0 0 0 2px #8FDDFF}
+.cdots{display:flex;gap:3px;height:7px}
+.dt,.dp{display:inline-block;width:7px;height:7px;border-radius:50%}
+.dt{background:var(--lime)} .dp{background:#BBA6FF}
+.clegend{display:flex;gap:14px;justify-content:center;margin-top:10px;font-size:12px;font-weight:700;color:var(--soft)}
+.clegend span{display:inline-flex;align-items:center;gap:6px}
+/* Hub: Travel + Fitness side by side, same size */
+.h-grid{align-items:stretch}
+.h-tile{height:100%;align-content:start}
+.h-next{margin-top:12px;background:var(--card2);border-radius:14px;padding:9px 10px}
+.h-next span{display:block;font-size:11px;font-weight:700;color:var(--soft)}
+.h-next b{display:block;font-size:14px;font-weight:800;line-height:1.25;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.h-next i{display:block;font-style:normal;font-size:12px;font-weight:700;color:#8FDDFF;margin-top:3px}
+:root[data-theme="light"] .h-next i{color:#1E7FA8}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -497,6 +544,7 @@ body.in-hub #appView, body.in-hub .tabs{display:none!important}
 .h-feat{cursor:pointer;transition:transform .15s var(--ease)}
 .h-feat:active{transform:scale(.985)}
 .h-feat .go{border:0;width:46px;height:46px;font-size:24px!important;border-radius:50%;background:var(--on-lime);color:var(--lime);display:grid;place-items:center;font-size:20px;font-weight:800}
+.h-feat+.h-feat{margin-top:12px}
 .h-feat .nm{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:18px 0 2px;position:relative;z-index:1}
 .h-feat .tg{font-size:14px;font-weight:600;opacity:.65;position:relative;z-index:1}
 .h-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;position:relative;z-index:1}
@@ -1221,19 +1269,34 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <div id="notiBody"></div>
 </div>
 <div id="travelView" class="hubv">
-  <header class="h-top"><button class="hub backbtn" id="trBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Sappy Travel</div></header>
-  <div class="tr-stats" id="trStats"></div>
-  <div class="mapcard"><div id="tMap"></div>
-    <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trFull" aria-label="Full screen map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
-    <div class="years chips" id="trYears"></div></div>
-  <div id="trSeed"><button class="card setlink" id="seedBtn"><span><b>Add my recent places</b><span>Bible Rock, Pettigala, Ambuluwawa, Hatale Mini World’s End, Scotland</span></span><span class="chev">›</span></button></div>
-  <div class="shead" style="margin:18px 4px 10px"><h3>Trips</h3></div>
-  <div id="trTrips"></div>
-  <div class="shead" style="margin:18px 4px 10px"><h3>Next hikes</h3><button class="addbtn" id="planAdd" aria-label="Plan a hike"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
-  <div id="trPlans"></div>
-  <div style="height:90px"></div>
+  <header class="h-top"><button class="hub backbtn" id="trBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px" id="trTitle">Sappy Travel</div></header>
+  <section id="tv-home">
+    <div id="trSoon"></div>
+    <div class="tr-hero" id="trStats"></div>
+    <div class="mapcard"><div id="tMap"></div>
+      <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
+      <div class="years chips" id="trYears"></div></div>
+    <div id="trSeed"><button class="card setlink" id="seedBtn"><span><b>Add my recent places</b><span>Bible Rock, Pettigala, Ambuluwawa, Hatale Mini World’s End, Scotland</span></span><span class="chev">›</span></button></div>
+    <div class="shead" style="margin:18px 4px 10px"><h3>Trips</h3></div>
+    <div class="chips" id="trFilter" style="margin-bottom:10px"></div>
+    <div id="trTrips"></div>
+  </section>
+  <section id="tv-plans" hidden>
+    <button class="btn full" id="planAdd" style="margin-bottom:12px">＋ Plan a visit</button>
+    <div id="trPlans"></div>
+  </section>
+  <section id="tv-cal" hidden><div id="trCal"></div></section>
+  <div style="height:120px"></div>
 </div>
-<button class="tfab" id="tripAdd" aria-label="Add a trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav class="tabs" id="travelTabs" aria-label="Travel">
+  <div class="in">
+    <button class="tab" data-tv="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg><span>Next visits</span></button>
+    <button class="tab" id="tvMap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="fab hubfab" id="tvHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
+    <button class="tab" id="tvAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Add visit</span></button>
+    <button class="tab" data-tv="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
+  </div>
+</nav>
 <div id="setView" class="hubv setv">
   <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
@@ -1370,7 +1433,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.3.2";
+const APP_VERSION = "6.4.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2439,7 +2502,6 @@ function enterScreen(){
 /* =============== Sappy Travel =============== */
 const TYPES={ hike:{name:"Hike",c:"#CDF46A",i:'<path d="M3 20l6-10 4 6 3-4 5 8z"/><circle cx="16" cy="6" r="2"/>'},
   walk:{name:"Walk",c:"#8FDDFF",i:'<circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2-6-3-3 2-5 3 3 3 1M9 12l-3 2"/>'},
-  drive:{name:"Drive",c:"#BBA6FF",i:'<path d="M4 17v-5l2-5h12l2 5v5zM4 12h16M7 17v2M17 17v2"/>'},
   place:{name:"Visit",c:"#FFD36E",i:'<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'} };
 const tsvg=(t,sz)=>'<svg viewBox="0 0 24 24" width="'+(sz||22)+'" height="'+(sz||22)+'" fill="none" stroke="#12140D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(TYPES[t]||TYPES.place).i+'</svg>';
 const LK=[[5.85,79.6],[9.85,81.9]];
@@ -2511,6 +2573,8 @@ const tYear=t=>t.date?+t.date.slice(0,4):(t.year||null);
 function openTravel(){
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-hub","in-set","in-noti"); document.body.classList.add("in-travel");
+  trView="home"; ["home","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home;
+  document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current","false"));
   window.scrollTo(0,0); renderTravel(); enterScreen();
   loadLeaflet().then(()=>{ initMap(); drawMap(); locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
@@ -2579,22 +2643,6 @@ function locateMe(center){
   navigator.geolocation.getCurrentPosition(p=>{ meLatLng=[p.coords.latitude,p.coords.longitude];
     if(LMAP){ if(meMarker) meMarker.setLatLng(meLatLng); else meMarker=L.marker(meLatLng,{icon:L.divIcon({className:"",html:'<div class="me"></div>',iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:1000}).addTo(LMAP);
       if(center) LMAP.setView(meLatLng,13); } },()=>{ if(center) toast("Location is off for this app"); },{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
-}
-function renderTravel(){
-  const all=trips(), yrs=[...new Set(all.map(tYear).filter(Boolean))].sort((a,b)=>b-a);
-  if(trYear!=="all" && !yrs.includes(+trYear)) trYear="all";
-  const sel=all.filter(t=>trYear==="all"||tYear(t)===+trYear);
-  const countries=new Set(sel.map(t=>t.cc).filter(Boolean)), foot=sel.filter(t=>t.type==="hike"||t.type==="walk").reduce((a,t)=>a+(t.dist||0),0);
-  $("trStats").innerHTML='<div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Hikes</span><b class="num">'+sel.filter(t=>t.type==="hike").length+'</b></div>';
-  $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
-  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(); });
-  $("trTrips").innerHTML=sel.length?sel.map(tripTile).join(""):'<div class="empty" style="padding:16px"><b>No trips yet</b>Tap ＋ to add your first trip.</div>';
-  $("trTrips").querySelectorAll(".ttile").forEach(b=>b.onclick=()=>openTrip(b.dataset.id));
-  const pl=plans();
-  $("trPlans").innerHTML=pl.length?pl.map(p=>'<button class="trip" data-id="'+esc(p.id)+'"><span class="ti" style="background:#BBA6FF">'+tsvg("hike")+'</span><span class="tm"><b>'+esc(p.name)+'</b><span>'+(p.date?new Date(fromYmd(p.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+' · ':'')+(p.drive?fmt(p.drive.km,0)+' km · '+fmtDur(p.drive.min*60)+' drive':'Tap for details')+'</span></span><span class="tr">'+(p.climb?'<small>Climb</small>'+esc(p.climb):'')+'</span></button>').join("")
-    :'<div class="note" style="margin:0 4px 8px">Plan your next hikes: distance from home, drive time and climb time.</div>';
-  $("trPlans").querySelectorAll(".trip").forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
-  $("trSeed").hidden=all.length>0;
 }
 function miniMap(el, t){
   loadLeaflet().then(()=>{ setTimeout(()=>{ const m=L.map(el,{zoomControl:false,attributionControl:false}); tileLayer().addTo(m);
@@ -2676,10 +2724,11 @@ function openTripForm(id){
         Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null});
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
+  if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
   $("fPhoto").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ t.photo=await compressPhoto(f); $("fPhotoBox").style.backgroundImage="url("+t.photo+")"; $("fPhotoBox").querySelector("span").textContent="Change photo"; }catch(_){ toast("Couldn’t read that photo"); } };
   $("fSave").onclick=()=>{
     const name=$("fName").value.trim(); if(!name) return toast("Add a name");
-    const dist=t.dist||0, sec=((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
+    const dist=t.dist||0, sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
     const date=$("fDate").value||"";
     put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,dist,moving:sec,dur:sec}));
     closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
@@ -2736,24 +2785,6 @@ function openAddPlace(kind){
     }
   };
 }
-function openPlan(id){
-  const p=S.plan[id]; if(!p) return;
-  const home=(S.travelHome&&S.travelHome.lat)?[S.travelHome.lat,S.travelHome.lng]:null;
-  openSheet('<div class="catHead"><span class="ic" style="background:#BBA6FF">'+tsvg("hike",26)+'</span><div><h2>'+esc(p.name)+'</h2><div class="note" style="margin:0">Next hike'+(p.date?' · '+new Date(fromYmd(p.date)).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"long"}):'')+'</div></div></div>'+
-    '<div class="tdmap" id="tdMap"></div>'+
-    '<div class="tgrid"><div><span>Drive from home</span><b class="num">'+(p.drive?fmt(p.drive.km,0)+' km':'—')+'</b></div><div><span>Drive time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div>'+
-    '<div><span>Straight line</span><b class="num">'+(p.straight?fmt(p.straight)+' km':'—')+'</b></div><div><span>Climb time</span><b>'+esc(p.climb||'—')+'</b></div></div>'+
-    (!home?'<button class="btn soft full" id="plHome" style="margin-bottom:10px">Set my current location as Home</button>':'')+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Planned date</span><input class="inp" type="date" id="plD" value="'+esc(p.date||"")+'"></label><label class="fl2"><span>Climb time</span><input class="inp" id="plC" value="'+esc(p.climb||"")+'" placeholder="e.g. 2h"></label></div>'+
-    '<div class="btns"><button class="btn" id="plSave" style="flex:1">Save</button><button class="btn soft" id="plDone">Done it ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
-  miniMap($("tdMap"),{type:"hike",lat:p.lat,lng:p.lng});
-  if($("plHome")) $("plHome").onclick=()=>{ navigator.geolocation.getCurrentPosition(async pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; put("cfg",{id:"travel",home:S.travelHome});
-      for(const q of plans()){ const n=Object.assign({},q,{drive:await driveRoute([S.travelHome.lat,S.travelHome.lng],[q.lat,q.lng]),straight:Math.round(hav([S.travelHome.lat,S.travelHome.lng],[q.lat,q.lng]))}); put("plan",n); }
-      toast("Home set"); openPlan(id); renderTravel(); },()=>toast("Allow location for this app first")); };
-  $("plSave").onclick=()=>{ put("plan",Object.assign({},p,{date:$("plD").value||"",climb:$("plC").value.trim()})); closeSheet(); renderTravel(); toast("Saved"); };
-  $("plDone").onclick=()=>{ remove("plan",p.id); put("trip",{id:"t"+uid(),name:p.name,date:ymd(Date.now()),year:new Date().getFullYear(),type:"hike",lat:p.lat,lng:p.lng,cc:p.cc||"LK",country:""}); closeSheet(); renderTravel(); drawMap(false); toast("Moved to trips. Import its GPX for the route."); };
-  $("plDel").onclick=()=>{ remove("plan",p.id); closeSheet(); renderTravel(); drawMap(false); };
-}
 /* ---- record a walk while the app is open ---- */
 let REC=null;
 async function startRec(){
@@ -2785,6 +2816,139 @@ async function seedPlaces(){
   renderTravel(); drawMap(); toast("Added. Tap each to set the date.");
 }
 
+/* ===== Sappy Travel v3: sections, footer, next visits, calendar ===== */
+let trView="home", trFilter="all";
+const TNAMES={home:"Sappy Travel",plans:"Next visits",cal:"Calendar"};
+const tKind=t=>(t&&TYPES[t.type])?t.type:"place";
+function travelGo(v){
+  if(sheetOpen) closeSheet(); trView=v;
+  ["home","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
+  $("trTitle").textContent=TNAMES[v];
+  document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv===v?"true":"false"));
+  window.scrollTo(0,0);
+  if(v==="home"){ renderTravel(); if(window.L && LMAP){ [60,350].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms)); } }
+  if(v==="plans") renderPlans();
+  if(v==="cal") renderCal();
+  enterScreen();
+}
+function daysTo(ymdStr){ if(!ymdStr) return null; return daysUntil(new Date(fromYmd(ymdStr))); }
+function whenWords(d){ return d===0?"today":d===1?"tomorrow":"in "+d+" days"; }
+function niceDate(ymdStr,long){ return ymdStr?new Date(fromYmd(ymdStr)).toLocaleDateString("en-GB",long?{weekday:"short",day:"numeric",month:"long",year:"numeric"}:{weekday:"short",day:"numeric",month:"short"}):"Date not set"; }
+
+/* ---- home ---- */
+function renderTravel(){
+  const all=trips(), yrs=[...new Set(all.map(tYear).filter(Boolean))].sort((a,b)=>b-a);
+  if(trYear!=="all" && !yrs.includes(+trYear)) trYear="all";
+  const sel=all.filter(t=>trYear==="all"||tYear(t)===+trYear);
+  const countries=new Set(sel.map(t=>t.cc).filter(Boolean));
+  $("trStats").innerHTML='<div class="trh-top"><span>Your travels</span><i>'+(trYear==="all"?"All years":trYear)+'</i></div>'+
+    '<div class="trh-tiles"><div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Hikes</span><b class="num">'+sel.filter(t=>t.type==="hike").length+'</b></div></div>';
+  $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
+  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(); });
+  // 7-day journey banner
+  const soon=plans().map(p=>({p,d:daysTo(p.date)})).filter(o=>o.d!=null&&o.d>=0&&o.d<=7);
+  $("trSoon").innerHTML=soon.map(o=>'<button class="soon tsoon'+(o.d<=1?' tom':'')+'" data-id="'+esc(o.p.id)+'"><span class="si2" style="background:'+TYPES[tKind(o.p)].c+'">'+tsvg(tKind(o.p),18)+'</span><span class="tx2"><b>Your next journey to '+esc(o.p.name)+' is '+whenWords(o.d)+'</b><span>'+esc(niceDate(o.p.date))+(o.p.drive?' · '+fmt(o.p.drive.km,0)+' km · '+fmtDur(o.p.drive.min*60)+' drive':'')+'</span></span><span class="wn">'+(o.d===0?"Today":o.d===1?"Tomorrow":o.d+" days")+'</span></button>').join("");
+  $("trSoon").querySelectorAll(".soon").forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+  // filter chips + trips grid
+  const F=[["all","All"],["hike","Hikes"],["walk","Walks"],["place","Visits"]];
+  $("trFilter").innerHTML=F.map(([k,n])=>'<button class="chip'+(trFilter===k?' on':'')+'" data-f="'+k+'">'+n+'</button>').join("");
+  $("trFilter").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trFilter=b.dataset.f; renderTravel(); });
+  const shown=sel.filter(t=>trFilter==="all"||tKind(t)===trFilter);
+  $("trTrips").innerHTML=shown.length?shown.map(tripTile).join(""):'<div class="empty" style="padding:16px"><b>Nothing here yet</b>Tap ＋ below to add a visit.</div>';
+  $("trTrips").querySelectorAll(".ttile").forEach(b=>b.onclick=()=>openTrip(b.dataset.id));
+  $("trSeed").hidden=all.length>0;
+}
+
+/* ---- next visits ---- */
+function renderPlans(){
+  const pl=plans();
+  $("trPlans").innerHTML=pl.length?pl.map(p=>{ const k=tKind(p), d=daysTo(p.date);
+    return '<button class="pcard" data-id="'+esc(p.id)+'"><span class="pi" style="background:'+TYPES[k].c+'">'+tsvg(k,22)+'</span><span class="pm"><b>'+esc(p.name)+'</b>'+
+      '<span>'+TYPES[k].name+' · '+esc(niceDate(p.date))+'</span>'+(p.drive?'<span>'+fmt(p.drive.km,0)+' km from home · '+fmtDur(p.drive.min*60)+' drive</span>':'')+'</span>'+
+      (d!=null&&d>=0?'<span class="pw'+(d<=7?' near':'')+'">'+(d===0?"Today":d===1?"Tomorrow":d+" days")+'</span>':'')+'</button>'; }).join("")
+    :'<div class="empty"><b>No visits planned</b>Tap “Plan a visit” to add where you want to go next.</div>';
+  $("trPlans").querySelectorAll(".pcard").forEach(b=>b.onclick=()=>openPlan(b.dataset.id));
+}
+function trailFields(h,m,hidden){ return '<div id="trailBox"'+(hidden?' hidden':'')+'><div style="font-size:13px;color:var(--soft);font-weight:600;margin:2px 0 6px">Time on the trail</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Hours</span><input class="inp num" id="fH" inputmode="numeric" data-plain="1" value="'+h+'" placeholder="2"></label>'+
+  '<label class="fl2"><span>Minutes</span><input class="inp num" id="fM" inputmode="numeric" data-plain="1" value="'+m+'" placeholder="30"></label></div></div>'; }
+function typeSelect(cur){ return '<select class="inp" id="fType">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+TYPES[k].name+'</option>').join("")+'</select>'; }
+function placeSearch(t,nameId){
+  let timer=null;
+  $("pq").oninput=()=>{ clearTimeout(timer); const q=$("pq").value.trim(); if(q.length<3) return; timer=setTimeout(async()=>{
+    $("pres").innerHTML='<div class="note">Searching…</div>';
+    try{ const r=await geocode(q); $("pres").innerHTML=r.map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">Nothing found. Try adding “Sri Lanka”.</div>';
+      $("pres").querySelectorAll("button").forEach(b=>b.onclick=()=>{ const o=r[+b.dataset.i];
+        Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null});
+        $("pq").value=t.loc; if(!$(nameId).value.trim()) $(nameId).value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
+    }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
+}
+function openPlanForm(id){
+  const p=id?Object.assign({},S.plan[id]):{id:"p"+uid(),type:"hike",date:""};
+  if(!TYPES[p.type]) p.type="place";
+  const sec=p.trail||0, h=sec?Math.floor(sec/3600):"", m=sec?Math.round((sec%3600)/60):"";
+  openSheet('<h2>'+(id?"Edit visit":"Plan a visit")+'</h2>'+
+    '<label class="fl2"><span>Place</span><input class="inp" id="pq" placeholder="Search, e.g. Knuckles" autocomplete="off" value="'+esc(p.loc||"")+'"></label><div class="results" id="pres"></div>'+
+    '<label class="fl2"><span>Name</span><input class="inp" id="fName" value="'+esc(p.name||"")+'" placeholder="e.g. Knuckles range hike"></label>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Date</span><input class="inp" type="date" id="fDate" value="'+esc(p.date||"")+'"></label>'+
+    '<label class="fl2"><span>Type</span>'+typeSelect(p.type)+'</label></div>'+trailFields(h,m,p.type==="place")+
+    '<button class="btn full" id="fSave">Save</button>');
+  placeSearch(p,"fName");
+  $("fType").onchange=()=>{ $("trailBox").hidden=$("fType").value==="place"; };
+  $("fSave").onclick=async()=>{
+    const name=$("fName").value.trim(); if(!name) return toast("Add a name"); if(p.lat==null) return toast("Search and pick the place");
+    const type=$("fType").value, trail=type==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
+    Object.assign(p,{name,date:$("fDate").value||"",type,trail});
+    const home=(S.travelHome&&S.travelHome.lat)?[S.travelHome.lat,S.travelHome.lng]:(typeof meLatLng!=="undefined"?meLatLng:null);
+    if(home && (!p.drive || p.driveFrom!==home.join(","))){ p.straight=Math.round(hav(home,[p.lat,p.lng])); try{ p.drive=await driveRoute(home,[p.lat,p.lng]); p.driveFrom=home.join(","); }catch(e){} }
+    put("plan",p); closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast(id?"Saved":"Visit planned");
+  };
+}
+function openPlan(id){
+  const p=S.plan[id]; if(!p) return; const k=tKind(p), d=daysTo(p.date);
+  const home=(S.travelHome&&S.travelHome.lat)?[S.travelHome.lat,S.travelHome.lng]:null;
+  openSheet('<div class="catHead"><span class="ic" style="background:'+TYPES[k].c+'">'+tsvg(k,26)+'</span><div><h2>'+esc(p.name)+'</h2><div class="note" style="margin:0">Next visit · '+TYPES[k].name+'</div></div></div>'+
+    (p.loc?'<div class="tloc">📍 '+esc(p.loc)+'</div>':'')+'<div class="tdmap" id="tdMap"></div>'+
+    '<div class="tgrid"><div><span>Date</span><b>'+esc(niceDate(p.date))+(d!=null&&d>=0?'<small style="display:block;font-size:12px;color:var(--soft)">'+whenWords(d)+'</small>':'')+'</b></div>'+
+    (k!=="place"?'<div><span>Time on trail</span><b class="num">'+(p.trail?fmtDur(p.trail):'—')+'</b></div>':'<div><span>Type</span><b>Visit</b></div>')+
+    '<div><span>From home</span><b class="num">'+(p.drive?fmt(p.drive.km,p.drive.km<100?1:0)+' km':(p.straight?fmt(p.straight)+' km':'—'))+'</b></div><div><span>Drive time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div></div>'+
+    (!home?'<button class="btn soft full" id="plHome" style="margin-bottom:10px">Set my current location as Home</button>':'')+
+    '<div class="btns"><button class="btn" id="plEdit" style="flex:1">Edit</button><button class="btn soft" id="plDone">Done it ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
+  miniMap($("tdMap"),{type:k,lat:p.lat,lng:p.lng});
+  if($("plHome")) $("plHome").onclick=()=>navigator.geolocation.getCurrentPosition(async pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; persist(); put("cfg",{id:"travel",home:S.travelHome});
+      for(const q of plans()){ const h=[S.travelHome.lat,S.travelHome.lng]; const n=Object.assign({},q,{straight:Math.round(hav(h,[q.lat,q.lng]))}); try{ n.drive=await driveRoute(h,[q.lat,q.lng]); n.driveFrom=h.join(","); }catch(e){} put("plan",n); }
+      toast("Home set"); openPlan(id); renderPlans(); },()=>toast("Allow location for this app first"));
+  $("plEdit").onclick=()=>openPlanForm(p.id);
+  $("plDone").onclick=()=>{ remove("plan",p.id); const date=p.date&&daysTo(p.date)<=0?p.date:ymd(Date.now());
+    put("trip",{id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,moving:p.trail||0,drive:p.drive,driveFrom:p.driveFrom});
+    closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast("Moved to your trips. Add a photo there."); };
+  $("plDel").onclick=()=>{ if(!confirm("Delete this planned visit?")) return; remove("plan",p.id); closeSheet(); renderPlans(); renderTravel(); drawMap(false); };
+}
+
+/* ---- calendar ---- */
+let calMonth=null, calSel=null;
+function renderCal(){
+  if(!calMonth){ const n=new Date(); calMonth=new Date(n.getFullYear(),n.getMonth(),1); }
+  if(!calSel) calSel=ymd(Date.now());
+  const ev={}; const add=(d,o)=>{ if(!d) return; (ev[d]=ev[d]||[]).push(o); };
+  trips().forEach(t=>add(t.date,{kind:"trip",t})); plans().forEach(p=>add(p.date,{kind:"plan",t:p}));
+  const y=calMonth.getFullYear(), m=calMonth.getMonth(), first=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), today=ymd(Date.now());
+  let cells=''; for(let i=0;i<first;i++) cells+='<span></span>';
+  for(let d=1; d<=days; d++){ const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), e=ev[k]||[];
+    cells+='<button class="cday'+(k===today?' today':'')+(k===calSel?' sel':'')+'" data-d="'+k+'"><i>'+d+'</i><span class="cdots">'+(e.some(x=>x.kind==="trip")?'<b class="dt"></b>':'')+(e.some(x=>x.kind==="plan")?'<b class="dp"></b>':'')+'</span></button>'; }
+  const list=(ev[calSel]||[]);
+  $("trCal").innerHTML='<div class="card"><div class="calhead"><button class="cnav" id="cPrev">‹</button><b>'+calMonth.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</b><button class="cnav" id="cNext">›</button></div>'+
+    '<div class="cweek">'+["M","T","W","T","F","S","S"].map(x=>'<span>'+x+'</span>').join("")+'</div><div class="cgrid">'+cells+'</div>'+
+    '<div class="clegend"><span><b class="dt"></b>Went</span><span><b class="dp"></b>Planned</span></div></div>'+
+    '<div class="day" style="margin-top:14px">'+esc(niceDate(calSel,true))+'</div>'+
+    (list.length?'<div class="list">'+list.map(o=>{ const k=tKind(o.t); return '<button class="tx" data-k="'+o.kind+'" data-id="'+esc(o.t.id)+'"><span class="ic" style="background:'+TYPES[k].c+'">'+tsvg(k,20)+'</span><span class="mid"><div class="m">'+esc(o.t.name)+'</div><div class="c">'+(o.kind==="plan"?"Planned":"Went")+' · '+TYPES[k].name+(o.t.loc?' · '+esc(o.t.loc):'')+'</div></span></button>'; }).join("")+'</div>'
+      :'<div class="note" style="margin:0 6px">Nothing on this day.</div>');
+  $("cPrev").onclick=()=>{ calMonth=new Date(y,m-1,1); renderCal(); };
+  $("cNext").onclick=()=>{ calMonth=new Date(y,m+1,1); renderCal(); };
+  $("trCal").querySelectorAll(".cday").forEach(b=>b.onclick=()=>{ calSel=b.dataset.d; renderCal(); });
+  $("trCal").querySelectorAll(".tx").forEach(b=>b.onclick=()=>b.dataset.k==="plan"?openPlan(b.dataset.id):openTrip(b.dataset.id));
+}
+
 /* =============== Sappy Hub =============== */
 /* APP LIST — add a line here for each new app. view: the screen it opens. ready:false = "Coming soon". */
 const APPS = [
@@ -2806,11 +2970,19 @@ function renderHub(){
   $("hDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
   $("hVer").textContent = APP_VERSION;
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
-  const feat=APPS.find(a=>a.ready), rest=APPS.filter(a=>a!==feat);
-  $("hFeat").innerHTML = feat ? '<div class="h-feat" role="button" tabindex="0" data-app="'+feat.id+'" style="background:'+feat.color+'"><div class="row1"><span class="ico">'+hsvg(feat.icon)+'</span><span class="go" aria-hidden="true">›</span></div><div class="nm">'+esc(feat.name)+'</div><div class="tg">'+esc(feat.tag)+'</div>'+
-    (feat.id==="pocket"?(()=>{ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num" data-count="'+Math.round(sp)+'" data-prefix="Rs ">'+rs(sp)+'</b></div>'].concat(ac.map(a=>'<div><span>'+esc(a.bank)+(a.acct?' ••'+esc(a.acct):'')+'</span><b class="num"'+(a.unset?'':' data-count="'+Math.round(a.balance)+'" data-prefix="Rs "')+'>'+(a.unset?'—':rs(a.balance))+'</b></div>'));
-      return '<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; })():'')+'</div>' : "";
-  $("hGrid").innerHTML = rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
+  const feats=APPS.filter(a=>a.id==="pocket"), feat=feats[0], rest=APPS.filter(a=>a.id!=="pocket");
+  const featCard=a=>{ let stats="";
+    if(a.id==="pocket"){ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(x=>'<div><span>'+esc(x.bank)+(x.acct?' ••'+esc(x.acct):'')+'</span><b class="num">'+(x.unset?'—':rs(x.balance))+'</b></div>'));
+      stats='<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; }
+    if(a.id==="travel"){ const tr=trips(), nx=plans().find(p=>p.date&&daysTo(p.date)>=0), yr=new Date().getFullYear();
+      stats='<div class="h-stats" style="grid-template-columns:1fr 1fr"><div><span>Places visited</span><b class="num">'+tr.length+'</b></div><div><span>This year</span><b class="num">'+tr.filter(t=>tYear(t)===yr).length+'</b></div>'+
+        '<div style="grid-column:1/-1"><span>Next visit</span><b>'+(nx?esc(nx.name)+' · '+whenWords(daysTo(nx.date)):'Nothing planned yet')+'</b></div></div>'; }
+    return '<div class="h-feat" role="button" tabindex="0" data-app="'+a.id+'" style="background:'+a.color+'"><div class="row1"><span class="ico">'+hsvg(a.icon)+'</span><span class="go" aria-hidden="true">›</span></div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+stats+'</div>'; };
+  $("hFeat").innerHTML = feats.map(featCard).join("");
+  $("hGrid").innerHTML = rest.map(a=>{ let extra="";
+    if(a.id==="travel"){ const nx=plans().find(p=>p.date&&daysTo(p.date)>=0);
+      extra='<div class="h-next"><span>Next visit</span><b>'+(nx?esc(nx.name):'Nothing planned')+'</b>'+(nx?'<i>'+esc(niceDate(nx.date))+' · '+whenWords(daysTo(nx.date))+'</i>':'')+'</div>'; }
+    return '<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+extra+'</div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>'; }).join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
 function showHub(){ if(sheetOpen) closeSheet(); document.body.classList.remove("in-travel"); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); enterScreen(); }
@@ -2819,8 +2991,11 @@ function openApp(id){
   if(id==="travel"){ openTravel(); }
 }
 $("toHub").onclick=showHub;
-$("trBack").onclick=showHub; $("tripAdd").onclick=()=>openTripForm(); $("planAdd").onclick=()=>openAddPlace("plan");
-$("trMe").onclick=()=>locateMe(true); $("trFull").onclick=openFullMap; $("seedBtn").onclick=seedPlaces;
+$("trBack").onclick=()=>{ if(trView!=="home") travelGo("home"); else showHub(); }; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
+document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
+$("tvMap").onclick=()=>{ loadLeaflet().then(openFullMap).catch(()=>toast("Map needs internet")); };
+$("tvHub").onclick=showHub; $("tvAdd").onclick=()=>openTripForm();
+$("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
 $("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); drawMap(); }); $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
@@ -2845,6 +3020,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpd
 function goBack(){
   if(sheetOpen){ closeSheet(); return; }
   if(document.body.classList.contains("in-fullmap")){ closeFullMap(); return; }
+  if(document.body.classList.contains("in-travel") && trView!=="home"){ travelGo("home"); return; }
   const b=document.body.classList;
   if(b.contains("in-set")){ closeSettings(); return; }
   if(b.contains("in-noti")){ closeNoti(); return; }
