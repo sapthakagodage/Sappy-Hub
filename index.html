@@ -329,6 +329,42 @@ body.in-fullmap nav#travelTabs.tabs{display:none!important}
 .h-next b{display:block;font-size:14px;font-weight:800;line-height:1.25;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .h-next i{display:block;font-style:normal;font-size:12px;font-weight:700;color:#8FDDFF;margin-top:3px}
 :root[data-theme="light"] .h-next i{color:#1E7FA8}
+/* Travel: map page fills the screen between header and footer */
+#tv-map .mapcard{margin:0;height:calc(100vh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));height:calc(100dvh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:380px}
+#tv-map #tMap{flex:1;height:auto!important;cursor:grab}
+body[data-tv="map"] #travelView > div[style*="height:120px"]{display:none}
+/* name pins with a drop-in animation */
+.lpin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;pointer-events:auto}
+.lpin .lname{order:1;background:#12140D;color:#F3F5EE;border:2px solid var(--c);border-radius:999px;padding:4px 10px;font:800 12px/1.2 "Manrope",system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.lpin .ldot{order:2;width:12px;height:12px;border-radius:50%;background:var(--c);border:2.5px solid #fff;margin-top:3px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.lpin.plan .lname{border-style:dashed}
+.lpin[style*="--i:-1"]{animation:none}
+.lpin{animation:pindrop .55s cubic-bezier(.2,.9,.25,1.15) both;animation-delay:calc(var(--i,0) * 90ms + 350ms)}
+@keyframes pindrop{from{opacity:0;transform:translate(-50%,-160%)}to{opacity:1;transform:translate(-50%,-100%)}}
+@media (prefers-reduced-motion: reduce){.lpin{animation:none}}
+/* floating + on Travel home */
+.tfab2{position:fixed;right:18px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:21;width:56px;height:56px;border-radius:50%;border:0;background:var(--lime);color:#12140D;display:none;place-items:center;box-shadow:0 12px 28px -8px rgba(0,0,0,.6),0 0 0 4px var(--bg)}
+.tfab2 svg{width:26px;height:26px}
+body.in-travel[data-tv="home"]:not(.in-fullmap) .tfab2{display:grid}
+/* Travel: footer always visible; drawers open above it */
+body.in-travel #travelTabs{z-index:46}
+body.in-travel .sheet{bottom:calc(84px + env(safe-area-inset-bottom,0px));border-radius:32px;max-height:calc(100dvh - 120px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+body.in-travel .sheet:not(.on){transform:translateY(130%)}
+/* calendar with place names */
+.cgrid{gap:3px}
+.cday{min-height:64px;align-content:start;padding:5px 2px 4px;gap:2px}
+.cday.has{background:var(--card2)}
+.cname{display:block;width:100%;font-size:9px;font-weight:800;line-height:1.15;border-radius:5px;padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#12140D}
+.cname.ct{background:var(--lime)}
+.cname.cp{background:#BBA6FF}
+.cmore{font-size:9px;font-weight:800;color:var(--soft)}
+/* calendar: month list with dates */
+.mrow .mdate{width:42px;height:42px;border-radius:13px;background:var(--card2);display:grid;place-items:center;align-content:center;flex:none;line-height:1}
+.mrow .mdate b{font-size:16px;font-weight:800}
+.mrow .mdate i{font-style:normal;font-size:10px;font-weight:700;color:var(--soft);margin-top:2px}
+.mrow.sel{background:var(--card2)}
+.mtag{font-size:11px;font-weight:800;border-radius:999px;padding:5px 9px;white-space:nowrap;color:#12140D}
+.mtag.ct{background:var(--lime)} .mtag.cp{background:#BBA6FF}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1273,13 +1309,15 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <section id="tv-home">
     <div id="trSoon"></div>
     <div class="tr-hero" id="trStats"></div>
-    <div class="mapcard"><div id="tMap"></div>
-      <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
-      <div class="years chips" id="trYears"></div></div>
     <div id="trSeed"><button class="card setlink" id="seedBtn"><span><b>Add my recent places</b><span>Bible Rock, Pettigala, Ambuluwawa, Hatale Mini World’s End, Scotland</span></span><span class="chev">›</span></button></div>
     <div class="shead" style="margin:18px 4px 10px"><h3>Trips</h3></div>
     <div class="chips" id="trFilter" style="margin-bottom:10px"></div>
     <div id="trTrips"></div>
+  </section>
+  <section id="tv-map" hidden>
+    <div class="mapcard"><div id="tMap"></div>
+      <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
+      <div class="years chips" id="trYears"></div></div>
   </section>
   <section id="tv-plans" hidden>
     <button class="btn full" id="planAdd" style="margin-bottom:12px">＋ Plan a visit</button>
@@ -1288,12 +1326,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <section id="tv-cal" hidden><div id="trCal"></div></section>
   <div style="height:120px"></div>
 </div>
+<button class="tfab2" id="tripAdd" aria-label="Add a trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 <nav class="tabs" id="travelTabs" aria-label="Travel">
   <div class="in">
-    <button class="tab" data-tv="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg><span>Next visits</span></button>
-    <button class="tab" id="tvMap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="tab" data-tv="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4zM10 20v-5h4v5"/></svg><span>Travel</span></button>
+    <button class="tab" data-tv="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
     <button class="fab hubfab" id="tvHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
-    <button class="tab" id="tvAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Add visit</span></button>
+    <button class="tab" data-tv="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg><span>Plan visit</span></button>
     <button class="tab" data-tv="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
   </div>
 </nav>
@@ -1433,7 +1472,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.4.1";
+const APP_VERSION = "6.5.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2573,10 +2612,10 @@ const tYear=t=>t.date?+t.date.slice(0,4):(t.year||null);
 function openTravel(){
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-hub","in-set","in-noti"); document.body.classList.add("in-travel");
-  trView="home"; ["home","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home;
-  document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current","false"));
+  trView="home"; ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home; document.body.dataset.tv="home";
+  document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv==="home"?"true":"false"));
   window.scrollTo(0,0); renderTravel(); enterScreen();
-  loadLeaflet().then(()=>{ initMap(); drawMap(); locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
+  loadLeaflet().then(()=>{ locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function initMap(){
   if(LMAP && !document.getElementById("tMap").classList.contains("leaflet-container")) LMAP=null;
@@ -2625,16 +2664,19 @@ function focusRow(id,fromList){ document.querySelectorAll(".fm-row").forEach(r=>
   const r=document.querySelector('.fm-row[data-id="'+id+'"]'); if(r&&!fromList) r.scrollIntoView({behavior:"smooth",block:"nearest"});
   const m=fMarkers[id]; if(m){ const el=m.getElement(); if(el){ el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } } }
 
-function drawMap(fit){
+function nameIcon(name,color,plan,i){ return L.divIcon({className:"",html:'<div class="lpin'+(plan?' plan':'')+'" style="--c:'+color+';--i:'+(i||0)+'"><span class="ldot"></span><span class="lname">'+esc(name)+'</span></div>',iconSize:[0,0],iconAnchor:[0,0]}); }
+function drawMap(fit,animate){
   if(!LMAP) return; LLAYER.clearLayers();
   const list=trips().filter(t=>trYear==="all"||tYear(t)===+trYear), b=[], num={};
   mapList().forEach((t,i)=>num[t.id]=i+1);
   list.forEach(t=>{ const c=(TYPES[t.type]||TYPES.place).c;
     if(t.track&&t.track.length>1){ const line=L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:4,opacity:.9}).addTo(LLAYER); line.on("click",()=>openTrip(t.id)); }
-    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:numIcon(num[t.id]||"",c),zIndexOffset:100-(num[t.id]||0)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
-  plans().forEach(p=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:pinIcon("#BBA6FF",true)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
+    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:nameIcon(t.name,c,false,animate?b.length:-1)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
+  plans().forEach((p,i)=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:nameIcon(p.name,"#BBA6FF",true,animate?b.length+i:-1)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
   if(fit!==false){
-    if(trScope==="lk") LMAP.fitBounds(LK,{padding:[10,10]});
+    const lkpts=b.filter(x=>x[0]>5.8&&x[0]<9.9&&x[1]>79.5&&x[1]<82);
+    if(trScope==="lk"){ const bb=lkpts.length>1?L.latLngBounds(lkpts).pad(.35):L.latLngBounds(LK);
+      if(animate&&!REDUCED){ LMAP.fitBounds(LK,{animate:false}); setTimeout(()=>LMAP.flyToBounds(bb,{maxZoom:11,duration:1.2}),250); } else LMAP.fitBounds(bb,{maxZoom:11}); }
     else { const w=b.filter(x=>!(x[0]>5.8&&x[0]<9.9&&x[1]>79.5&&x[1]<82)); if(b.length) LMAP.fitBounds(L.latLngBounds(b).pad(.4),{maxZoom:4}); else LMAP.setView([25,20],2); }
   }
 }
@@ -2818,15 +2860,20 @@ async function seedPlaces(){
 
 /* ===== Sappy Travel v3: sections, footer, next visits, calendar ===== */
 let trView="home", trFilter="all";
-const TNAMES={home:"Sappy Travel",plans:"Next visits",cal:"Calendar"};
+const TNAMES={home:"Sappy Travel",map:"All places",plans:"Plan a visit",cal:"Calendar"};
 const tKind=t=>(t&&TYPES[t.type])?t.type:"place";
+function showBigMap(){
+  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize(); drawMap(true,true); locateMe(false); },80); })
+    .catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
+}
 function travelGo(v){
   if(sheetOpen) closeSheet(); trView=v;
-  ["home","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
-  $("trTitle").textContent=TNAMES[v];
+  ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
+  document.body.dataset.tv=v; $("trTitle").textContent=TNAMES[v];
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv===v?"true":"false"));
   window.scrollTo(0,0);
-  if(v==="home"){ renderTravel(); if(window.L && LMAP){ [60,350].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms)); } }
+  if(v==="home") renderTravel();
+  if(v==="map") showBigMap();
   if(v==="plans") renderPlans();
   if(v==="cal") renderCal();
   enterScreen();
@@ -2844,7 +2891,7 @@ function renderTravel(){
   $("trStats").innerHTML='<div class="trh-top"><span>Your travels</span><i>'+(trYear==="all"?"All years":trYear)+'</i></div>'+
     '<div class="trh-tiles"><div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Hikes</span><b class="num">'+sel.filter(t=>t.type==="hike").length+'</b></div></div>';
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
-  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(); });
+  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(true,true); });
   // 7-day journey banner
   const soon=plans().map(p=>({p,d:daysTo(p.date)})).filter(o=>o.d!=null&&o.d>=0&&o.d<=7);
   $("trSoon").innerHTML=soon.map(o=>'<button class="soon tsoon'+(o.d<=1?' tom':'')+'" data-id="'+esc(o.p.id)+'"><span class="si2" style="background:'+TYPES[tKind(o.p)].c+'">'+tsvg(tKind(o.p),18)+'</span><span class="tx2"><b>Your next journey to '+esc(o.p.name)+' is '+whenWords(o.d)+'</b><span>'+esc(niceDate(o.p.date))+(o.p.drive?' · '+fmt(o.p.drive.km,0)+' km · '+fmtDur(o.p.drive.min*60)+' drive':'')+'</span></span><span class="wn">'+(o.d===0?"Today":o.d===1?"Tomorrow":o.d+" days")+'</span></button>').join("");
@@ -2935,14 +2982,16 @@ function renderCal(){
   const y=calMonth.getFullYear(), m=calMonth.getMonth(), first=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), today=ymd(Date.now());
   let cells=''; for(let i=0;i<first;i++) cells+='<span></span>';
   for(let d=1; d<=days; d++){ const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), e=ev[k]||[];
-    cells+='<button class="cday'+(k===today?' today':'')+(k===calSel?' sel':'')+'" data-d="'+k+'"><i>'+d+'</i><span class="cdots">'+(e.some(x=>x.kind==="trip")?'<b class="dt"></b>':'')+(e.some(x=>x.kind==="plan")?'<b class="dp"></b>':'')+'</span></button>'; }
+    cells+='<button class="cday'+(k===today?' today':'')+(k===calSel?' sel':'')+(e.length?' has':'')+'" data-d="'+k+'"><i>'+d+'</i>'+e.slice(0,2).map(x=>'<span class="cname '+(x.kind==="plan"?'cp':'ct')+'">'+esc(x.t.name)+'</span>').join("")+(e.length>2?'<span class="cmore">+'+(e.length-2)+'</span>':'')+'</button>'; }
   const list=(ev[calSel]||[]);
   $("trCal").innerHTML='<div class="card"><div class="calhead"><button class="cnav" id="cPrev">‹</button><b>'+calMonth.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</b><button class="cnav" id="cNext">›</button></div>'+
     '<div class="cweek">'+["M","T","W","T","F","S","S"].map(x=>'<span>'+x+'</span>').join("")+'</div><div class="cgrid">'+cells+'</div>'+
-    '<div class="clegend"><span><b class="dt"></b>Went</span><span><b class="dp"></b>Planned</span></div></div>'+
-    '<div class="day" style="margin-top:14px">'+esc(niceDate(calSel,true))+'</div>'+
-    (list.length?'<div class="list">'+list.map(o=>{ const k=tKind(o.t); return '<button class="tx" data-k="'+o.kind+'" data-id="'+esc(o.t.id)+'"><span class="ic" style="background:'+TYPES[k].c+'">'+tsvg(k,20)+'</span><span class="mid"><div class="m">'+esc(o.t.name)+'</div><div class="c">'+(o.kind==="plan"?"Planned":"Went")+' · '+TYPES[k].name+(o.t.loc?' · '+esc(o.t.loc):'')+'</div></span></button>'; }).join("")+'</div>'
-      :'<div class="note" style="margin:0 6px">Nothing on this day.</div>');
+    '<div class="clegend"><span><b class="dt"></b>Went</span><span><b class="dp"></b>Hoping to go</span></div></div>'+
+    (()=>{ const mk=y+"-"+String(m+1).padStart(2,"0"); const rows=Object.keys(ev).filter(d=>d.startsWith(mk)).sort().flatMap(d=>ev[d].map(o=>({d,o})));
+      if(!rows.length) return '<div class="note" style="margin:14px 6px 0">No visits this month.</div>';
+      return '<div class="day" style="margin-top:16px">This month</div><div class="list">'+rows.map(({d,o})=>{ const k=tKind(o.t), dt=new Date(fromYmd(d));
+        return '<button class="tx mrow'+(d===calSel?' sel':'')+'" data-k="'+o.kind+'" data-id="'+esc(o.t.id)+'"><span class="mdate"><b>'+dt.getDate()+'</b><i>'+dt.toLocaleDateString("en-GB",{weekday:"short"})+'</i></span>'+
+          '<span class="mid"><div class="m">'+esc(o.t.name)+'</div><div class="c">'+TYPES[k].name+(o.t.loc?' · '+esc(o.t.loc):'')+'</div></span><span class="mtag '+(o.kind==="plan"?'cp':'ct')+'">'+(o.kind==="plan"?"Hoping to go":"Went")+'</span></button>'; }).join("")+'</div>'; })();
   $("cPrev").onclick=()=>{ calMonth=new Date(y,m-1,1); renderCal(); };
   $("cNext").onclick=()=>{ calMonth=new Date(y,m+1,1); renderCal(); };
   $("trCal").querySelectorAll(".cday").forEach(b=>b.onclick=()=>{ calSel=b.dataset.d; renderCal(); });
@@ -2993,10 +3042,9 @@ function openApp(id){
 $("toHub").onclick=showHub;
 $("trBack").onclick=()=>{ if(trView!=="home") travelGo("home"); else showHub(); }; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
-$("tvMap").onclick=()=>{ loadLeaflet().then(openFullMap).catch(()=>toast("Map needs internet")); };
-$("tvHub").onclick=showHub; $("tvAdd").onclick=()=>openTripForm();
+$("tvHub").onclick=showHub; $("tripAdd").onclick=()=>openTripForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
-$("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); drawMap(); }); $("pasteOpen").onclick=openPaste;
+$("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); drawMap(true,true); }); $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
   if(sheetOpen) closeSheet();
