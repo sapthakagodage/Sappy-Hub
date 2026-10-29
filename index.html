@@ -1547,7 +1547,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.8.4";
+const APP_VERSION = "6.8.5";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2211,9 +2211,10 @@ function renderTrend(){
   if(chartMode!=="months") selMonth=null;
   if(chartMode==="months"){
     tr.className="trend months"; tr.style.gridTemplateColumns="";
-    const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).total})), mx=Math.max(1,...ms.map(x=>x.t));
+    // same measure as Weeks and Days: total spending, before friends' paybacks
+    const ms=lastMonths(6).map(d=>{ const r=monthSpend(d.getFullYear(),d.getMonth()); return {d,t:r.gross,back:r.back}; }), mx=Math.max(1,...ms.map(x=>x.t));
     $("tcTitle").textContent="Last 6 months";
-    setSub(selMonth!=null ? ms[selMonth].d.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+" · "+(ms[selMonth].t?rs(ms[selMonth].t):"Nothing spent") : "");
+    setSub(selMonth!=null ? ms[selMonth].d.toLocaleDateString("en-GB",{month:"long"})+" · "+(ms[selMonth].t?rs(ms[selMonth].t):"Nothing spent")+(ms[selMonth].back?" · "+rs(ms[selMonth].back)+" back":"") : "");
     tr.innerHTML=ms.map((x,i)=>'<button class="tb'+(selMonth===i?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
     tr.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
       if(selMonth===i){ selMonth=null; renderActivity(); return; }
