@@ -1565,7 +1565,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.0.0";
+const APP_VERSION = "7.0.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2391,8 +2391,7 @@ function openCat(c){
 }
 
 function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
-function openTx(id){
-  const t0=S.tx[id]; if(t0 && t0.type==="in" && t0.cat==="Paid back" && !linksOf(t0).length){ openLink(id); return; }
+function openTx(id,edit){
   const t=S.tx[id]; if(!t) return; let cat=t.cat;
   const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
   let topSel=t.topup||"";
@@ -2401,8 +2400,8 @@ function openTx(id){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
-    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(backMap()[t.id]?'<i>'+rs(backMap()[t.id])+' paid back by friends</i>':t.split>1?'<i>split '+t.split+' ways</i>':'')+'</div><button class="btn soft" id="txSplit">Split</button></div>':'')+
-    (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">Change</button></div>':'')+
+    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(t.split>1?'<i>split '+t.split+' ways, you included</i>':friendsOn(t.id)?'<i>shared by '+(friendsOn(t.id)+1)+' · you + '+friendsOn(t.id)+' friend'+(friendsOn(t.id)>1?'s':'')+'</i>':'<i>no one has paid back yet</i>')+'</div><button class="btn soft" id="txSplit">Split</button></div>':'')+
+    (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Change":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -2412,6 +2411,8 @@ function openTx(id){
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
+  if($("txSplit")) $("txSplit").onclick=()=>openSplit(t.id);
+  if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); } });
@@ -3174,16 +3175,20 @@ function renderCal(){
 let backCache=null, backVer=-1, dataVer=0;
 function linksOf(t){ return (t.links||(t.linkTo?[t.linkTo]:[])).filter(id=>live(S.tx[id])); }
 function backMap(){ if(backVer===dataVer && backCache) return backCache;
-  const m={};
-  Object.values(S.tx).filter(t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&linksOf(t).length).sort((a,b)=>a.ts-b.ts).forEach(p=>{
-    const ids=linksOf(p), rem=ids.map(id=>Math.max(0,lkrOf(S.tx[id])-(m[id]||0))), R=rem.reduce((a,b)=>a+b,0); if(R<=0) return;
+  const m={}, pbs=Object.values(S.tx).filter(t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&linksOf(t).length).sort((a,b)=>a.ts-b.ts);
+  // people on each payment: every friend who paid back for it, plus you -> you always keep at least your equal part
+  const ppl={}; pbs.forEach(p=>linksOf(p).forEach(id=>{ (ppl[id]=ppl[id]||new Set()).add((p.merchant||p.id).toLowerCase()); }));
+  const cap=id=>{ const k=ppl[id]?ppl[id].size:0; return lkrOf(S.tx[id])*k/(k+1); };
+  pbs.forEach(p=>{
+    const ids=linksOf(p), rem=ids.map(id=>Math.max(0,cap(id)-(m[id]||0))), R=rem.reduce((a,b)=>a+b,0); if(R<=0) return;
     const P=lkrOf(p); ids.forEach((id,i)=>{ m[id]=(m[id]||0)+Math.min(rem[i],P*rem[i]/R); });   // split by each payment's remaining amount
   });
   backCache=m; backVer=dataVer; return m; }
 // what an expense really cost you
+function friendsOn(id){ const f=new Set(); Object.values(S.tx).forEach(p=>{ if(live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(id)) f.add((p.merchant||p.id).toLowerCase()); }); return f.size; }
 function myShare(t){ if(!t||t.type!=="out") return 0; const base=lkrOf(t);
-  if(t.split>1) return base/t.split;
-  return Math.max(0, base-(backMap()[t.id]||0)); }
+  if(t.split>1) return base/t.split;                         // split equally, you included
+  const k=friendsOn(t.id); return k ? base/(k+1) : base; }    // whole amount until friends pay back, then your part: amount ÷ (friends + you)
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
 function looseBacks(){ return txList().filter(isLooseBack); }
@@ -3204,7 +3209,8 @@ function openLink(id){
   openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Tick every payment it covers — e.g. lunch and drinks.</div>'+
     (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
       :'<div class="note" style="margin-top:12px">No payments in the 30 days before this. It isn’t taken off your spending.</div>')+
-    '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>');
+    '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>'+
+    '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{ document.querySelectorAll("#lkList .lrow").forEach(b=>{ const on=sel.has(b.dataset.id); b.classList.toggle("sel",on); b.querySelector(".tick").textContent=on?"✓":""; });
     if($("lkSum")){ const tot=[...sel].reduce((a,k)=>a+lkrOf(S.tx[k]),0); $("lkSum").textContent=sel.size?sel.size+" payment"+(sel.size>1?"s":"")+" · "+rs(tot):"Tick at least one"; }
     if($("lkSave")) $("lkSave").textContent=sel.size>1?"Link to "+sel.size+" payments":"Link"; };
@@ -3214,6 +3220,7 @@ function openLink(id){
     const n=Object.assign({},p,{links:[...sel]}); delete n.linkTo; put("tx",n); dataVer++; closeSheet(); toast("Linked · your share updated"); render(); setTimeout(nextLink,450); };
   if($("lkNone")) $("lkNone").onclick=()=>{ const n=Object.assign({},p); delete n.linkTo; delete n.links; put("tx",n); dataVer++; closeSheet(); render(); };
   $("lkLater").onclick=closeSheet;
+  $("lkCat").onclick=()=>openTx(p.id,true);
 }
 
 function nextLink(){ const l=looseBacks().filter(p=>backSuggestions(p).length); if(l.length && !sheetOpen) openLink(l[0].id); }
