@@ -1547,7 +1547,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.8.7";
+const APP_VERSION = "6.9.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2471,8 +2471,14 @@ function openFd(id){
 let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("on"),2600); }
 
 /* =============== wiring =============== */
+function freshPocketPage(){
+  month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
+  focusCat=null; filter="All"; accFilter="all";
+  chartMode="months"; selDay=null; selWeek=null; selMonth=null;
+  if($("q")) $("q").value="";
+}
 function go(v){ if(sheetOpen) closeSheet();
-  if(v==="activity" && view!=="activity"){ chartMode="months"; selDay=null; selWeek=null; selMonth=null; }   // chart starts fresh each visit
+  freshPocketPage();   // every page opens fresh: current month, nothing selected, filters cleared
   view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
@@ -2748,7 +2754,7 @@ function plans(){ return Object.values(S.plan||{}).filter(live).sort((a,b)=>(a.d
 const tYear=t=>t.date?+t.date.slice(0,4):(t.year||null);
 
 function openTravel(){
-  if(sheetOpen) closeSheet();
+  if(sheetOpen) closeSheet(); freshTravelPage();
   document.body.classList.remove("in-hub","in-set","in-noti"); document.body.classList.add("in-travel");
   trView="home"; ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home; document.body.dataset.tv="home";
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv==="home"?"true":"false"));
@@ -3005,8 +3011,10 @@ function showBigMap(){
   loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize(); drawMap(true,true); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
     .catch(()=>{ if(first) busyEnd(); $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
+function freshTravelPage(){ trYear="all"; trFilter="all"; trScope="lk"; calMonth=null; calSel=null;
+  document.querySelectorAll("#trScope button").forEach(b=>b.classList.toggle("on",b.dataset.s==="lk")); }
 function travelGo(v){
-  if(sheetOpen) closeSheet(); trView=v;
+  if(sheetOpen) closeSheet(); freshTravelPage(); trView=v;
   ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
   document.body.dataset.tv=v; $("trTitle").textContent=TNAMES[v];
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv===v?"true":"false"));
