@@ -1510,7 +1510,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.6.1";
+const APP_VERSION = "6.7.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1562,6 +1562,7 @@ const ICON = {
   bag:'<path d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2"/>',
   repeat:'<path d="M4 11V9a2 2 0 0 1 2-2h13l-3-3M20 13v2a2 2 0 0 1-2 2H5l3 3"/>',
   bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  care:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.6 7.6 20 18M8.6 16.4 20 6"/>',
   heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M12 9v5M9.5 11.5h5"/>',
   cap:'<path d="M2 9l10-5 10 5-10 5zM6 11v5c2 2 10 2 12 0v-5"/>',
   cash:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',
@@ -1585,6 +1586,7 @@ const CATS = {
   "Fitness":      {i:"gym",   c:"#FF9BBE", k:["gym","fitness","power world","powerworld","crossfit","yoga","pilates","sports","swimming","pool","martial","badminton","tennis","cricket","futsal","decathlon","nike","adidas"]},
   "Fun":          {i:"film",  c:"#E7A9FF", k:["cinema","scope","pvr","majestic","liberty","ccc","movie","mytickets","ticketslk","concert","event","game","steam","playstation","xbox","nintendo","karaoke","bowling","club","pub","bar"]},
   "Shopping":     {i:"bag",   c:"#FFE27D", k:["daraz","odel","nolimit","no limit","fashion bug","cool planet","house of fashion","abans","singer","softlogic","damro","kapruka","amazon","aliexpress","temu","ikea","mall","stores","store","textile","fashion","cellular","mobile shop","electronics","hardware","book","stationery"]},
+  "Personal care":{i:"care",  c:"#F7C6E8", k:["salon","saloon","barber","barbershop","hair","haircut","hair cut","beauty","beautician","cosmetic","cosmetics","makeup","make up","skincare","skin care","shampoo","conditioner","perfume","fragrance","parlour","parlor","nail","nails","spa ceylon","the body shop","body shop","nature's secrets","natures secrets","janet","ramani fernando","cosmetics.lk","grooming","dermatolog","sunscreen","lotion"]},
   "Subscriptions":{i:"repeat",c:"#BBA6FF", k:["apple","icloud","itunes","netflix","spotify","youtube","google","facebk","facebook","meta (facebook)","microsoft","openai","chatgpt","anthropic","canva","adobe","zoom","linkedin","prime video","disney","dropbox","notion","github"]},
   "Bills":        {i:"bolt",  c:"#7FE3D3", k:["dialog","mobitel","slt","hutch","airtel","ceb","leco","electricity","water board","nwsdb","insurance","aia","ceylinco","allianz","union assurance","peo tv","billpmt","bill","rent","lease","loan"]},
   "Health":       {i:"heart", c:"#9CF0BE", k:["pharmacy","pharma","osu sala","healthguard","union chemists","chemist","hospital","asiri","nawaloka","lanka hospital","durdans","hemas","ninewells","clinic","medical","channel","lab","laboratory","dental","eye","optical","vision"]},
@@ -1596,11 +1598,11 @@ const CATS = {
   "Income":       {i:"income",c:"#CDF46A", k:[]},
   "Fixed deposit":{i:"bank",  c:"#7FD6FF", k:[]}
 };
-const SPEND = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Subscriptions","Bills","Health","Education","Cash","Transfers","Other"];
+const SPEND = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Personal care","Subscriptions","Bills","Health","Education","Cash","Transfers","Other"];
 const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back"]);
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
-const MATCH_ORDER=["Subscriptions","Fuel","Eating out","Groceries","Fitness","Day out","Fun","Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
+const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
 
 /* =============== helpers =============== */
 const $ = id => document.getElementById(id);
@@ -1637,7 +1639,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 10;
+const PARSER_VERSION = 11;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -1700,7 +1702,7 @@ function parseSms(raw){
     const pats = type==="in"
       ? [new RegExp("\\bfrom\\s+"+W+stop,"i"), new RegExp("\\bby\\s+"+W+stop,"i")]
       : [new RegExp("\\bat\\s+"+W+stop,"i"), new RegExp("@\\s*"+W+stop,"i"), new RegExp("merchant[:\\s]+"+W+stop,"i"), new RegExp("\\bto\\s+"+W+stop,"i")];
-    for(const p of pats){ const mm=s.match(p); if(mm) where=where||mm[1]; if(mm && !/^(your|the|a\/?c|ac\b|acc|account|card|ac no)/i.test(mm[1].trim())){ merchant=mm[1]; break; } }
+    for(const p of pats){ const mm=s.match(p); if(mm) where=where||mm[1]; if(mm && !/^(your|the\s+(?:a\/?c|acc|account|card)|a\/?c|ac\b|acc|account|card|ac no)/i.test(mm[1].trim())){ merchant=mm[1]; break; } }
   }
   merchant=merchant.replace(/\*+/g," ").replace(/\b\d{6,}\b/g,"").replace(/\s{2,}/g," ").trim();
   if(!merchant){
