@@ -1547,7 +1547,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.8.5";
+const APP_VERSION = "6.8.6";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2025,7 +2025,7 @@ function monthSpend(y,m){
   Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
     if(t.type==="in"&&t.cat==="Paid back"){ back+=lkrOf(t); return; }
     if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=lkrOf(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
-  return {total:Math.max(0,total-back),gross:total,back,by};
+  return {total,gross:total,back,by};
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
@@ -2046,7 +2046,7 @@ function renderHome(){
   const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
   const spent=out.reduce((s,t)=>s+lkrOf(t),0);
   const backs=mt.filter(t=>t.type==="in"&&t.cat==="Paid back"), back=backs.reduce((s,t)=>s+lkrOf(t),0);
-  const net=Math.max(0,spent-back);
+  const net=spent;
   const fdOut=mt.filter(t=>t.type==="out"&&t.cat==="Fixed deposit").reduce((s,t)=>s+lkrOf(t),0);
   const left=inc-spent-fdOut;
   const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+lkrOf(t));
@@ -2059,7 +2059,7 @@ function renderHome(){
   // lime hero: spent on top, balance + came in below
   $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"});
   $("cVal").textContent=fmt(Math.round(net)); $("cVal").dataset.count=Math.round(net);
-  $("cSub").textContent=out.length?out.length+" payments · "+(back?"friends paid back "+rs(back):rs(net/days)+" a day"):"No spending yet";
+  $("cSub").textContent=out.length?out.length+" payments · "+rs(net/days)+" a day":"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
   $("insBadge").textContent=badge;
   const fx=balances().filter(b=>b.cur!=="LKR"), accs=mainAccounts();
@@ -2084,7 +2084,6 @@ function renderHome(){
   const maxP=rows.length?rows[0][1]/spent:1;
   $("legend").innerHTML=rows.map(([c,v])=>{ const p=v/spent, w=60+Math.round((p/maxP)*16);
     return '<button class="pb" data-c="'+esc(c)+'"><span class="bar3" style="width:'+w+'%;background:'+CATS[c].c+'"><span class="ii">'+icon(c,16)+'</span><span class="nm">'+esc(c)+'</span><span class="pc">'+Math.round(p*100)+'%</span></span><span class="amt2 num">'+rs(v)+'</span></button>'; }).join("");
-  if(back) $("legend").insertAdjacentHTML("beforeend",'<button class="pb pbback" data-c="Paid back"><span class="bar3" style="width:60%;background:transparent;border:2px dashed '+CATS["Paid back"].c+';color:var(--ink)"><span class="ii" style="background:'+CATS["Paid back"].c+'">'+icon("Paid back",16)+'</span><span class="nm">Friends paid back</span></span><span class="amt2 num" style="color:var(--pos)">−'+rs(back)+'</span></button>');
   $("legend").querySelectorAll(".pb").forEach(b=>b.onclick=()=>openCat(b.dataset.c));
 
 }
@@ -2214,7 +2213,7 @@ function renderTrend(){
     // same measure as Weeks and Days: total spending, before friends' paybacks
     const ms=lastMonths(6).map(d=>{ const r=monthSpend(d.getFullYear(),d.getMonth()); return {d,t:r.gross,back:r.back}; }), mx=Math.max(1,...ms.map(x=>x.t));
     $("tcTitle").textContent="Last 6 months";
-    setSub(selMonth!=null ? ms[selMonth].d.toLocaleDateString("en-GB",{month:"long"})+" · "+(ms[selMonth].t?rs(ms[selMonth].t):"Nothing spent")+(ms[selMonth].back?" · "+rs(ms[selMonth].back)+" back":"") : "");
+    setSub(selMonth!=null ? ms[selMonth].d.toLocaleDateString("en-GB",{month:"long"})+" · "+(ms[selMonth].t?rs(ms[selMonth].t):"Nothing spent") : "");
     tr.innerHTML=ms.map((x,i)=>'<button class="tb'+(selMonth===i?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
     tr.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
       if(selMonth===i){ selMonth=null; renderActivity(); return; }
