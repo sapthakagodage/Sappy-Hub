@@ -394,6 +394,43 @@ body.in-travel .sheet:not(.on){transform:translateY(130%)}
 .bz-ring{width:22px;height:22px;border-radius:50%;border:3px solid var(--card2);border-top-color:var(--lime);animation:bzSpin .8s linear infinite;flex:none}
 @keyframes bzSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.sp-logo,.sp-name,.sp-tag,.sp-logo::after,.sp-bar i{animation:none!important;width:100%!important}.bz-ring{animation-duration:1.6s}}
+/* activity chart: months / days toggle */
+.tc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px}
+.tc-sub{font-size:14px;font-weight:800;opacity:.75;margin-bottom:10px;min-height:19px}
+.tc-sub[hidden]{display:none!important}
+.tb.wk .col i{background:var(--on-violet)}
+.trend.weeks.has-sel .tb.wk:not(.sel) .col i{opacity:.35}
+.tb.wk.sel .m{opacity:1}
+.trend.weeks{margin-top:10px}
+.tc-head b{display:block;font-size:16px;font-weight:800;white-space:nowrap}
+.tc-head span{white-space:nowrap}
+.tc-head span{display:block;font-size:13px;font-weight:700;opacity:.65;margin-top:2px}
+.tc-seg{display:flex;background:rgba(23,18,42,.12);border-radius:999px;padding:3px;flex:none}
+.tc-seg button{border:0;background:none;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:800;color:var(--on-violet);opacity:.7}
+.tc-seg button.on{background:var(--on-violet);color:var(--violet);opacity:1}
+.trend.days{display:flex;gap:2px;align-items:stretch;height:150px}
+.db{flex:1;min-width:0;border:0;background:none;padding:0;display:grid;grid-template-rows:1fr 16px;color:inherit}
+.db .col{display:flex;align-items:flex-end;justify-content:center}
+.db .col i{display:block;width:100%;max-width:9px;border-radius:4px 4px 2px 2px;background:rgba(23,18,42,.22);min-height:0}
+.db.today .col i{background:rgba(23,18,42,.5)}
+.db.on .col i{background:var(--on-violet)}
+.db.future .col i{background:transparent}
+.db .m{font-size:10px;font-weight:800;opacity:.6;text-align:center;align-self:end}
+.db.on .m{opacity:1}
+/* activity chart: same look and fixed size for Months / Weeks / Days */
+#trendCard .tc-sub{display:block!important;visibility:visible;height:20px!important;padding:0!important;line-height:20px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#trendCard .tc-sub.blank{visibility:hidden}
+#trendCard .trend{height:160px!important;margin-top:0!important;padding-top:0}
+#trendCard .tb .col i,#trendCard .db .col i{background:rgba(23,18,42,.22)!important;opacity:1!important}
+#trendCard .tb.on .col i,#trendCard .db.on .col i{background:var(--on-violet)!important}
+#trendCard .tb .m,#trendCard .tb .v{opacity:.7}
+#trendCard .tb.on .m,#trendCard .tb.on .v{opacity:1}
+#trendCard .trend.days{display:flex;gap:2px;align-items:stretch}
+#trendCard .db{display:grid;grid-template-rows:auto 1fr auto;gap:6px}
+#trendCard .db .v{font-size:11px;line-height:13px;min-height:13px}
+#trendCard .tb{gap:6px}
+#trendCard .tb .v{min-height:13px;line-height:13px}
+#trendCard .tb .m,#trendCard .db .m{line-height:14px;min-height:14px}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1452,7 +1489,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <!-- ACTIVITY -->
   <section id="v-activity" hidden>
     <div class="card violet" id="trendCard">
-      <h3>Last 6 months <span class="r">Tap a month</span></h3>
+      <div class="tc-head"><b id="tcTitle">Last 6 months</b><div class="tc-seg" id="tcSeg"><button data-m="months" class="on">Months</button><button data-m="weeks">Weeks</button><button data-m="days">Days</button></div></div><div class="tc-sub blank" id="tcSub">&nbsp;</div>
       <div class="trend" id="trend"></div>
     </div>
     <div class="search"><input id="q" type="search" placeholder="Search" aria-label="Search"></div>
@@ -1510,7 +1547,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.7.0";
+const APP_VERSION = "6.8.4";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2161,13 +2198,53 @@ function listInto(el, list, emptyMsg, flat){
 }
 
 /* ---------- activity ---------- */
+let chartMode="months", selDay=null, selWeek=null, selMonth=null;
+function daySpend(y,m){ const n=new Date(y,m+1,0).getDate(), a=new Array(n).fill(0);
+  Object.values(S.tx).forEach(t=>{ if(!live(t)||t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const d=new Date(t.ts); if(d.getFullYear()===y&&d.getMonth()===m) a[d.getDate()-1]+=lkrOf(t); });
+  return a; }
+function renderTrend(){
+  $("tcSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===chartMode));
+  const tr=$("trend"), sub=$("tcSub");
+  const setSub=t=>{ sub.textContent=t||"\u00a0"; sub.classList.toggle("blank",!t); };   // the line always keeps its space
+  if(chartMode!=="weeks") selWeek=null;
+  if(chartMode!=="days") selDay=null;
+  if(chartMode!=="months") selMonth=null;
+  if(chartMode==="months"){
+    tr.className="trend months"; tr.style.gridTemplateColumns="";
+    const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).total})), mx=Math.max(1,...ms.map(x=>x.t));
+    $("tcTitle").textContent="Last 6 months";
+    setSub(selMonth!=null ? ms[selMonth].d.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+" · "+(ms[selMonth].t?rs(ms[selMonth].t):"Nothing spent") : "");
+    tr.innerHTML=ms.map((x,i)=>'<button class="tb'+(selMonth===i?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
+    tr.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
+      if(selMonth===i){ selMonth=null; renderActivity(); return; }
+      selMonth=i; const d=ms[i].d; month=new Date(d.getFullYear(),d.getMonth(),1); render(); });
+    return;
+  }
+  if(chartMode==="weeks"){
+    tr.className="trend weeks";
+    const y=month.getFullYear(), m=month.getMonth(), a=daySpend(y,m), n=a.length, wk=[];
+    let start=1; while(start<=n){ const dow=(new Date(y,m,start).getDay()+6)%7, end=Math.min(n,start+(6-dow)); wk.push({s:start,e:end,t:a.slice(start-1,end).reduce((x,v)=>x+v,0)}); start=end+1; }
+    const mx=Math.max(1,...wk.map(w=>w.t)), ml=month.toLocaleDateString("en-GB",{month:"short"});
+    if(selWeek!=null && !wk[selWeek]) selWeek=null;
+    $("tcTitle").textContent=month.toLocaleDateString("en-GB",{month:"long"});
+    setSub(selWeek!=null ? wk[selWeek].s+(wk[selWeek].e!==wk[selWeek].s?"–"+wk[selWeek].e:"")+" "+ml+" · "+(wk[selWeek].t?rs(wk[selWeek].t):"Nothing spent") : "");
+    tr.style.gridTemplateColumns="repeat("+wk.length+",1fr)";
+    tr.innerHTML=wk.map((w,i)=>'<button class="tb'+(selWeek===i?' on':'')+'" data-w="'+i+'"><span class="v num">'+(w.t?short(w.t):"")+'</span><span class="col"><i style="height:'+(w.t/mx*100)+'%"></i></span><span class="m">'+w.s+(w.e!==w.s?"–"+w.e:"")+'</span></button>').join("");
+    tr.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const i=+b.dataset.w; selWeek = selWeek===i?null:i; renderActivity(); });
+    return;
+  }
+  tr.style.gridTemplateColumns="";
+  const y=month.getFullYear(), m=month.getMonth(), a=daySpend(y,m), mx=Math.max(1,...a);
+  $("tcTitle").textContent=month.toLocaleDateString("en-GB",{month:"long"});
+  setSub(selDay ? new Date(y,m,selDay).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" · "+(a[selDay-1]?rs(a[selDay-1]):"Nothing spent") : "");
+  tr.className="trend days";
+  tr.innerHTML=a.map((v,i)=>{ const d=i+1, lab=(d===1||d%5===0)?d:"";
+    return '<button class="db'+(selDay===d?' on':'')+'" data-d="'+d+'" aria-label="'+d+': '+rs(v)+'"><span class="v"></span><span class="col"><i style="height:'+(v?Math.max(4,v/mx*100):0)+'%"></i></span><span class="m">'+lab+'</span></button>'; }).join("");
+  tr.querySelectorAll(".db").forEach(b=>b.onclick=()=>{ const d=+b.dataset.d; selDay = selDay===d?null:d; renderActivity(); });
+}
 function renderActivity(){
 
-  const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).total}));
-  const mx=Math.max(1,...ms.map(x=>x.t));
-  $("trendCard").hidden=!ms.some(x=>x.t);
-  $("trend").innerHTML=ms.map((x,i)=>'<button class="tb'+(i===5?' on':'')+'" data-i="'+i+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></button>').join("");
-  $("trend").querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const d=ms[+b.dataset.i].d; month=new Date(d.getFullYear(),d.getMonth(),1); render(); });
+  renderTrend();
 
   // accounts used this month, with what was spent from each
   const mtx=txList().filter(inMonth), accs={};
@@ -2183,6 +2260,9 @@ function renderActivity(){
   $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
   const q=$("q").value.trim().toLowerCase();
   let list=txList().filter(inMonth);
+  if(chartMode==="days" && selDay) list=list.filter(t=>new Date(t.ts).getDate()===selDay);
+  if(chartMode==="weeks" && selWeek!=null){ const b=document.querySelector('#trend .tb[data-w="'+selWeek+'"] .m'); const r=b?b.textContent.split("–").map(Number):null;
+    if(r) list=list.filter(t=>{ const d=new Date(t.ts).getDate(); return d>=r[0]&&d<=(r[1]||r[0]); }); }
   if(accFilter!=="all") list=list.filter(t=>accKey(t)===accFilter);
   if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
@@ -2395,9 +2475,10 @@ function go(v){ if(sheetOpen) closeSheet(); view=v; document.body.classList.togg
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("fab").onclick=openAdd;
-$("prev").onclick=()=>{ setTimeout(enterScreen,0); month.setMonth(month.getMonth()-1); focusCat=null; render(); };
-$("next").onclick=()=>{ setTimeout(enterScreen,0); month.setMonth(month.getMonth()+1); focusCat=null; render(); };
+$("prev").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()-1); focusCat=null; render(); };
+$("next").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()+1); focusCat=null; render(); };
 $("q").oninput=renderActivity;
+$("tcSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{ chartMode=b.dataset.m; selDay=null; selWeek=null; selMonth=null; renderActivity(); if(!REDUCED) document.querySelectorAll("#trend .col i").forEach((el,i)=>playClass(el,"barup",Math.min(i,20)*0.4)); });
 
 $("sbSave").onclick=()=>{ const u=cleanUrl($("sbUrl").value), k=$("sbKey").value.replace(/\s+/g,"");
   if(!/^https:\/\/.+\..+/.test(u)) return toast("Check the Project URL");
