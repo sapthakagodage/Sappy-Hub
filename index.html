@@ -365,6 +365,8 @@ body.in-travel .sheet:not(.on){transform:translateY(130%)}
 .mrow.sel{background:var(--card2)}
 .mtag{font-size:11px;font-weight:800;border-radius:999px;padding:5px 9px;white-space:nowrap;color:#12140D}
 .mtag.ct{background:var(--lime)} .mtag.cp{background:#BBA6FF}
+/* compact calendar days (dots only) */
+.cgrid .cday{min-height:44px!important;height:auto!important;padding:6px 0 5px!important;align-content:start;gap:4px}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1472,7 +1474,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.5.0";
+const APP_VERSION = "6.5.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2982,7 +2984,7 @@ function renderCal(){
   const y=calMonth.getFullYear(), m=calMonth.getMonth(), first=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), today=ymd(Date.now());
   let cells=''; for(let i=0;i<first;i++) cells+='<span></span>';
   for(let d=1; d<=days; d++){ const k=y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0"), e=ev[k]||[];
-    cells+='<button class="cday'+(k===today?' today':'')+(k===calSel?' sel':'')+(e.length?' has':'')+'" data-d="'+k+'"><i>'+d+'</i>'+e.slice(0,2).map(x=>'<span class="cname '+(x.kind==="plan"?'cp':'ct')+'">'+esc(x.t.name)+'</span>').join("")+(e.length>2?'<span class="cmore">+'+(e.length-2)+'</span>':'')+'</button>'; }
+    cells+='<button class="cday'+(k===today?' today':'')+(k===calSel?' sel':'')+(e.length?' has':'')+'" data-d="'+k+'"><i>'+d+'</i><span class="cdots">'+(e.some(x=>x.kind==="trip")?'<b class="dt"></b>':'')+(e.some(x=>x.kind==="plan")?'<b class="dp"></b>':'')+'</span></button>'; }
   const list=(ev[calSel]||[]);
   $("trCal").innerHTML='<div class="card"><div class="calhead"><button class="cnav" id="cPrev">‹</button><b>'+calMonth.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</b><button class="cnav" id="cNext">›</button></div>'+
     '<div class="cweek">'+["M","T","W","T","F","S","S"].map(x=>'<span>'+x+'</span>').join("")+'</div><div class="cgrid">'+cells+'</div>'+
