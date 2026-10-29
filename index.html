@@ -1547,7 +1547,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.8.6";
+const APP_VERSION = "6.8.7";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2471,7 +2471,9 @@ function openFd(id){
 let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove("on"),2600); }
 
 /* =============== wiring =============== */
-function go(v){ if(sheetOpen) closeSheet(); view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
+function go(v){ if(sheetOpen) closeSheet();
+  if(v==="activity" && view!=="activity"){ chartMode="months"; selDay=null; selWeek=null; selMonth=null; }   // chart starts fresh each visit
+  view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("fab").onclick=openAdd;
@@ -3238,6 +3240,7 @@ function freshStart(){
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-set","in-noti","in-travel");
   month=new Date(); month.setDate(1); month.setHours(0,0,0,0); focusCat=null; filter="All"; accFilter="all";
+  chartMode="months"; selDay=null; selWeek=null; selMonth=null;
   view="home"; document.body.classList.remove("on-savings"); ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!=="home");
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v==="home"?"true":"false"));
   showHub();
