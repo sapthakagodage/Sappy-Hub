@@ -1565,7 +1565,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.0.1";
+const APP_VERSION = "7.0.2";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2400,7 +2400,7 @@ function openTx(id,edit){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
-    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(t.split>1?'<i>split '+t.split+' ways, you included</i>':friendsOn(t.id)?'<i>shared by '+(friendsOn(t.id)+1)+' · you + '+friendsOn(t.id)+' friend'+(friendsOn(t.id)>1?'s':'')+'</i>':'<i>no one has paid back yet</i>')+'</div><button class="btn soft" id="txSplit">Split</button></div>':'')+
+    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(friendsOn(t.id)?'<i>shared by '+(friendsOn(t.id)+1)+' · you + '+friendsOn(t.id)+' friend'+(friendsOn(t.id)>1?'s':'')+'</i>':'<i>no one has paid back yet</i>')+'</div></div>':'')+
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Change":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
@@ -2411,7 +2411,6 @@ function openTx(id,edit){
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
-  if($("txSplit")) $("txSplit").onclick=()=>openSplit(t.id);
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
@@ -3187,7 +3186,6 @@ function backMap(){ if(backVer===dataVer && backCache) return backCache;
 // what an expense really cost you
 function friendsOn(id){ const f=new Set(); Object.values(S.tx).forEach(p=>{ if(live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(id)) f.add((p.merchant||p.id).toLowerCase()); }); return f.size; }
 function myShare(t){ if(!t||t.type!=="out") return 0; const base=lkrOf(t);
-  if(t.split>1) return base/t.split;                         // split equally, you included
   const k=friendsOn(t.id); return k ? base/(k+1) : base; }    // whole amount until friends pay back, then your part: amount ÷ (friends + you)
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
@@ -3195,7 +3193,7 @@ function looseBacks(){ return txList().filter(isLooseBack); }
 // likely payments a payback is for: spending before it, within 30 days, bigger than the payback
 function backSuggestions(p){
   const pv=lkrOf(p);
-  return txList().filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat)&&t.ts<=p.ts+3600e3&&p.ts-t.ts<=30*864e5&&lkrOf(t)>=pv*0.15)
+  return txList().filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat)&&t.ts<=p.ts+3600e3&&p.ts-t.ts<=31*864e5&&lkrOf(t)>=pv*0.15)
     .map(t=>{ const days=(p.ts-t.ts)/864e5, linked=(backMap()[t.id]||0)>0, big=lkrOf(t)>=pv*0.95; return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)}; })
     .sort((a,b)=>a.score-b.score).slice(0,8).map(x=>x.t);
 }
@@ -3208,7 +3206,7 @@ function openLink(id){
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[t.cat]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
   openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Tick every payment it covers — e.g. lunch and drinks.</div>'+
     (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
-      :'<div class="note" style="margin-top:12px">No payments in the 30 days before this. It isn’t taken off your spending.</div>')+
+      :'<div class="note" style="margin-top:12px">No payments in the month before this. It isn’t taken off your spending.</div>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>'+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{ document.querySelectorAll("#lkList .lrow").forEach(b=>{ const on=sel.has(b.dataset.id); b.classList.toggle("sel",on); b.querySelector(".tick").textContent=on?"✓":""; });
