@@ -431,6 +431,24 @@ body.in-travel .sheet:not(.on){transform:translateY(130%)}
 #trendCard .tb{gap:6px}
 #trendCard .tb .v{min-height:13px;line-height:13px}
 #trendCard .tb .m,#trendCard .db .m{line-height:14px;min-height:14px}
+/* shared payments */
+.sharebar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--on-lime);border-radius:var(--r-md);padding:12px 14px;margin:10px 0}
+.sharebar span{display:block;font-size:12px;font-weight:700;color:#A2A79B}
+.sharebar b{display:block;font-size:20px;font-weight:800;color:var(--lime)}
+.sharebar i{display:block;font-style:normal;font-size:12px;font-weight:700;color:#C9CDC2;margin-top:2px}
+.sharebar .btn{padding:10px 16px;flex:none}
+.tx .share{color:#9EE6C6!important;font-weight:800}
+:root[data-theme="light"] .tx .share{color:#1F8A5B!important}
+.tx .tolink{color:var(--lime);font-weight:800}
+:root[data-theme="light"] .tx .tolink{color:#4F7A0E}
+.lrow.sel{background:var(--card2);box-shadow:inset 0 0 0 2px var(--lime)}
+.splitopts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.splitopts button{border:0;background:var(--card2);color:var(--ink);border-radius:14px;padding:12px 0;font-weight:800}
+.splitopts button.on{background:var(--lime);color:#12140D}
+.soon.linkb{border-left-color:#9EE6C6}
+.lrow .tick{width:24px;height:24px;border-radius:8px;border:2px solid var(--line);display:grid;place-items:center;font-weight:900;font-size:14px;color:#12140D;flex:none}
+.lrow.sel .tick{background:var(--lime);border-color:var(--lime)}
+.lrow.sel{background:var(--card2)}
 /* subscriptions */
 .alert{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--violet);color:var(--on-violet);border-radius:var(--r-md);padding:12px 14px;margin-bottom:10px}
 .alert .ai{width:36px;height:36px;border-radius:12px;background:rgba(23,18,42,.12);display:grid;place-items:center;flex:none;font-size:18px}
@@ -1547,7 +1565,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "6.9.0";
+const APP_VERSION = "7.0.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1668,7 +1686,7 @@ function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e)
 const live = o => o && !o.del;
 
 function put(kind, obj){
-  obj.u = Date.now(); S[kind][obj.id] = obj;
+  obj.u = Date.now(); S[kind][obj.id] = obj; if(typeof dataVer!=="undefined") dataVer++;
   S.dirty[kind+":"+obj.id] = 1; persist(); render(); queueSync();
 }
 function saveRules(){ put("cfg",{id:"rules",map:Object.assign({},S.rules),acct:Object.assign({},S.bankByAcct)}); }
@@ -2023,20 +2041,23 @@ function monthSpend(y,m){
   let total=0; const by={};
   let back=0;
   Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
-    if(t.type==="in"&&t.cat==="Paid back"){ back+=lkrOf(t); return; }
-    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=lkrOf(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
+    if(isLooseBack(t)){ back+=lkrOf(t); return; }   // waits until linked to a payment
+    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=myShare(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
   return {total,gross:total,back,by};
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
 function renderSoon(){
+  const loose=(typeof looseBacks==="function")?looseBacks().filter(p=>backSuggestions(p).length):[];
   const it=notiItems().filter(i=>i.d<=7);
   const show=it.slice(0,3);
   $("soonBox").innerHTML=show.map(i=>'<button class="soon'+(i.kind==="fd"?' isfd':'')+(i.d===0?' today':i.d===1?' tom':'')+'" data-k="'+i.kind+'" data-id="'+esc(i.id)+'">'+
     '<span class="si2" style="background:'+(i.kind==="fd"?CATS["Fixed deposit"].c:"var(--violet)")+'">'+(i.kind==="fd"?icon("Fixed deposit",18):esc(i.letter))+'</span>'+
     '<span class="tx2"><b>'+esc(i.title)+'</b><span>'+esc(i.line)+'</span></span><span class="wn">'+(i.d===0?"Today":i.d===1?"Tomorrow":"In "+i.d+" days")+'</span></button>').join("")+
     (it.length>3?'<button class="link" id="soonMore" style="margin:-2px 4px 10px">+'+(it.length-3)+' more in Notifications</button>':'');
-  $("soonBox").querySelectorAll(".soon").forEach(b=>b.onclick=()=>{ if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
+  if(loose.length) $("soonBox").insertAdjacentHTML("afterbegin",'<button class="soon linkb" id="linkBanner"><span class="si2" style="background:#9EE6C6">'+icon("Paid back",18)+'</span><span class="tx2"><b>'+loose.length+' payback'+(loose.length>1?'s':'')+' to link</b><span>Tap to match '+(loose.length>1?'them':'it')+' with the payment'+(loose.length>1?'s':'')+' you made</span></span><span class="wn">Link</span></button>');
+  if($("linkBanner")) $("linkBanner").onclick=()=>openLink(loose[0].id);
+  $("soonBox").querySelectorAll(".soon[data-k]").forEach(b=>b.onclick=()=>{ if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
   if($("soonMore")) $("soonMore").onclick=()=>{ document.body.classList.add("in-hub"); openNoti(); };
 }
 function renderHome(){
@@ -2044,12 +2065,12 @@ function renderHome(){
   const all=txList(), mt=all.filter(inMonth);
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=mt.filter(t=>t.type==="in"&&t.cat==="Income").reduce((s,t)=>s+lkrOf(t),0);
-  const spent=out.reduce((s,t)=>s+lkrOf(t),0);
-  const backs=mt.filter(t=>t.type==="in"&&t.cat==="Paid back"), back=backs.reduce((s,t)=>s+lkrOf(t),0);
+  const back=mt.filter(isLooseBack).reduce((s,t)=>s+lkrOf(t),0);
+  const spent=out.reduce((s,t)=>s+myShare(t),0);
   const net=spent;
   const fdOut=mt.filter(t=>t.type==="out"&&t.cat==="Fixed deposit").reduce((s,t)=>s+lkrOf(t),0);
   const left=inc-spent-fdOut;
-  const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+lkrOf(t));
+  const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+myShare(t));
   const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
   const mName=month.toLocaleDateString("en-GB",{month:"long"});
   const now=new Date(), isCur=now.getFullYear()===month.getFullYear()&&now.getMonth()===month.getMonth();
@@ -2183,7 +2204,7 @@ function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(
 function txHtml(t){
   const c=CATS[t.cat]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(t.cat)+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(t.cat)+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="out"&&(t.split>1||backMap()[t.id])?'<div class="o num share">your share '+rs(myShare(t))+'</div>':'')+(t.type==="in"&&t.cat==="Paid back"&&!(t.linkTo&&live(S.tx[t.linkTo]))?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -2199,7 +2220,8 @@ function listInto(el, list, emptyMsg, flat){
 /* ---------- activity ---------- */
 let chartMode="months", selDay=null, selWeek=null, selMonth=null;
 function daySpend(y,m){ const n=new Date(y,m+1,0).getDate(), a=new Array(n).fill(0);
-  Object.values(S.tx).forEach(t=>{ if(!live(t)||t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const d=new Date(t.ts); if(d.getFullYear()===y&&d.getMonth()===m) a[d.getDate()-1]+=lkrOf(t); });
+  Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
+    if(t.type==="out"&&!NOT_SPENDING.has(t.cat)) a[d.getDate()-1]+=myShare(t); });
   return a; }
 function renderTrend(){
   $("tcSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===chartMode));
@@ -2224,10 +2246,10 @@ function renderTrend(){
     tr.className="trend weeks";
     const y=month.getFullYear(), m=month.getMonth(), a=daySpend(y,m), n=a.length, wk=[];
     let start=1; while(start<=n){ const dow=(new Date(y,m,start).getDay()+6)%7, end=Math.min(n,start+(6-dow)); wk.push({s:start,e:end,t:a.slice(start-1,end).reduce((x,v)=>x+v,0)}); start=end+1; }
-    const mx=Math.max(1,...wk.map(w=>w.t)), ml=month.toLocaleDateString("en-GB",{month:"short"});
+    wk.forEach(w=>w.t=Math.max(0,w.t)); const mx=Math.max(1,...wk.map(w=>w.t)), ml=month.toLocaleDateString("en-GB",{month:"short"});
     if(selWeek!=null && !wk[selWeek]) selWeek=null;
     $("tcTitle").textContent=month.toLocaleDateString("en-GB",{month:"long"});
-    setSub(selWeek!=null ? wk[selWeek].s+(wk[selWeek].e!==wk[selWeek].s?"–"+wk[selWeek].e:"")+" "+ml+" · "+(wk[selWeek].t?rs(wk[selWeek].t):"Nothing spent") : "");
+    setSub(selWeek!=null ? wk[selWeek].s+(wk[selWeek].e!==wk[selWeek].s?"–"+wk[selWeek].e:"")+" "+ml+" · "+(wk[selWeek].t>0?rs(wk[selWeek].t):"Nothing spent") : "");
     tr.style.gridTemplateColumns="repeat("+wk.length+",1fr)";
     tr.innerHTML=wk.map((w,i)=>'<button class="tb'+(selWeek===i?' on':'')+'" data-w="'+i+'"><span class="v num">'+(w.t?short(w.t):"")+'</span><span class="col"><i style="height:'+(w.t/mx*100)+'%"></i></span><span class="m">'+w.s+(w.e!==w.s?"–"+w.e:"")+'</span></button>').join("");
     tr.querySelectorAll(".tb").forEach(b=>b.onclick=()=>{ const i=+b.dataset.w; selWeek = selWeek===i?null:i; renderActivity(); });
@@ -2236,10 +2258,10 @@ function renderTrend(){
   tr.style.gridTemplateColumns="";
   const y=month.getFullYear(), m=month.getMonth(), a=daySpend(y,m), mx=Math.max(1,...a);
   $("tcTitle").textContent=month.toLocaleDateString("en-GB",{month:"long"});
-  setSub(selDay ? new Date(y,m,selDay).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" · "+(a[selDay-1]?rs(a[selDay-1]):"Nothing spent") : "");
+  setSub(selDay ? new Date(y,m,selDay).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+" · "+(a[selDay-1]>0?rs(a[selDay-1]):a[selDay-1]<0?"Paybacks "+rs(-a[selDay-1]):"Nothing spent") : "");
   tr.className="trend days";
   tr.innerHTML=a.map((v,i)=>{ const d=i+1, lab=(d===1||d%5===0)?d:"";
-    return '<button class="db'+(selDay===d?' on':'')+'" data-d="'+d+'" aria-label="'+d+': '+rs(v)+'"><span class="v"></span><span class="col"><i style="height:'+(v?Math.max(4,v/mx*100):0)+'%"></i></span><span class="m">'+lab+'</span></button>'; }).join("");
+    return '<button class="db'+(selDay===d?' on':'')+'" data-d="'+d+'" aria-label="'+d+': '+rs(v)+'"><span class="v"></span><span class="col"><i style="height:'+(v>0?Math.max(4,v/mx*100):0)+'%"></i></span><span class="m">'+lab+'</span></button>'; }).join("");
   tr.querySelectorAll(".db").forEach(b=>b.onclick=()=>{ const d=+b.dataset.d; selDay = selDay===d?null:d; renderActivity(); });
 }
 function renderActivity(){
@@ -2249,7 +2271,7 @@ function renderActivity(){
   // accounts used this month, with what was spent from each
   const mtx=txList().filter(inMonth), accs={};
   mtx.forEach(t=>{ if(!t.bank||t.bank==="Bank"||t.bank==="Manual") return; const k=accKey(t); accs[k]=accs[k]||{k,name:t.bank+(t.acct?" ••"+t.acct:""),out:0};
-    if(t.type==="out"&&!NOT_SPENDING.has(t.cat)) accs[k].out+=lkrOf(t); });
+    if(t.type==="out"&&!NOT_SPENDING.has(t.cat)) accs[k].out+=myShare(t); });
   const al=Object.values(accs).sort((a,b)=>b.out-a.out);
   if(accFilter!=="all" && !accs[accFilter]) accFilter="all";
   $("achips").hidden=al.length<2;
@@ -2370,6 +2392,7 @@ function openCat(c){
 
 function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
 function openTx(id){
+  const t0=S.tx[id]; if(t0 && t0.type==="in" && t0.cat==="Paid back" && !linksOf(t0).length){ openLink(id); return; }
   const t=S.tx[id]; if(!t) return; let cat=t.cat;
   const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
   let topSel=t.topup||"";
@@ -2378,6 +2401,8 @@ function openTx(id){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
+    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(backMap()[t.id]?'<i>'+rs(backMap()[t.id])+' paid back by friends</i>':t.split>1?'<i>split '+t.split+' ways</i>':'')+'</div><button class="btn soft" id="txSplit">Split</button></div>':'')+
+    (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">Change</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -3143,6 +3168,65 @@ function renderCal(){
   $("cNext").onclick=()=>{ calMonth=new Date(y,m+1,1); renderCal(); };
   $("trCal").querySelectorAll(".cday").forEach(b=>b.onclick=()=>{ calSel=b.dataset.d; renderCal(); });
   $("trCal").querySelectorAll(".tx").forEach(b=>b.onclick=()=>b.dataset.k==="plan"?openPlan(b.dataset.id):openTrip(b.dataset.id));
+}
+
+/* =============== shared payments: your share, linked paybacks, split =============== */
+let backCache=null, backVer=-1, dataVer=0;
+function linksOf(t){ return (t.links||(t.linkTo?[t.linkTo]:[])).filter(id=>live(S.tx[id])); }
+function backMap(){ if(backVer===dataVer && backCache) return backCache;
+  const m={};
+  Object.values(S.tx).filter(t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&linksOf(t).length).sort((a,b)=>a.ts-b.ts).forEach(p=>{
+    const ids=linksOf(p), rem=ids.map(id=>Math.max(0,lkrOf(S.tx[id])-(m[id]||0))), R=rem.reduce((a,b)=>a+b,0); if(R<=0) return;
+    const P=lkrOf(p); ids.forEach((id,i)=>{ m[id]=(m[id]||0)+Math.min(rem[i],P*rem[i]/R); });   // split by each payment's remaining amount
+  });
+  backCache=m; backVer=dataVer; return m; }
+// what an expense really cost you
+function myShare(t){ if(!t||t.type!=="out") return 0; const base=lkrOf(t);
+  if(t.split>1) return base/t.split;
+  return Math.max(0, base-(backMap()[t.id]||0)); }
+// paybacks not linked to a payment: taken off on the day they arrive
+const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
+function looseBacks(){ return txList().filter(isLooseBack); }
+// likely payments a payback is for: spending before it, within 30 days, bigger than the payback
+function backSuggestions(p){
+  const pv=lkrOf(p);
+  return txList().filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat)&&t.ts<=p.ts+3600e3&&p.ts-t.ts<=30*864e5&&lkrOf(t)>=pv*0.15)
+    .map(t=>{ const days=(p.ts-t.ts)/864e5, linked=(backMap()[t.id]||0)>0, big=lkrOf(t)>=pv*0.95; return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)}; })
+    .sort((a,b)=>a.score-b.score).slice(0,8).map(x=>x.t);
+}
+function openLink(id){
+  const p=S.tx[id]; if(!p) return;
+  const cur=linksOf(p), sug=backSuggestions(p);
+  cur.forEach(cid=>{ if(!sug.some(t=>t.id===cid)) sug.unshift(S.tx[cid]); });
+  const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));   // most likely payment ticked
+  const P=lkrOf(p);
+  const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[t.cat]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
+  openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Tick every payment it covers — e.g. lunch and drinks.</div>'+
+    (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
+      :'<div class="note" style="margin-top:12px">No payments in the 30 days before this. It isn’t taken off your spending.</div>')+
+    '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>');
+  const paint=()=>{ document.querySelectorAll("#lkList .lrow").forEach(b=>{ const on=sel.has(b.dataset.id); b.classList.toggle("sel",on); b.querySelector(".tick").textContent=on?"✓":""; });
+    if($("lkSum")){ const tot=[...sel].reduce((a,k)=>a+lkrOf(S.tx[k]),0); $("lkSum").textContent=sel.size?sel.size+" payment"+(sel.size>1?"s":"")+" · "+rs(tot):"Tick at least one"; }
+    if($("lkSave")) $("lkSave").textContent=sel.size>1?"Link to "+sel.size+" payments":"Link"; };
+  document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{ const k=b.dataset.id; sel.has(k)?sel.delete(k):sel.add(k); paint(); });
+  paint();
+  if($("lkSave")) $("lkSave").onclick=()=>{ if(!sel.size) return toast("Tick at least one payment");
+    const n=Object.assign({},p,{links:[...sel]}); delete n.linkTo; put("tx",n); dataVer++; closeSheet(); toast("Linked · your share updated"); render(); setTimeout(nextLink,450); };
+  if($("lkNone")) $("lkNone").onclick=()=>{ const n=Object.assign({},p); delete n.linkTo; delete n.links; put("tx",n); dataVer++; closeSheet(); render(); };
+  $("lkLater").onclick=closeSheet;
+}
+
+function nextLink(){ const l=looseBacks().filter(p=>backSuggestions(p).length); if(l.length && !sheetOpen) openLink(l[0].id); }
+function openSplit(id){
+  const t=S.tx[id]; if(!t) return; let n=t.split||0;
+  const opts=[0,2,3,4,5,6,8,10];
+  openSheet('<h2>Split this payment</h2><div class="note">'+esc(t.merchant)+' · '+rs(lkrOf(t))+'. How many people shared it, including you?</div>'+
+    '<div class="splitopts">'+opts.map(k=>'<button data-n="'+k+'" class="'+(k===n?'on':'')+'">'+(k?k:'Not split')+'</button>').join("")+'</div>'+
+    '<div class="fromhome" style="margin-top:12px"><span>Your share</span><b id="spShare">'+rs(n>1?lkrOf(t)/n:myShare(Object.assign({},t,{split:0})))+'</b></div>'+
+    '<button class="btn full" id="spSave">Save</button>');
+  document.querySelectorAll(".splitopts button").forEach(b=>b.onclick=()=>{ n=+b.dataset.n; document.querySelectorAll(".splitopts button").forEach(x=>x.classList.toggle("on",x===b));
+    $("spShare").textContent=rs(n>1?lkrOf(t)/n:myShare(Object.assign({},t,{split:0}))); });
+  $("spSave").onclick=()=>{ const o=Object.assign({},t); if(n>1) o.split=n; else delete o.split; put("tx",o); dataVer++; closeSheet(); toast(n>1?"Split "+n+" ways":"Not split"); render(); };
 }
 
 /* =============== Sappy Hub =============== */
