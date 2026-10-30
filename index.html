@@ -128,7 +128,11 @@ button:active{transform:scale(.98)}
 .donut-wrap .seg{transition:stroke-dasharray .9s var(--ease),stroke-dashoffset .9s var(--ease)}
 .tab{transition:background .25s var(--ease),color .25s var(--ease)}
 .chip{transition:background .2s var(--ease),color .2s var(--ease)}
-.dragging{transition:none!important;will-change:transform;box-shadow:-12px 0 30px -12px rgba(0,0,0,.32);backface-visibility:hidden}\n.ios-back-preview{position:fixed;inset:0;z-index:900;overflow:hidden;pointer-events:none;background:var(--bg);contain:layout paint;will-change:transform}
+.dragging{transition:none!important;will-change:transform;box-shadow:-12px 0 30px -12px rgba(0,0,0,.32);backface-visibility:hidden}\n.ios-back-preview{position:fixed;inset:0;z-index:900;overflow-y:auto;overflow-x:hidden;pointer-events:none;background:var(--bg);will-change:transform;-webkit-overflow-scrolling:auto}
+.ios-preview-content{position:relative;min-height:100%;background:var(--bg)}
+.ios-back-preview #appView,.ios-back-preview #travelView,.ios-back-preview #hubView,.ios-back-preview #setView,.ios-back-preview #notiView{display:block!important;visibility:visible!important;opacity:1!important}
+.ios-back-preview nav.tabs{display:block!important;z-index:2}
+.ios-back-preview [hidden]{display:none!important}
 .ios-back-preview>.hubv,.ios-back-preview>#appView{display:block!important;max-width:520px;margin:0 auto}
 .ios-front{position:relative;z-index:901;background:var(--bg);min-height:100vh}
 .ios-gesture-settle{transition-property:transform!important;transition-timing-function:cubic-bezier(.22,.8,.22,1)!important}
@@ -1583,7 +1587,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.7";
+const APP_VERSION = "7.1.8";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3367,7 +3371,7 @@ function retainBackScreen(){
   const copy=source.cloneNode(true);
   copy.querySelectorAll("script,iframe,video,canvas").forEach(n=>n.remove());
   copy.querySelectorAll("input,textarea,select,button,a").forEach(n=>n.setAttribute("tabindex","-1"));
-  const record={node:copy,scrollY:window.scrollY};
+  const record={node:copy,scrollY:window.scrollY,route:key};
   backScreenCache.delete(key);backScreenCache.set(key,record);
   while(backScreenCache.size>10)backScreenCache.delete(backScreenCache.keys().next().value);
 }
@@ -3430,12 +3434,36 @@ function goBack(){
     if(!saved)return;
     preview=document.createElement("div");
     preview.className="ios-back-preview";
+    const shell=document.createElement("div");
+    shell.className="ios-preview-content";
     const clone=saved.node.cloneNode(true);
+    // A clone keeps the original route's CSS-hidden sections, but the cloned
+    // page itself must be made visible even when the current route differs.
+    clone.removeAttribute("hidden");
     clone.style.setProperty("display","block","important");
+    clone.style.setProperty("visibility","visible","important");
+    clone.style.setProperty("opacity","1","important");
     clone.style.setProperty("transform","none","important");
     clone.style.setProperty("animation","none","important");
     clone.style.minHeight="100vh";
-    preview.appendChild(clone);
+    shell.appendChild(clone);
+    // Bottom navigation is a sibling of the page, not a child of appView.
+    // Include the matching footer so the entire previous UI is shown.
+    if(saved.route.startsWith("pocket:")||saved.route.startsWith("travel:")){
+      const original=saved.route.startsWith("travel:")?$("travelTabs"):document.querySelector("nav.tabs:not(#travelTabs)");
+      if(original){
+        const nav=original.cloneNode(true);
+        nav.removeAttribute("hidden");
+        nav.style.setProperty("display","block","important");
+        nav.style.setProperty("visibility","visible","important");
+        nav.style.setProperty("position","absolute","important");
+        nav.style.setProperty("bottom","0","important");
+        nav.style.setProperty("left","0","important");
+        nav.style.setProperty("right","0","important");
+        shell.appendChild(nav);
+      }
+    }
+    preview.appendChild(shell);
     document.body.appendChild(preview);
     preview.scrollTop=saved.scrollY;
     preview.style.transform="translate3d(-24px,0,0)";
