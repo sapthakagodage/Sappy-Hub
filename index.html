@@ -3332,7 +3332,7 @@ function openApp(id){
   if(id==="travel"){ openTravel(); }
 }
 
-$("trBack").onclick=animatedBack; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
+ const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
  $("tripAdd").onclick=()=>openTripForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
@@ -3350,8 +3350,8 @@ function closeSettings(){
 }
 $("hubSet").onclick=openSettings;
 $("mapKey").onchange=()=>{ S.mapKey=$("mapKey").value.trim(); persist(); put("cfg",{id:"maps",key:S.mapKey}); if(typeof LMAP!=="undefined" && LMAP){ try{ LMAP.remove(); }catch(e){} LMAP=null; } toast(S.mapKey?"Map key saved":"Using the free maps"); };
-document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=animatedBack;
-$("setBack").onclick=animatedBack;
+document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); 
+
 
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
