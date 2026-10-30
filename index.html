@@ -1398,8 +1398,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
 /* Swipe-back: animate snapshots on the compositor, not live rerendered DOM. */
 @keyframes sappy-back-out{from{transform:translate3d(0,0,0);opacity:1}to{transform:translate3d(24px,0,0);opacity:.92}}
 @keyframes sappy-back-in{from{transform:translate3d(-18px,0,0);opacity:.96}to{transform:translate3d(0,0,0);opacity:1}}
-::view-transition-old(root){animation:310ms cubic-bezier(.22,.7,.2,1) both sappy-back-out}
-::view-transition-new(root){animation:350ms cubic-bezier(.22,1,.36,1) both sappy-back-in}
+::view-transition-old(root){animation:440ms cubic-bezier(.22,.7,.2,1) both sappy-back-out}
+::view-transition-new(root){animation:480ms cubic-bezier(.22,1,.36,1) both sappy-back-in}
 @media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}
 /* Lock scroll anchoring and suppress legacy entrance motion during back navigation. */
 html.sappy-back-transitioning{scroll-behavior:auto!important;overflow-anchor:none!important}
@@ -1606,7 +1606,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.2.6";
+const APP_VERSION = "7.2.7";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
