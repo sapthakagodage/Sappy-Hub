@@ -1493,9 +1493,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </section>
 </div>
-<div class="wrap" id="appView">\n  
+<div class="wrap" id="appView">
+
 
   <header class="bar">
+    <button type="button" class="pocket-header-back" data-animated-back aria-label="Back to Overview or Sappy Hub"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
     <h1><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
     <div class="mswitch" id="mswitch">
       <button id="prev" aria-label="Previous month">‹</button>
@@ -1593,7 +1595,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.2.0";
+const APP_VERSION = "7.2.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3408,17 +3410,20 @@ function animatedBack(){
   root.dataset.backAnimating="1";
   const finish=()=>{
     delete root.dataset.backAnimating;
-    root.style.removeProperty("animation");
     quickBack=true;
     try{goBack();}finally{quickBack=false;}
-    const incoming=document.body.classList.contains("in-hub")?$("hubView"):document.body.classList.contains("in-travel")?$("travelView"):document.body.classList.contains("in-set")?$("setView"):$("appView");
+    const bb=document.body.classList;
+    const incoming=bb.contains("in-hub")?$("hubView"):bb.contains("in-travel")?$("travelView"):bb.contains("in-set")?$("setView"):bb.contains("in-noti")?$("notiView"):$("appView");
     if(incoming&&incoming.animate&&!REDUCED){
-      incoming.animate([{opacity:.88,transform:"translate3d(-12px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}],{duration:210,easing:"cubic-bezier(.22,1,.36,1)"});
+      incoming.animate([{opacity:.96,transform:"translate3d(-9px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}],
+        {duration:170,easing:"cubic-bezier(.22,1,.36,1)"});
     }
   };
   if(REDUCED){finish();return;}
-  const a=root.animate([{opacity:1,transform:"translate3d(0,0,0)"},{opacity:.88,transform:"translate3d(40px,0,0)"}],{duration:175,easing:"cubic-bezier(.4,0,.8,.4)"});
-  a.onfinish=finish;a.oncancel=()=>{delete root.dataset.backAnimating;};
+  const a=root.animate([{opacity:1,transform:"translate3d(0,0,0)"},{opacity:.97,transform:"translate3d(26px,0,0)"}],
+    {duration:135,easing:"cubic-bezier(.4,0,.8,.4)"});
+  a.onfinish=finish;
+  a.oncancel=()=>{delete root.dataset.backAnimating;};
 }
 document.addEventListener("click",e=>{
   const button=e.target.closest("[data-animated-back]");
