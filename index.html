@@ -1389,7 +1389,8 @@ svg.leaflet-image-layer.leaflet-interactive path {
 	}
 
 .tabs .nav-add{width:54px;height:54px;flex-shrink:0;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:transform .2s ease}.tabs .nav-add:active{transform:scale(.92)}.tabs .nav-add svg{width:26px;height:26px}
-.pocket-backbar{display:flex;align-items:center;min-height:38px;margin:-4px 0 8px}
+.pocket-header-back{display:inline-grid;place-items:center;flex:0 0 30px;width:30px;height:34px;margin-right:5px;border:0;border-radius:10px;background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation}
+.pocket-header-back:active{background:var(--card2);transform:scale(.95)}
 .ios-back-button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .pocket-backbar .ios-back-button{display:inline-flex;align-items:center;gap:4px;padding:6px 12px 6px 4px;background:transparent;border:0;color:var(--ink);font:inherit;font-size:15px;font-weight:700}
 .pocket-backbar .ios-back-button span{font-size:31px;line-height:20px;font-weight:400}
@@ -1492,7 +1493,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </section>
 </div>
-<div class="wrap" id="appView">\n  <div class="pocket-backbar"><button type="button" class="ios-back-button" data-animated-back aria-label="Go back"><span aria-hidden="true">‹</span> Back</button></div>
+<div class="wrap" id="appView">\n  
 
   <header class="bar">
     <h1><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
@@ -1592,7 +1593,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.9";
+const APP_VERSION = "7.2.0";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3387,29 +3388,17 @@ function rememberScreen(){
   if(navTrail[navTrail.length-1]!==here){ navTrail.push(here); if(navTrail.length>30) navTrail.shift(); }
 }
 function goBack(){
-  if(sheetOpen){ closeSheet(); return; }
-  if(document.body.classList.contains("in-fullmap")){ closeFullMap(); return; }
+  if(sheetOpen){closeSheet();return;}
+  if(document.body.classList.contains("in-fullmap")){closeFullMap();return;}
   const here=currentScreen();
-  let target;
-  while(navTrail.length){ const prev=navTrail.pop(); if(prev!==here){ target=prev; break; } }
-  if(!target){
-    if(here==="hub") return;
-    target=here.startsWith("travel:")?(here==="travel:home"?"hub":"travel:home"):
-      here.startsWith("pocket:")?(here==="pocket:home"?"hub":"pocket:home"):"hub";
-  }
   restoringScreen=true;
   try{
-    if(target==="hub") showHub();
-    else if(target==="settings") openSettings();
-    else if(target==="noti") openNoti();
-    else if(target.startsWith("travel:")){
-      if(!document.body.classList.contains("in-travel")) openTravel();
-      travelGo(target.slice(7));
-    }else if(target.startsWith("pocket:")){
-      document.body.classList.remove("in-hub","in-travel","in-set","in-noti");
-      go(target.slice(7));
-    }
-  }finally{ restoringScreen=false; }
+    if(here==="hub")return;
+    if(here==="settings"||here==="noti"){showHub();return;}
+    if(here.startsWith("travel:")){if(trView==="home")showHub();else travelGo("home");return;}
+    if(here.startsWith("pocket:")){if(view==="home")showHub();else go("home");return;}
+    showHub();
+  }finally{restoringScreen=false;navTrail.length=0;}
 }
 // Navigation is button-driven; edge-swipe gesture intentionally disabled.
 function animatedBack(){
@@ -3434,7 +3423,23 @@ function animatedBack(){
 document.addEventListener("click",e=>{
   const button=e.target.closest("[data-animated-back]");
   if(button){e.preventDefault();e.stopImmediatePropagation();animatedBack();}
-});
+},true);
+(function(){
+  let sx=0,sy=0,tracking=false;
+  document.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1)return;
+    const t=e.touches[0];sx=t.clientX;sy=t.clientY;
+    tracking=sx<=24&&!document.body.classList.contains("in-hub")&&
+      !e.target.closest("input,textarea,select,[contenteditable],.leaflet-container");
+  },{passive:true});
+  document.addEventListener("touchcancel",()=>{tracking=false;},{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!tracking||!e.changedTouches.length)return;
+    tracking=false;
+    const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(dx>65&&dx>Math.abs(dy)*1.5)animatedBack();
+  },{passive:true});
+})();
 ;;
 let hiddenAt=0;
 function freshStart(){
