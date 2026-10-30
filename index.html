@@ -1721,7 +1721,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.7";
+const APP_VERSION = "7.3.8";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3669,8 +3669,20 @@ document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti);
 
 
 window.addEventListener("hashchange",checkHash);
-checkUpdate("app",APP_VERSION,"version.json");
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate("app",APP_VERSION,"version.json"); });
+// iOS Home Screen apps can resume a cached document without a fresh page load.
+// Re-check the release whenever the web app becomes active again.
+let lastActiveVersionCheck=0;
+function checkActiveAppVersion(){
+  if(document.hidden)return;
+  const now=Date.now();
+  if(now-lastActiveVersionCheck<2500)return;
+  lastActiveVersionCheck=now;
+  checkUpdate("app",APP_VERSION,"version.json");
+}
+checkActiveAppVersion();
+document.addEventListener("visibilitychange",checkActiveAppVersion);
+window.addEventListener("focus",checkActiveAppVersion);
+window.addEventListener("pageshow",checkActiveAppVersion);
 /* ===== contextual navigation + iPhone-style edge swipe ===== */
 const navTrail=[];
 let restoringScreen=false;
