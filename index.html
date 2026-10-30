@@ -1718,7 +1718,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.4";
+const APP_VERSION = "7.3.5";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3115,13 +3115,20 @@ function focusProvinceShape(name){
     }
   });
 }
+// Always frame the entire island inside the visible map container.
+function fitWholeSriLanka(){
+  if(!LMAP||travelMapMode!=="provinces"||trView!=="map")return;
+  LMAP.invalidateSize({pan:false});
+  LMAP.stop();
+  LMAP.fitBounds(LK,{padding:[24,24],maxZoom:8,animate:false});
+}
 async function renderProvinceMap(){
   if(!LMAP||travelMapMode!=="provinces")return;
   if(provinceLayer){provinceLayer.remove();provinceLayer=null;}
   LLAYER.clearLayers();
   const info=$("trProvinceMapInfo");
   renderProvinceDetails();
-  LMAP.fitBounds(LK,{padding:[18,18],animate:false});
+  fitWholeSriLanka();
   try{
     const data=await loadProvinceShapes();
     if(travelMapMode!=="provinces"||!LMAP)return;
@@ -3138,8 +3145,10 @@ async function renderProvinceMap(){
         layer.on("click",e=>{L.DomEvent.stopPropagation(e);selectedMapProvince=name;renderProvinceDetails();});
       }
     }).addTo(LMAP);
-    LMAP.fitBounds(provinceLayer.getBounds(),{padding:[16,16],animate:false});
-    if(selectedMapProvince)focusProvinceShape(selectedMapProvince);
+    // Fitting to fixed island bounds avoids malformed boundary extents or
+    // the last tapped province becoming the next default camera.
+    fitWholeSriLanka();
+    requestAnimationFrame(()=>fitWholeSriLanka());
   }catch(e){
     if(info&&!info.querySelector(".tr-province-boundary-note")){
       info.insertAdjacentHTML("afterbegin",'<p class="tr-province-boundary-note">Province outlines could not load. Coverage and saved places are listed below.</p>');
@@ -3364,8 +3373,9 @@ let trView="home", trFilter="all";
 const TNAMES={home:"Sappy Travel",map:"All places",plans:"Plan a visit",cal:"Calendar"};
 const tKind=t=>(t&&TYPES[t.type])?t.type:"place";
 function showBigMap(){
+  selectedMapProvince=""; // a new visit to Map always starts from the island overview
   const first=!window.L || !LMAP; if(first) busyStart("Loading the map…");
-  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize(); if(travelMapMode==="provinces")renderProvinceMap(); else drawMap(true,true); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
+  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize({pan:false}); if(travelMapMode==="provinces"){renderProvinceMap(); requestAnimationFrame(()=>fitWholeSriLanka());} else drawMap(true,true); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
     .catch(()=>{ if(first) busyEnd(); $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function freshTravelPage(){ trYear="all"; trFilter="all"; trScope="lk"; calMonth=null; calSel=null;
