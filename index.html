@@ -1422,7 +1422,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <div id="hubView" class="hubv">
   <header class="h-top">
     <div class="h-brand"><span class="h-mark">S</span>Sappy Hub</div>
-    <div style="display:flex;gap:8px;align-items:center"><div class="h-date" id="hDate"></div><button class="hub bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><i class="bellb" hidden></i></button><button class="hub" id="hubSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg></button></div>
+    <div style="display:flex;gap:8px;align-items:center"><div class="h-date" id="hDate"></div><button class="hub bell" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><i class="bellb" hidden></i></button><button class="hub" id="hubSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.8 3.5h4.4l.6 2.1c.5.2 1 .4 1.4.8l2-.9 3.1 3.1-.9 2c.3.5.6.9.8 1.4l2.1.6v4.4l-2.1.6c-.2.5-.5 1-.8 1.4l.9 2-3.1 3.1-2-.9c-.5.3-.9.6-1.4.8l-.6 2.1H9.8l-.6-2.1c-.5-.2-1-.5-1.4-.8l-2 .9-3.1-3.1.9-2c-.3-.5-.6-.9-.8-1.4L.7 15.8v-4.4l2.1-.6c.2-.5.5-1 .8-1.4l-.9-2 3.1-3.1 2 .9c.5-.3.9-.6 1.4-.8l.6-2.1Z" transform="translate(0 -1.3) scale(.96)"/><circle cx="12" cy="12" r="3"/></svg></button></div>
   </header>
   <div class="h-hello" id="hHello">Hello</div>
   <h1 class="h-title">All my records,<br><em>in one place.</em></h1>
@@ -1471,16 +1471,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <div id="setView" class="hubv setv">
   <header class="h-top"><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
-    <h2 style="margin-top:0">Look · all apps</h2>
-    <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
-
-    <h2>Maps (optional)</h2>
-    <div class="card">
-      <p class="note" style="margin-top:0">Maps work without a key. Add a free MapTiler key only if you want their map style.</p>
-      <label class="fl2" style="margin:0"><span>MapTiler key</span><input class="inp" id="mapKey" placeholder="Leave empty to use the free maps" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-    </div>
-
-    <h2>Cloud sync</h2>
+    <h2 style="margin-top:0">Cloud sync</h2>
     <div class="card">
       <div class="row" style="padding-top:0"><div><div class="k">Status</div><div class="d" id="syncWhen">Not connected</div></div><span class="pill" id="syncPill"><i></i><span>Off</span></span></div>
       <div class="row" style="border-top:1px solid var(--line)"><div><div class="k">Supabase connection</div><div class="d">Project URL and API key</div></div><button class="btn soft" id="sbOpen">Edit</button></div>
@@ -1498,6 +1489,9 @@ html.sappy-back-transitioning .fadein{animation:none!important}
       <div class="btns"><button class="btn" id="exp">Download backup</button><button class="btn soft" id="impBtn">Restore</button></div>
       <input type="file" id="imp" accept="application/json" hidden>
     </div>
+
+    <h2 >Look · all apps</h2>
+    <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
 
     <h2>App</h2>
     <div class="card">
@@ -1606,7 +1600,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.2.8";
+const APP_VERSION = "7.2.9";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2388,7 +2382,6 @@ function renderSavings(){
 
 /* ---------- settings ---------- */
 function renderSettings(){
-  if($("mapKey") && document.activeElement!==$("mapKey")) $("mapKey").value=S.mapKey||"";
   showLatest();
   $("ver").textContent="v"+APP_VERSION;
   $("sbUrl").value=S.sb.url; $("sbKey").value=S.sb.key;
@@ -3361,7 +3354,6 @@ function closeSettings(){
   if(setFrom==="hub") showHub(); else { render(); window.scrollTo(0,0); enterScreen(); }
 }
 $("hubSet").onclick=openSettings;
-$("mapKey").onchange=()=>{ S.mapKey=$("mapKey").value.trim(); persist(); put("cfg",{id:"maps",key:S.mapKey}); if(typeof LMAP!=="undefined" && LMAP){ try{ LMAP.remove(); }catch(e){} LMAP=null; } toast(S.mapKey?"Map key saved":"Using the free maps"); };
 document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); 
 
 
