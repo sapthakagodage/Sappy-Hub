@@ -128,7 +128,11 @@ button:active{transform:scale(.98)}
 .donut-wrap .seg{transition:stroke-dasharray .9s var(--ease),stroke-dashoffset .9s var(--ease)}
 .tab{transition:background .25s var(--ease),color .25s var(--ease)}
 .chip{transition:background .2s var(--ease),color .2s var(--ease)}
-.dragging{transition:none!important;will-change:transform;box-shadow:-12px 0 30px -12px rgba(0,0,0,.32);backface-visibility:hidden}\n.ios-gesture-settle{transition-property:transform,box-shadow!important;transition-timing-function:cubic-bezier(.22,.8,.22,1)!important;will-change:transform;backface-visibility:hidden}
+.dragging{transition:none!important;will-change:transform;box-shadow:-12px 0 30px -12px rgba(0,0,0,.32);backface-visibility:hidden}\n.ios-back-preview{position:fixed;inset:0;z-index:900;overflow:hidden;pointer-events:none;background:var(--bg);contain:layout paint;will-change:transform}
+.ios-back-preview>.hubv,.ios-back-preview>#appView{display:block!important;max-width:520px;margin:0 auto}
+.ios-front{position:relative;z-index:901;background:var(--bg);min-height:100vh}
+.ios-gesture-settle{transition-property:transform!important;transition-timing-function:cubic-bezier(.22,.8,.22,1)!important}
+.ios-gesture-settle{transition-property:transform,box-shadow!important;transition-timing-function:cubic-bezier(.22,.8,.22,1)!important;will-change:transform;backface-visibility:hidden}
 .snap{transition:transform .18s cubic-bezier(.3,.7,.3,1)!important}
 @keyframes quickin{from{opacity:.4;transform:translateX(-18px)}to{opacity:1;transform:none}}
 .quickin{animation:quickin .2s var(--ease) both}
@@ -1579,7 +1583,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.6";
+const APP_VERSION = "7.1.7";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3352,9 +3356,25 @@ function currentScreen(){
   if(b.contains("in-travel")) return "travel:"+trView;
   return "pocket:"+view;
 }
+// Retain a lightweight DOM view of the screen before leaving it.
+// This is only displayed under the active page during an edge-back gesture.
+const backScreenCache=new Map();
+function retainBackScreen(){
+  const key=currentScreen();
+  const id=key==="hub"?"hubView":key==="settings"?"setView":key==="noti"?"notiView":key.startsWith("travel:")?"travelView":"appView";
+  const source=$(id);
+  if(!source)return;
+  const copy=source.cloneNode(true);
+  copy.querySelectorAll("script,iframe,video,canvas").forEach(n=>n.remove());
+  copy.querySelectorAll("input,textarea,select,button,a").forEach(n=>n.setAttribute("tabindex","-1"));
+  const record={node:copy,scrollY:window.scrollY};
+  backScreenCache.delete(key);backScreenCache.set(key,record);
+  while(backScreenCache.size>10)backScreenCache.delete(backScreenCache.keys().next().value);
+}
 function rememberScreen(){
   if(restoringScreen) return;
   const here=currentScreen();
+  retainBackScreen();
   if(navTrail[navTrail.length-1]!==here){ navTrail.push(here); if(navTrail.length>30) navTrail.shift(); }
 }
 function goBack(){
@@ -3383,64 +3403,102 @@ function goBack(){
   }finally{ restoringScreen=false; }
 }
 (function(){
-  let sx=0,sy=0,dx=0,active=false,dragging=false,el=null;
+  let sx=0,sy=0,dx=0,active=false,dragging=false,el=null,preview=null,raf=0;
   const pageEl=()=>{
     const b=document.body.classList;
-    if(sheetOpen) return null;
-    if(b.contains("in-set")) return $("setView");
-    if(b.contains("in-noti")) return $("notiView");
-    if(b.contains("in-travel")) return $("travelView");
-    if(b.contains("in-hub")) return null;
+    if(sheetOpen)return null;
+    if(b.contains("in-set"))return $("setView");
+    if(b.contains("in-noti"))return $("notiView");
+    if(b.contains("in-travel"))return $("travelView");
+    if(b.contains("in-hub"))return null;
     return $("appView");
   };
-  const reset=()=>{ if(el){ el.classList.remove("dragging","snap"); el.style.transform=""; } active=false; dragging=false; dx=0; el=null; };
+  const backTarget=()=>{
+    const here=currentScreen();
+    for(let i=navTrail.length-1;i>=0;i--)if(navTrail[i]!==here)return navTrail[i];
+    return here.startsWith("travel:")?(here==="travel:home"?"hub":"travel:home"):
+      here.startsWith("pocket:")?(here==="pocket:home"?"hub":"pocket:home"):"hub";
+  };
+  const clearPreview=()=>{
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    if(preview){preview.remove();preview=null;}
+    if(el){el.classList.remove("ios-front","dragging","ios-gesture-settle");el.style.transform="";el.style.transitionDuration="";}
+  };
+  const reset=()=>{clearPreview();active=false;dragging=false;dx=0;el=null;};
+  const preparePreview=()=>{
+    const saved=backScreenCache.get(backTarget());
+    if(!saved)return;
+    preview=document.createElement("div");
+    preview.className="ios-back-preview";
+    const clone=saved.node.cloneNode(true);
+    clone.style.setProperty("display","block","important");
+    clone.style.setProperty("transform","none","important");
+    clone.style.setProperty("animation","none","important");
+    clone.style.minHeight="100vh";
+    preview.appendChild(clone);
+    document.body.appendChild(preview);
+    preview.scrollTop=saved.scrollY;
+    preview.style.transform="translate3d(-24px,0,0)";
+  };
   document.addEventListener("touchstart",e=>{
     if(e.touches.length!==1){reset();return;}
-    const t=e.touches[0]; sx=t.clientX;sy=t.clientY;
-    active=sx<=32 && !document.body.classList.contains("in-hub") &&
+    const t=e.touches[0];sx=t.clientX;sy=t.clientY;
+    active=sx<=32&&!document.body.classList.contains("in-hub")&&
       !e.target.closest("input,textarea,select,[contenteditable=true],.leaflet-container");
     dragging=false;dx=0;el=active?pageEl():null;
   },{passive:true});
   document.addEventListener("touchmove",e=>{
     if(!active||e.touches.length!==1)return;
-    const t=e.touches[0], x=t.clientX-sx, y=t.clientY-sy;
+    const t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;
     if(!dragging){
       if(Math.abs(y)>12&&Math.abs(y)>Math.abs(x)){reset();return;}
       if(x<12)return;
       if(x<Math.abs(y)*1.3){reset();return;}
-      dragging=true;if(el)el.classList.add("dragging");
+      dragging=true;
+      preparePreview();
+      if(el)el.classList.add("dragging","ios-front");
     }
-    dx=Math.max(0,x);
-    if(el){el.style.transform="translate3d("+Math.min(dx,innerWidth)+"px,0,0)";}
+    dx=Math.max(0,Math.min(x,innerWidth));
+    if(raf)cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(()=>{
+      raf=0;
+      if(el)el.style.transform="translate3d("+dx+"px,0,0)";
+      if(preview)preview.style.transform="translate3d("+(-24+24*dx/innerWidth)+"px,0,0)";
+    });
     if(e.cancelable)e.preventDefault();
   },{passive:false});
   document.addEventListener("touchcancel",reset,{passive:true});
   document.addEventListener("touchend",()=>{
     if(!active)return;
-    const outgoing=el, shouldBack=dragging&&dx>Math.min(96,innerWidth*.23);
+    const outgoing=el,shouldBack=dragging&&dx>Math.min(96,innerWidth*.23);
     const distance=dx;
-    active=false;dragging=false;el=null;dx=0;
-    if(!outgoing){if(shouldBack)goBack();return;}
+    active=false;dragging=false;dx=0;
+    if(raf){cancelAnimationFrame(raf);raf=0;}
+    if(!outgoing){if(shouldBack)goBack();reset();return;}
     outgoing.classList.remove("dragging");
     outgoing.classList.add("ios-gesture-settle");
+    if(preview)preview.classList.add("ios-gesture-settle");
     const duration=shouldBack?Math.max(155,Math.min(280,(innerWidth-distance)*.55)):200;
     outgoing.style.transitionDuration=duration+"ms";
     outgoing.style.transform=shouldBack?"translate3d(100vw,0,0)":"translate3d(0,0,0)";
+    if(preview){
+      preview.style.transitionDuration=duration+"ms";
+      preview.style.transform=shouldBack?"translate3d(0,0,0)":"translate3d(-24px,0,0)";
+    }
     let finished=false;
     const finish=()=>{
       if(finished)return;finished=true;
       outgoing.removeEventListener("transitionend",finish);
-      outgoing.classList.remove("ios-gesture-settle");
-      outgoing.style.transitionDuration="";outgoing.style.transform="";
+      clearPreview();el=null;
       if(shouldBack){
         quickBack=true;
         try{goBack();}finally{quickBack=false;}
       }
     };
     outgoing.addEventListener("transitionend",finish,{once:true});
-    setTimeout(finish,duration+35);
+    setTimeout(finish,duration+45);
   },{passive:true});
-})();
+})();;
 let hiddenAt=0;
 function freshStart(){
   navTrail.length=0;
