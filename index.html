@@ -3065,7 +3065,8 @@ function openTripForm(id){
     $("pres").innerHTML='<div class="note">Searching…</div>';
     try{ const r=await geocode(q); $("pres").innerHTML=r.map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">Nothing found. Try adding “Sri Lanka”.</div>';
       $("pres").querySelectorAll("button").forEach(b=>b.onclick=()=>{ const o=r[+b.dataset.i];
-        Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null,province:o.province||""});\n        if($("fProvince"))$("fProvince").value=tripProvince(t);
+        Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null,province:o.province||""});
+        if($("fProvince"))$("fProvince").value=tripProvince(t);
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
   if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
