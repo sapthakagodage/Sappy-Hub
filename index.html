@@ -1573,7 +1573,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.0";
+const APP_VERSION = "7.1.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2434,7 +2434,7 @@ function openTx(id,edit){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
-    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(friendsOn(t.id)?'<i>shared by '+(friendsOn(t.id)+1)+' · you + '+friendsOn(t.id)+' friend'+(friendsOn(t.id)>1?'s':'')+'</i>':'<i>no one has paid back yet</i>')+'</div></div>':'')+
+    (t.type==="out"&&!NOT_SPENDING.has(t.cat)&&friendsOn(t.id)?'<div class="sharebar"><div><span>Your share</span><b class="num">'+rs(myShare(t))+'</b>'+(friendsOn(t.id)?'<i>shared by '+(friendsOn(t.id)+1)+' · you + '+friendsOn(t.id)+' friend'+(friendsOn(t.id)>1?'s':'')+'</i>':'<i>no one has paid back yet</i>')+'</div></div>':'')+
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Change":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
