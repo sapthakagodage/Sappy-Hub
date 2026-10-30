@@ -1534,7 +1534,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
     <div id="trTrips"></div>
   </section>
   <section id="tv-map" hidden>
-    <div class="tr-map-mode" id="trMapMode" role="group" aria-label="Map display"><button type="button" data-map-mode="places" class="on">Places</button><button type="button" data-map-mode="provinces">Provinces</button></div>
+    <div class="tr-map-mode" id="trMapMode" role="group" aria-label="Map display"><button type="button" data-map-mode="places">Places</button><button type="button" data-map-mode="provinces" class="on">Provinces</button></div>
     <div class="mapcard"><div id="tMap"></div>
       <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
       <div class="years chips" id="trYears"></div></div>
@@ -3028,7 +3028,7 @@ function focusRow(id,fromList){ document.querySelectorAll(".fm-row").forEach(r=>
 function nameIcon(name,color,plan,i){ return L.divIcon({className:"",html:'<div class="lpin'+(plan?' plan':'')+'" style="--c:'+color+';--i:'+(i||0)+'"><span class="ldot"></span><span class="lname">'+esc(name)+'</span></div>',iconSize:[0,0],iconAnchor:[0,0]}); }
 // Province coverage is based on saved Sri Lankan trips only. Boundary geometry
 // is sourced from Sri Lanka NSDI; geoBoundaries is a fallback if unavailable.
-let travelMapMode="places", provinceLayer=null, provinceShapesPromise=null, selectedMapProvince="";
+let travelMapMode="provinces", provinceLayer=null, provinceShapesPromise=null, selectedMapProvince="";
 const PROVINCE_GEO_URL="https://gisapps.nsdi.gov.lk/server/rest/services/Srilanka/Boundaries/MapServer/4/query?where=1%3D1&outFields=province_name&returnGeometry=true&outSR=4326&f=geojson";
 function provinceNameFromShape(properties){
   const p=properties||{};
