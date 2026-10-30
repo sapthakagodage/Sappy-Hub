@@ -1401,6 +1401,12 @@ svg.leaflet-image-layer.leaflet-interactive path {
 ::view-transition-old(root){animation:210ms cubic-bezier(.22,.7,.2,1) both sappy-back-out}
 ::view-transition-new(root){animation:250ms cubic-bezier(.22,1,.36,1) both sappy-back-in}
 @media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}
+/* Lock scroll anchoring and suppress legacy entrance motion during back navigation. */
+html.sappy-back-transitioning{scroll-behavior:auto!important;overflow-anchor:none!important}
+html.sappy-back-transitioning body{overflow-anchor:none!important}
+html.sappy-back-transitioning .quickin,
+html.sappy-back-transitioning .rise,
+html.sappy-back-transitioning .fadein{animation:none!important}
 </style>
 </head>
 <body class="in-hub">
@@ -1600,7 +1606,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.2.3";
+const APP_VERSION = "7.2.4";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2754,7 +2760,7 @@ let quickBack=false;
 function enterScreen(){
   if(REDUCED) return;
   const root=screenRoot(); if(!root) return;
-  if(quickBack){ playClass(root,"quickin",0); root.querySelectorAll("[data-count]").forEach(el=>{ const v=parseFloat(el.dataset.count); if(isFinite(v)) el.textContent=(el.dataset.prefix||"")+fmt(v,+(el.dataset.dec||0)); }); return; }
+  if(quickBack){ root.querySelectorAll("[data-count]").forEach(el=>{ const v=parseFloat(el.dataset.count); if(isFinite(v)) el.textContent=(el.dataset.prefix||"")+fmt(v,+(el.dataset.dec||0)); }); return; }
   const items=[...root.children].filter(x=>!x.hidden && x.offsetParent!==null);
   // header of the app too
   if(!["in-hub","in-set","in-noti","in-travel"].some(c=>document.body.classList.contains(c))) playClass(document.querySelector(".bar"),"fadein",0);
@@ -3418,18 +3424,21 @@ function animatedBack(){
   backTransitionBusy=true;
   const navigate=()=>{
     quickBack=true;
+    document.documentElement.classList.add("sappy-back-transitioning");
     try{goBack();}finally{quickBack=false;}
   };
   if(REDUCED||typeof document.startViewTransition!=="function"){
     navigate();
+    document.documentElement.classList.remove("sappy-back-transitioning");
     backTransitionBusy=false;
     return;
   }
   try{
     const transition=document.startViewTransition(navigate);
-    transition.finished.then(()=>{backTransitionBusy=false;},()=>{backTransitionBusy=false;});
+    transition.finished.then(()=>{document.documentElement.classList.remove("sappy-back-transitioning");backTransitionBusy=false;},()=>{document.documentElement.classList.remove("sappy-back-transitioning");backTransitionBusy=false;});
   }catch(e){
     navigate();
+    document.documentElement.classList.remove("sappy-back-transitioning");
     backTransitionBusy=false;
   }
 }
