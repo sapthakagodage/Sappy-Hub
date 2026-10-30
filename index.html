@@ -1420,11 +1420,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <p class="h-foot">Sappy Hub v<span id="hVer"></span></p>
 </div>
 <div id="notiView" class="hubv">
-  <header class="h-top"><button class="hub backbtn ios-back-button" id="notiBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Notifications</div></header>
+  <header class="h-top"><div class="h-brand" style="flex:1;margin-left:10px">Notifications</div></header>
   <div id="notiBody"></div>
 </div>
 <div id="travelView" class="hubv">
-  <header class="h-top"><button class="hub backbtn ios-back-button" id="trBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px" id="trTitle">Sappy Travel</div></header>
+  <header class="h-top"><div class="h-brand" style="flex:1;margin-left:10px" id="trTitle">Sappy Travel</div></header>
   <section id="tv-home">
     <div id="trSoon"></div>
     <div class="tr-hero" id="trStats"></div>
@@ -1457,7 +1457,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   </div>
 </nav>
 <div id="setView" class="hubv setv">
-  <header class="h-top"><button class="hub backbtn ios-back-button" id="setBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
+  <header class="h-top"><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
     <h2 style="margin-top:0">Look · all apps</h2>
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
@@ -1497,7 +1497,6 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
 
   <header class="bar">
-    <button type="button" class="pocket-header-back" data-animated-back aria-label="Back to Overview or Sappy Hub"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
     <h1><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
     <div class="mswitch" id="mswitch">
       <button id="prev" aria-label="Previous month">‹</button>
@@ -1595,7 +1594,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.2.1";
+const APP_VERSION = "7.2.2";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3403,6 +3402,8 @@ function goBack(){
   }finally{restoringScreen=false;navTrail.length=0;}
 }
 // Navigation is button-driven; edge-swipe gesture intentionally disabled.
+// Back animation is performed on the visible page only; the app's existing
+// route renderer then paints the destination. Avoid concurrent enter animations.
 function animatedBack(){
   const b=document.body.classList;
   const root=b.contains("in-set")?$("setView"):b.contains("in-noti")?$("notiView"):b.contains("in-travel")?$("travelView"):$("appView");
@@ -3412,18 +3413,14 @@ function animatedBack(){
     delete root.dataset.backAnimating;
     quickBack=true;
     try{goBack();}finally{quickBack=false;}
-    const bb=document.body.classList;
-    const incoming=bb.contains("in-hub")?$("hubView"):bb.contains("in-travel")?$("travelView"):bb.contains("in-set")?$("setView"):bb.contains("in-noti")?$("notiView"):$("appView");
-    if(incoming&&incoming.animate&&!REDUCED){
-      incoming.animate([{opacity:.96,transform:"translate3d(-9px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}],
-        {duration:170,easing:"cubic-bezier(.22,1,.36,1)"});
-    }
   };
-  if(REDUCED){finish();return;}
-  const a=root.animate([{opacity:1,transform:"translate3d(0,0,0)"},{opacity:.97,transform:"translate3d(26px,0,0)"}],
-    {duration:135,easing:"cubic-bezier(.4,0,.8,.4)"});
-  a.onfinish=finish;
-  a.oncancel=()=>{delete root.dataset.backAnimating;};
+  if(REDUCED||!root.animate){finish();return;}
+  const animation=root.animate([
+    {opacity:1,transform:"translate3d(0,0,0)"},
+    {opacity:.98,transform:"translate3d(22px,0,0)"}
+  ],{duration:165,easing:"cubic-bezier(.2,.7,.2,1)"});
+  animation.onfinish=finish;
+  animation.oncancel=()=>{delete root.dataset.backAnimating;};
 }
 document.addEventListener("click",e=>{
   const button=e.target.closest("[data-animated-back]");
@@ -3434,7 +3431,8 @@ document.addEventListener("click",e=>{
   document.addEventListener("touchstart",e=>{
     if(e.touches.length!==1)return;
     const t=e.touches[0];sx=t.clientX;sy=t.clientY;
-    tracking=sx<=24&&!document.body.classList.contains("in-hub")&&
+    tracking=sx<=32&&!document.body.classList.contains("in-hub")&&
+      !sheetOpen&&!document.body.classList.contains("in-fullmap")&&
       !e.target.closest("input,textarea,select,[contenteditable],.leaflet-container");
   },{passive:true});
   document.addEventListener("touchcancel",()=>{tracking=false;},{passive:true});
@@ -3442,7 +3440,7 @@ document.addEventListener("click",e=>{
     if(!tracking||!e.changedTouches.length)return;
     tracking=false;
     const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
-    if(dx>65&&dx>Math.abs(dy)*1.5)animatedBack();
+    if(dx>78&&dx>Math.abs(dy)*1.6)animatedBack();
   },{passive:true});
 })();
 ;;
