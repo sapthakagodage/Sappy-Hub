@@ -1407,6 +1407,36 @@ html.sappy-back-transitioning body{overflow-anchor:none!important}
 html.sappy-back-transitioning .quickin,
 html.sappy-back-transitioning .rise,
 html.sappy-back-transitioning .fadein{animation:none!important}
+/* Travel story snapshot */
+.tr-hero{padding:18px 16px 16px;background:linear-gradient(148deg,#9BE4F3 0%,#8FDDFF 58%,#ACEDC4 100%);color:#12140D}
+.tr-snap-metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;position:relative;z-index:1}
+.tr-snap-metric{min-width:0;min-height:106px;border-radius:18px;background:#121B20;padding:13px 12px;display:flex;flex-direction:column;align-items:flex-start}
+.tr-snap-metric>span{font-size:12px;font-weight:750;color:#C4D2D4}
+.tr-snap-metric strong{font-size:34px;letter-spacing:-.045em;line-height:1.25;color:#9BE4F3}
+.tr-snap-metric small{font-size:11px;line-height:1.35;color:#D5DEE0;font-weight:650;overflow-wrap:anywhere}
+.tr-snap-section{position:relative;z-index:1;margin-top:11px;padding:14px;border-radius:19px;background:rgba(255,255,255,.76)}
+.tr-snap-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tr-snap-heading>div{display:flex;flex-direction:column;gap:2px}
+.tr-snap-heading span{font-size:12px;font-weight:800}
+.tr-snap-heading strong{font-size:26px;letter-spacing:-.04em;line-height:1.2}
+.tr-snap-heading strong small{font-size:12px;font-weight:750;letter-spacing:normal;opacity:.72}
+.tr-snap-percent,.tr-snap-count{border-radius:999px;background:#121B20;color:#9BE4F3;padding:5px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.tr-snap-progress{height:7px;background:rgba(18,27,32,.13);border-radius:999px;overflow:hidden}
+.tr-snap-progress i{display:block;height:100%;background:#176C5E;border-radius:999px;transition:width .35s ease}
+.tr-snap-provinces{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tr-snap-provinces span{font-size:10px;font-weight:750;border-radius:999px;padding:5px 8px;background:rgba(18,27,32,.07);color:#647276}
+.tr-snap-provinces span.covered{background:#176C5E;color:#fff}
+.tr-snap-hint{font-size:11px;line-height:1.5;margin:10px 0 0;color:#52666A}
+.tr-snap-place-list{display:flex;flex-wrap:wrap;gap:6px}
+.tr-snap-place{border:1px solid rgba(18,27,32,.12);background:#fff;color:#152325;border-radius:999px;font-size:11px;font-weight:750;padding:7px 10px;max-width:100%;text-align:left;white-space:normal}
+.tr-snap-place:active{background:#C9EDF0}
+.tr-snap-more{margin-top:10px}
+.tr-snap-more summary{font-size:12px;font-weight:800;cursor:pointer;list-style:none}
+.tr-snap-more summary::-webkit-details-marker{display:none}
+.tr-snap-more summary:after{content:"⌄";margin-left:6px}
+.tr-snap-more[open] summary{margin-bottom:10px}
+.tr-snap-empty{font-size:12px;font-weight:700;margin:13px 0 0}
+@media(max-width:360px){.tr-snap-metric{padding:10px 9px}.tr-snap-provinces span{padding:5px 6px}}
 </style>
 </head>
 <body class="in-hub">
@@ -1600,7 +1630,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.0";
+const APP_VERSION = "7.3.1";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2828,13 +2858,54 @@ function parseGpx(text){
 async function geocode(q){
   const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=1&accept-language=en&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"}});
   if(!r.ok) throw new Error("search"); const j=await r.json();
-  return j.map(o=>({name:(o.name||o.display_name.split(",")[0]).trim(), full:o.display_name, lat:+o.lat, lng:+o.lon, cc:((o.address||{}).country_code||"").toUpperCase(), country:(o.address||{}).country||""}));
+  return j.map(o=>({name:(o.name||o.display_name.split(",")[0]).trim(), full:o.display_name, lat:+o.lat, lng:+o.lon, cc:((o.address||{}).country_code||"").toUpperCase(), country:(o.address||{}).country||"", province:((o.address||{}).country_code||"").toUpperCase()==="LK"?provinceFromAddress((o.address||{}).state,(o.address||{}).county):""}));
 }
 async function revGeo(lat,lng){ try{ const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=en&lat="+lat+"&lon="+lng); const o=await r.json();
-  const a=o.address||{}; return {name:a.village||a.town||a.city||a.county||a.state||"Trip", cc:(a.country_code||"").toUpperCase(), country:a.country||""}; }catch(e){ return {name:"Trip",cc:"",country:""}; } }
+  const a=o.address||{}; return {name:a.village||a.town||a.city||a.county||a.state||"Trip", cc:(a.country_code||"").toUpperCase(), country:a.country||"", province:(a.country_code||"").toUpperCase()==="LK"?provinceFromAddress(a.state,a.county):""}; }catch(e){ return {name:"Trip",cc:"",country:""}; } }
 async function driveRoute(a,b){ try{ const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=false"); const j=await r.json();
   if(j.routes&&j.routes[0]) return {km:Math.round(j.routes[0].distance/100)/10, min:Math.round(j.routes[0].duration/60)}; }catch(e){} return null; }
 
+const LK_PROVINCES=["Western","Central","Southern","Northern","Eastern","North Western","North Central","Uva","Sabaragamuwa"];
+const LK_DISTRICTS={
+  "Western":["colombo","gampaha","kalutara","negombo"],
+  "Central":["kandy","matale","nuwara eliya","peradeniya","gampola","hatton","ambuluwa","pussellawa","knuckles","sigiriya","dambulla","pallekele","pettigala"],
+  "Southern":["galle","matara","hambantota","tangalle","tangalla","unawatuna","hikkaduwa","mirissa","weligama"],
+  "Northern":["jaffna","kilinochchi","kilinochchi","mannar","mullaitivu","vavuniya","point pedro"],
+  "Eastern":["trincomalee","batticaloa","ampara","kalmunai","arugam bay","pasikudah"],
+  "North Western":["kurunegala","puttalam","chilaw","kuliyapitiya","narammala"],
+  "North Central":["anuradhapura","polonnaruwa","mihintale","minneriya","habarana"],
+  "Uva":["badulla","monaragala","ella","bandarawela","haputale","diyatalawa","wellawaya"],
+  "Sabaragamuwa":["ratnapura","kegalle","belihuloya","balangoda","kitulgala","kithulgala","pinnawala","bible rock"]
+};
+function normalizedProvince(value){
+  const v=String(value||"").toLowerCase().replace(/\bprovince\b/g,"").replace(/\bprovincial\b/g,"").replace(/\s+/g," ").trim();
+  return LK_PROVINCES.find(p=>p.toLowerCase()===v)||"";
+}
+function provinceFromAddress(state,county){
+  const explicit=normalizedProvince(state);
+  if(explicit)return explicit;
+  const full=String([state,county].filter(Boolean).join(", ")).toLowerCase();
+  for(const p of LK_PROVINCES){
+    if(full.includes(p.toLowerCase()+" province"))return p;
+  }
+  const pieces=full.split(/[,/]/).map(x=>x.trim()).filter(Boolean);
+  for(const p of LK_PROVINCES){
+    if((LK_DISTRICTS[p]||[]).some(name=>pieces.some(x=>x===name||x===name+" district")))return p;
+  }
+  return "";
+}
+function tripProvince(t){
+  if(t.cc&&t.cc!=="LK")return "";
+  const explicit=normalizedProvince(t.province||"");
+  if(explicit)return explicit;
+  const loc=String(t.loc||"");
+  return provinceFromAddress("",loc);
+}
+function provincePicker(value){
+  return '<label class="fl2"><span>Sri Lankan province (optional)</span><select class="inp" id="fProvince"><option value="">Not specified</option>'+
+    LK_PROVINCES.map(p=>'<option value="'+esc(p)+'"'+(p===value?' selected':'')+'>'+esc(p)+'</option>').join("")+
+    '</select></label>';
+}
 function trips(){ return Object.values(S.trip||{}).filter(live).sort((a,b)=>(b.date||String(b.year||0)).localeCompare(a.date||String(a.year||0))); }
 function plans(){ return Object.values(S.plan||{}).filter(live).sort((a,b)=>(a.date||"9").localeCompare(b.date||"9")); }
 const tYear=t=>t.date?+t.date.slice(0,4):(t.year||null);
@@ -2980,6 +3051,7 @@ function openTripForm(id){
     '<label class="fl2"><span>Place</span><input class="inp" id="pq" placeholder="Search, e.g. Ambuluwawa" autocomplete="off" value="'+esc(t.loc||"")+'"></label>'+
     '<div class="results" id="pres"></div>'+
     '<label class="fl2"><span>Name</span><input class="inp" id="fName" value="'+esc(t.name||"")+'" placeholder="e.g. Ambuluwawa hike"></label>'+
+    provincePicker(tripProvince(t))+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Date</span><input class="inp" type="date" id="fDate" value="'+esc(t.date||"")+'"></label>'+
     '<label class="fl2"><span>Type</span><select class="inp" id="fType">'+Object.keys(TYPES).map(k=>'<option value="'+k+'"'+(k===t.type?' selected':'')+'>'+TYPES[k].name+'</option>').join("")+'</select></label></div>'+
     '<div style="font-size:13px;color:var(--soft);font-weight:600;margin:2px 0 6px">Time on the trail</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
@@ -2993,7 +3065,7 @@ function openTripForm(id){
     $("pres").innerHTML='<div class="note">Searching…</div>';
     try{ const r=await geocode(q); $("pres").innerHTML=r.map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">Nothing found. Try adding “Sri Lanka”.</div>';
       $("pres").querySelectorAll("button").forEach(b=>b.onclick=()=>{ const o=r[+b.dataset.i];
-        Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null});
+        Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null,province:o.province||""});\n        if($("fProvince"))$("fProvince").value=tripProvince(t);
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
   if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
@@ -3002,7 +3074,7 @@ function openTripForm(id){
     const name=$("fName").value.trim(); if(!name) return toast("Add a name");
     const dist=t.dist||0, sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
     const date=$("fDate").value||"";
-    put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,dist,moving:sec,dur:sec}));
+    put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:$("fProvince").value||"",dist,moving:sec,dur:sec}));
     closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
   };
 }
@@ -3022,7 +3094,7 @@ async function saveTrack(pts,name){
   const st=trackStats(pts), type=guessType(st), first=pts[0], last=pts[pts.length-1];
   const g=await revGeo(last[0],last[1]);
   const d=first[3]?ymd(first[3]):ymd(Date.now());
-  const t=Object.assign({id:"t"+uid(), name:name||g.name, date:d, year:+d.slice(0,4), type, lat:last[0], lng:last[1], cc:g.cc, country:g.country, track:simplify(pts,1500).map(p=>[Math.round(p[0]*1e5)/1e5,Math.round(p[1]*1e5)/1e5,p[2]!=null?Math.round(p[2]):null,p[3]])}, st);
+  const t=Object.assign({id:"t"+uid(), name:name||g.name, date:d, year:+d.slice(0,4), type, lat:last[0], lng:last[1], cc:g.cc, country:g.country, province:g.province||"", track:simplify(pts,1500).map(p=>[Math.round(p[0]*1e5)/1e5,Math.round(p[1]*1e5)/1e5,p[2]!=null?Math.round(p[2]):null,p[3]])}, st);
   put("trip",t); closeSheet(); renderTravel(); drawMap(); toast(TYPES[type].name+" added · "+fmt(st.dist,1)+" km");
   setTimeout(()=>openTrip(t.id),400);
 }
@@ -3051,7 +3123,7 @@ function openAddPlace(kind){
       put("plan",p); closeSheet(); renderTravel(); drawMap(false); toast("Added to next hikes");
     } else {
       const d=$("pd").value||"", y=d?+d.slice(0,4):(+$("py").value||null);
-      put("trip",{id:"t"+uid(), name:picked.name, date:d, year:y, type:$("pt").value, lat:picked.lat, lng:picked.lng, cc:picked.cc, country:picked.country});
+      put("trip",{id:"t"+uid(), name:picked.name, date:d, year:y, type:$("pt").value, lat:picked.lat, lng:picked.lng, cc:picked.cc, country:picked.country, province:picked.province||""});
       closeSheet(); if(picked.cc&&picked.cc!=="LK"){ trScope="world"; $("trScope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.s==="world")); }
       renderTravel(); drawMap(); toast("Place added");
     }
@@ -3082,7 +3154,7 @@ async function seedPlaces(){
   const list=[["Bible Rock, Sri Lanka","Bible Rock","hike",2026],["Pettigala, Sri Lanka","Pettigala","hike",2026],["Ambuluwawa, Sri Lanka","Ambuluwawa","hike",2026],["Hatale, Sri Lanka","Hatale Mini World's End","hike",2026],["Scotland","Scotland","place",null]];
   $("trSeed").innerHTML='<div class="note" style="text-align:center">Finding places…</div>';
   for(const [q,name,type,yr] of list){
-    try{ const r=await geocode(q); if(r[0]) put("trip",{id:"t"+uid(),name,date:"",year:yr,type,lat:r[0].lat,lng:r[0].lng,cc:r[0].cc,country:r[0].country}); }catch(e){}
+    try{ const r=await geocode(q); if(r[0]) put("trip",{id:"t"+uid(),name,date:"",year:yr,type,lat:r[0].lat,lng:r[0].lng,cc:r[0].cc,country:r[0].country,province:r[0].province||""}); }catch(e){}
     await new Promise(r=>setTimeout(r,1100));   // be polite to the free map search
   }
   renderTravel(); drawMap(); toast("Added. Tap each to set the date.");
@@ -3120,9 +3192,25 @@ function renderTravel(){
   const all=trips(), yrs=[...new Set(all.map(tYear).filter(Boolean))].sort((a,b)=>b-a);
   if(trYear!=="all" && !yrs.includes(+trYear)) trYear="all";
   const sel=all.filter(t=>trYear==="all"||tYear(t)===+trYear);
-  const countries=new Set(sel.map(t=>t.cc).filter(Boolean));
-  $("trStats").innerHTML='<div class="trh-top"><span>Your travels</span><i>'+(trYear==="all"?"All years":trYear)+'</i></div>'+
-    '<div class="trh-tiles"><div><span>Places</span><b class="num">'+sel.length+'</b></div><div><span>Countries</span><b class="num">'+(countries.size||(sel.length?1:0))+'</b></div><div><span>Hikes</span><b class="num">'+sel.filter(t=>t.type==="hike").length+'</b></div></div>';
+  const uniquePlaces=[...new Map(sel.filter(t=>t.name).map(t=>[t.name.trim().toLocaleLowerCase(),t])).values()];
+  const countryMap=new Map();
+  sel.forEach(t=>{if(t.cc)countryMap.set(t.cc,t.country||({LK:"Sri Lanka",GB:"United Kingdom",UK:"United Kingdom"}[t.cc]||t.cc));});
+  const provinces=new Set(sel.map(tripProvince).filter(Boolean));
+  const untagged=sel.filter(t=>t.cc==="LK"&&!tripProvince(t)).length;
+  const placeButtons=uniquePlaces.map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join("");
+  $("trStats").innerHTML='<div class="trh-top"><span>Your travel story</span><i>'+(trYear==="all"?"All years":trYear)+'</i></div>'+
+    '<div class="tr-snap-metrics">'+
+      '<div class="tr-snap-metric"><span>Places explored</span><strong class="num">'+uniquePlaces.length+'</strong><small>Distinct places visited</small></div>'+
+      '<div class="tr-snap-metric"><span>Countries visited</span><strong class="num">'+countryMap.size+'</strong><small>'+esc([...countryMap.values()].join(' · ')||'Your next adventure awaits')+'</small></div>'+
+    '</div>'+
+    '<div class="tr-snap-section"><div class="tr-snap-heading"><div><span>Sri Lanka explored</span><strong>'+provinces.size+' <small>/ 9 provinces</small></strong></div><span class="tr-snap-percent">'+Math.round(provinces.size/9*100)+'%</span></div>'+
+    '<div class="tr-snap-progress" role="progressbar" aria-label="Sri Lankan provinces covered" aria-valuemin="0" aria-valuemax="9" aria-valuenow="'+provinces.size+'"><i style="width:'+(provinces.size/9*100)+'%"></i></div>'+
+    '<div class="tr-snap-provinces">'+LK_PROVINCES.map(p=>'<span class="'+(provinces.has(p)?'covered':'')+'">'+(provinces.has(p)?'✓ ':'')+esc(p)+'</span>').join('')+'</div>'+
+    (untagged?'<p class="tr-snap-hint">'+untagged+' Sri Lankan '+(untagged===1?'trip needs':'trips need')+' a province. Add it while editing a trip.</p>':'')+'</div>'+
+    (uniquePlaces.length?'<div class="tr-snap-section tr-snap-places"><div class="tr-snap-heading"><span>Places you’ve been</span><span class="tr-snap-count">'+uniquePlaces.length+' saved</span></div>'+
+      '<div class="tr-snap-place-list">'+uniquePlaces.slice(0,4).map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div>'+
+      (uniquePlaces.length>4?'<details class="tr-snap-more"><summary>View all '+uniquePlaces.length+' places</summary><div class="tr-snap-place-list">'+uniquePlaces.slice(4).map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div></details>':'')+'</div>':'<p class="tr-snap-empty">Add a visited place to start your travel story.</p>');
+  $("trStats").querySelectorAll(".tr-snap-place").forEach(b=>b.onclick=()=>openTrip(b.dataset.id));
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
   $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(true,true); });
   // 7-day journey banner
