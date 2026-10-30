@@ -128,7 +128,7 @@ button:active{transform:scale(.98)}
 .donut-wrap .seg{transition:stroke-dasharray .9s var(--ease),stroke-dashoffset .9s var(--ease)}
 .tab{transition:background .25s var(--ease),color .25s var(--ease)}
 .chip{transition:background .2s var(--ease),color .2s var(--ease)}
-.dragging{transition:none!important;will-change:transform;box-shadow:-18px 0 40px -12px rgba(0,0,0,.55)}
+.dragging{transition:none!important;will-change:transform;box-shadow:-12px 0 30px -12px rgba(0,0,0,.32);backface-visibility:hidden}\n.ios-gesture-settle{transition-property:transform,box-shadow!important;transition-timing-function:cubic-bezier(.22,.8,.22,1)!important;will-change:transform;backface-visibility:hidden}
 .snap{transition:transform .18s cubic-bezier(.3,.7,.3,1)!important}
 @keyframes quickin{from{opacity:.4;transform:translateX(-18px)}to{opacity:1;transform:none}}
 .quickin{animation:quickin .2s var(--ease) both}
@@ -1579,7 +1579,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.5";
+const APP_VERSION = "7.1.6";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3417,32 +3417,28 @@ function goBack(){
   document.addEventListener("touchcancel",reset,{passive:true});
   document.addEventListener("touchend",()=>{
     if(!active)return;
-    const outgoing=el, shouldBack=dragging&&dx>Math.min(105,innerWidth*.25);
-    active=false;
-    if(!shouldBack){
-      if(outgoing){
-        outgoing.classList.remove("dragging");
-        outgoing.classList.add("snap");
-        outgoing.style.transform="translate3d(0,0,0)";
-        const finish=()=>{outgoing.classList.remove("snap");outgoing.style.transform="";};
-        outgoing.addEventListener("transitionend",finish,{once:true});
-        setTimeout(finish,220);
+    const outgoing=el, shouldBack=dragging&&dx>Math.min(96,innerWidth*.23);
+    const distance=dx;
+    active=false;dragging=false;el=null;dx=0;
+    if(!outgoing){if(shouldBack)goBack();return;}
+    outgoing.classList.remove("dragging");
+    outgoing.classList.add("ios-gesture-settle");
+    const duration=shouldBack?Math.max(155,Math.min(280,(innerWidth-distance)*.55)):200;
+    outgoing.style.transitionDuration=duration+"ms";
+    outgoing.style.transform=shouldBack?"translate3d(100vw,0,0)":"translate3d(0,0,0)";
+    let finished=false;
+    const finish=()=>{
+      if(finished)return;finished=true;
+      outgoing.removeEventListener("transitionend",finish);
+      outgoing.classList.remove("ios-gesture-settle");
+      outgoing.style.transitionDuration="";outgoing.style.transform="";
+      if(shouldBack){
+        quickBack=true;
+        try{goBack();}finally{quickBack=false;}
       }
-    }else{
-      // Navigate immediately: cloning the whole screen was blocking iPhone's main thread.
-      // Animate only the incoming page with the compositor.
-      if(outgoing){outgoing.classList.remove("dragging");outgoing.style.transform="";}
-      quickBack=true;
-      try{goBack();}finally{quickBack=false;}
-      const incoming=pageEl();
-      if(incoming && incoming.animate && !REDUCED){
-        incoming.animate([
-          {transform:"translate3d(-22px,0,0)",opacity:.78},
-          {transform:"translate3d(0,0,0)",opacity:1}
-        ],{duration:240,easing:"cubic-bezier(.22,1,.36,1)"});
-      }
-    }
-    dragging=false;el=null;dx=0;
+    };
+    outgoing.addEventListener("transitionend",finish,{once:true});
+    setTimeout(finish,duration+35);
   },{passive:true});
 })();
 let hiddenAt=0;
