@@ -1437,6 +1437,37 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 .tr-snap-more[open] summary{margin-bottom:10px}
 .tr-snap-empty{font-size:12px;font-weight:700;margin:13px 0 0}
 @media(max-width:360px){.tr-snap-metric{padding:10px 9px}.tr-snap-provinces span{padding:5px 6px}}
+/* Compact Travel overview: year-specific stats and a separate actionable reminder. */
+.tr-hero{padding:17px;background:#8FDDFF}
+.tr-snap-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;position:relative;z-index:1}
+.tr-snap-header>div{display:flex;flex-direction:column;gap:2px}
+.tr-snap-eyebrow{font-size:10px;letter-spacing:.09em;font-weight:800;opacity:.65}
+.tr-snap-header strong{font-size:18px;font-weight:800;letter-spacing:-.025em}
+.tr-snap-year-label{flex:none;position:relative}
+.tr-snap-year-label select{appearance:none;-webkit-appearance:none;background:#121B20;color:#8FDDFF;border:0;border-radius:12px;font-size:12px;font-weight:800;min-height:34px;padding:7px 27px 7px 11px;max-width:105px;text-align:left}
+.tr-snap-year-label:after{content:"⌄";position:absolute;right:10px;top:6px;font-size:15px;color:#8FDDFF;pointer-events:none}
+.tr-snap-metrics{gap:8px}
+.tr-snap-metric{min-height:76px;padding:12px 13px;justify-content:space-between}
+.tr-snap-metric>span{font-size:12px}
+.tr-snap-metric strong{font-size:29px}
+.tr-snap-coverage{position:relative;z-index:1;background:rgba(255,255,255,.88);padding:14px;border-radius:18px;margin-top:9px}
+.tr-snap-coverage-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.tr-snap-coverage-head>div{display:flex;flex-direction:column;gap:2px}
+.tr-snap-coverage-head span{font-size:10px;letter-spacing:.06em;font-weight:800;color:#51666B}
+.tr-snap-coverage-head strong{font-size:23px;font-weight:850;letter-spacing:-.035em}
+.tr-snap-coverage-head strong small{font-size:12px;font-weight:700;letter-spacing:0;color:#52666A}
+.tr-snap-coverage-head>b{font-size:19px;letter-spacing:-.03em;color:#176C5E}
+.tr-snap-progress{height:9px;background:#D5E3E0}
+.tr-snap-progress i{background:#176C5E}
+.tr-snap-motivation{font-size:12px;font-weight:800;margin:10px 0 0;color:#176C5E}
+.tr-snap-covered{font-size:11px;margin:5px 0 0;color:#607376;line-height:1.45}
+.tr-province-alert{margin:0 0 14px}
+.tr-province-alert-button{display:flex;align-items:center;width:100%;text-align:left;gap:11px;background:var(--card);border:1px solid var(--line);border-left:3px solid #8FDDFF;color:var(--ink);border-radius:16px;padding:12px 13px;box-shadow:var(--shadow)}
+.tr-province-alert-icon{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:9px;background:rgba(143,221,255,.16);color:#63C5EB;font-size:15px;font-weight:900}
+.tr-province-alert-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tr-province-alert-text strong{font-size:12px;font-weight:800}
+.tr-province-alert-text small{font-size:11px;color:var(--soft);line-height:1.4;font-weight:600}
+.tr-province-alert-arrow{font-size:24px;color:var(--soft);line-height:1}
 </style>
 </head>
 <body class="in-hub">
@@ -1470,6 +1501,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
   <section id="tv-home">
     <div id="trSoon"></div>
     <div class="tr-hero" id="trStats"></div>
+    <div id="trProvinceAlert" class="tr-province-alert" hidden></div>
     <div id="trSeed"><button class="card setlink" id="seedBtn"><span><b>Add my recent places</b><span>Bible Rock, Pettigala, Ambuluwawa, Hatale Mini World’s End, Scotland</span></span><span class="chev">›</span></button></div>
     <div class="shead" style="margin:18px 4px 10px"><h3>Trips</h3></div>
     <div class="chips" id="trFilter" style="margin-bottom:10px"></div>
@@ -1630,7 +1662,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.1";
+const APP_VERSION = "7.3.2";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2902,7 +2934,7 @@ function tripProvince(t){
   return provinceFromAddress("",loc);
 }
 function provincePicker(value){
-  return '<label class="fl2"><span>Sri Lankan province (optional)</span><select class="inp" id="fProvince"><option value="">Not specified</option>'+
+  return '<label class="fl2" id="fProvinceWrap"><span>Sri Lankan province</span><select class="inp" id="fProvince"><option value="">Select province</option>'+
     LK_PROVINCES.map(p=>'<option value="'+esc(p)+'"'+(p===value?' selected':'')+'>'+esc(p)+'</option>').join("")+
     '</select></label>';
 }
@@ -3060,6 +3092,13 @@ function openTripForm(id){
     '<div class="fl2"><span style="display:block;font-size:13px;color:var(--soft);margin-bottom:6px;font-weight:600">Photo (one)</span>'+
     '<label class="photopick" id="fPhotoBox" style="'+(t.photo?'background-image:url('+t.photo+')':'')+'"><input type="file" id="fPhoto" accept="image/*" hidden><span>'+(t.photo?'Change photo':'＋ Add a photo')+'</span></label></div>'+
     '<button class="btn full" id="fSave">Save</button>');
+  const toggleTripProvince=()=>{
+    const isSriLankan=t.cc==="LK";
+    $("fProvinceWrap").hidden=!isSriLankan;
+    $("fProvince").disabled=!isSriLankan;
+    if(!isSriLankan)$("fProvince").value="";
+  };
+  toggleTripProvince();
   let timer=null;
   $("pq").oninput=()=>{ clearTimeout(timer); const q=$("pq").value.trim(); if(q.length<3) return; timer=setTimeout(async()=>{
     $("pres").innerHTML='<div class="note">Searching…</div>';
@@ -3067,6 +3106,7 @@ function openTripForm(id){
       $("pres").querySelectorAll("button").forEach(b=>b.onclick=()=>{ const o=r[+b.dataset.i];
         Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,loc:o.full.split(",").slice(0,2).map(x=>x.trim()).join(", "),drive:null,province:o.province||""});
         if($("fProvince"))$("fProvince").value=tripProvince(t);
+        toggleTripProvince();
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
   if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
@@ -3075,7 +3115,7 @@ function openTripForm(id){
     const name=$("fName").value.trim(); if(!name) return toast("Add a name");
     const dist=t.dist||0, sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
     const date=$("fDate").value||"";
-    put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:$("fProvince").value||"",dist,moving:sec,dur:sec}));
+    put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:t.cc==="LK"?($("fProvince").value||""):"",dist,moving:sec,dur:sec}));
     closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
   };
 }
@@ -3193,27 +3233,33 @@ function renderTravel(){
   const all=trips(), yrs=[...new Set(all.map(tYear).filter(Boolean))].sort((a,b)=>b-a);
   if(trYear!=="all" && !yrs.includes(+trYear)) trYear="all";
   const sel=all.filter(t=>trYear==="all"||tYear(t)===+trYear);
-  const uniquePlaces=[...new Map(sel.filter(t=>t.name).map(t=>[t.name.trim().toLocaleLowerCase(),t])).values()];
-  const countryMap=new Map();
-  sel.forEach(t=>{if(t.cc)countryMap.set(t.cc,t.country||({LK:"Sri Lanka",GB:"United Kingdom",UK:"United Kingdom"}[t.cc]||t.cc));});
-  const provinces=new Set(sel.map(tripProvince).filter(Boolean));
-  const untagged=sel.filter(t=>t.cc==="LK"&&!tripProvince(t)).length;
-  const placeButtons=uniquePlaces.map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join("");
-  $("trStats").innerHTML='<div class="trh-top"><span>Your travel story</span><i>'+(trYear==="all"?"All years":trYear)+'</i></div>'+
+  const uniquePlaces=new Set(sel.filter(t=>t.name).map(t=>t.name.trim().toLocaleLowerCase()));
+  const countries=new Set(sel.map(t=>t.cc).filter(Boolean));
+  const provinces=new Set(sel.filter(t=>t.cc==="LK").map(tripProvince).filter(Boolean));
+  const missing=sel.filter(t=>t.cc==="LK"&&!tripProvince(t));
+  const remaining=9-provinces.size;
+  const pct=Math.round(provinces.size/9*100);
+  const encouragement=remaining===0?"All nine! Sri Lanka explored.":remaining===1?"Just 1 province left to explore!":provinces.size===0?"Your Sri Lanka adventure starts here.":remaining<=3?"So close — only "+remaining+" provinces to go!":remaining+" more provinces waiting for you.";
+  const yearOptions=['all'].concat(yrs).map(y=>'<option value="'+y+'"'+(String(trYear)===String(y)?' selected':'')+'>'+(y==="all"?"All years":y)+'</option>').join("");
+  $("trStats").innerHTML=
+    '<div class="tr-snap-header"><div><span class="tr-snap-eyebrow">YOUR JOURNEY</span><strong>Travel overview</strong></div><label class="tr-snap-year-label"><span class="sr-only">Travel year</span><select id="travelSummaryYear" aria-label="Select travel year">'+yearOptions+'</select></label></div>'+
     '<div class="tr-snap-metrics">'+
-      '<div class="tr-snap-metric"><span>Places explored</span><strong class="num">'+uniquePlaces.length+'</strong><small>Distinct places visited</small></div>'+
-      '<div class="tr-snap-metric"><span>Countries visited</span><strong class="num">'+countryMap.size+'</strong><small>'+esc([...countryMap.values()].join(' · ')||'Your next adventure awaits')+'</small></div>'+
+      '<div class="tr-snap-metric"><span>Places visited</span><strong class="num">'+uniquePlaces.size+'</strong></div>'+
+      '<div class="tr-snap-metric"><span>Countries</span><strong class="num">'+countries.size+'</strong></div>'+
     '</div>'+
-    '<div class="tr-snap-section"><div class="tr-snap-heading"><div><span>Sri Lanka explored</span><strong>'+provinces.size+' <small>/ 9 provinces</small></strong></div><span class="tr-snap-percent">'+Math.round(provinces.size/9*100)+'%</span></div>'+
-    '<div class="tr-snap-progress" role="progressbar" aria-label="Sri Lankan provinces covered" aria-valuemin="0" aria-valuemax="9" aria-valuenow="'+provinces.size+'"><i style="width:'+(provinces.size/9*100)+'%"></i></div>'+
-    '<div class="tr-snap-provinces">'+LK_PROVINCES.map(p=>'<span class="'+(provinces.has(p)?'covered':'')+'">'+(provinces.has(p)?'✓ ':'')+esc(p)+'</span>').join('')+'</div>'+
-    (untagged?'<p class="tr-snap-hint">'+untagged+' Sri Lankan '+(untagged===1?'trip needs':'trips need')+' a province. Add it while editing a trip.</p>':'')+'</div>'+
-    (uniquePlaces.length?'<div class="tr-snap-section tr-snap-places"><div class="tr-snap-heading"><span>Places you’ve been</span><span class="tr-snap-count">'+uniquePlaces.length+' saved</span></div>'+
-      '<div class="tr-snap-place-list">'+uniquePlaces.slice(0,4).map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div>'+
-      (uniquePlaces.length>4?'<details class="tr-snap-more"><summary>View all '+uniquePlaces.length+' places</summary><div class="tr-snap-place-list">'+uniquePlaces.slice(4).map(t=>'<button type="button" class="tr-snap-place" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div></details>':'')+'</div>':'<p class="tr-snap-empty">Add a visited place to start your travel story.</p>');
-  $("trStats").querySelectorAll(".tr-snap-place").forEach(b=>b.onclick=()=>openTrip(b.dataset.id));
+    '<div class="tr-snap-coverage"><div class="tr-snap-coverage-head"><div><span>SRI LANKA COVERED</span><strong>'+provinces.size+' <small>of 9 provinces</small></strong></div><b>'+pct+'%</b></div>'+
+    '<div class="tr-snap-progress" role="progressbar" aria-label="Sri Lankan provinces explored" aria-valuemin="0" aria-valuemax="9" aria-valuenow="'+provinces.size+'"><i style="width:'+(provinces.size/9*100)+'%"></i></div>'+
+    '<p class="tr-snap-motivation">'+encouragement+'</p>'+
+    (provinces.size?'<p class="tr-snap-covered">'+esc([...provinces].join(' · '))+'</p>':'')+
+    '</div>';
+  $("travelSummaryYear").onchange=e=>{trYear=e.target.value;renderTravel();};
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
-  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ trYear=b.dataset.y; renderTravel(); drawMap(true,true); });
+  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{trYear=b.dataset.y;renderTravel();drawMap(true,true);});
+  $("trProvinceAlert").hidden=missing.length===0;
+  if(missing.length){
+    $("trProvinceAlert").innerHTML='<button type="button" class="tr-province-alert-button" id="trProvinceFix"><span class="tr-province-alert-icon">!</span><span class="tr-province-alert-text"><strong>'+missing.length+' '+(missing.length===1?'trip needs':'trips need')+' a province</strong><small>Complete the location to update your Sri Lanka coverage.</small></span><span class="tr-province-alert-arrow">›</span></button>';
+    $("trProvinceFix").onclick=()=>openTripForm(missing[0].id);
+  }
   // 7-day journey banner
   const soon=plans().map(p=>({p,d:daysTo(p.date)})).filter(o=>o.d!=null&&o.d>=0&&o.d<=7);
   $("trSoon").innerHTML=soon.map(o=>'<button class="soon tsoon'+(o.d<=1?' tom':'')+'" data-id="'+esc(o.p.id)+'"><span class="si2" style="background:'+TYPES[tKind(o.p)].c+'">'+tsvg(tKind(o.p),18)+'</span><span class="tx2"><b>Your next journey to '+esc(o.p.name)+' is '+whenWords(o.d)+'</b><span>'+esc(niceDate(o.p.date))+(o.p.drive?' · '+fmt(o.p.drive.km,0)+' km · '+fmtDur(o.p.drive.min*60)+' drive':'')+'</span></span><span class="wn">'+(o.d===0?"Today":o.d===1?"Tomorrow":o.d+" days")+'</span></button>').join("");
