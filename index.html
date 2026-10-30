@@ -1579,7 +1579,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.3";
+const APP_VERSION = "7.1.4";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3417,20 +3417,41 @@ function goBack(){
   document.addEventListener("touchcancel",reset,{passive:true});
   document.addEventListener("touchend",()=>{
     if(!active)return;
-    const target=el, shouldBack=dragging&&dx>Math.min(110,innerWidth*.27);
+    const target=el, shouldBack=dragging&&dx>Math.min(105,innerWidth*.25);
     active=false;
-    if(!target){if(shouldBack){quickBack=true;goBack();quickBack=false;}reset();return;}
-    target.classList.remove("dragging");target.classList.add("snap");
-    target.style.transform=shouldBack?"translate3d("+innerWidth+"px,0,0)":"translate3d(0,0,0)";
-    let finished=false;
-    const finish=()=>{
-      if(finished)return;finished=true;
-      target.removeEventListener("transitionend",finish);
-      target.classList.remove("snap");target.style.transform="";
-      if(shouldBack){quickBack=true;try{goBack();}finally{quickBack=false;}}
-    };
-    target.addEventListener("transitionend",finish,{once:true});
-    setTimeout(finish,260);
+    if(!target){if(shouldBack){quickBack=true;try{goBack();}finally{quickBack=false;}}reset();return;}
+    if(!shouldBack){
+      target.classList.remove("dragging");
+      target.classList.add("snap");
+      target.style.transform="translate3d(0,0,0)";
+      target.addEventListener("transitionend",()=>{target.classList.remove("snap");target.style.transform="";},{once:true});
+      setTimeout(()=>{target.classList.remove("snap");target.style.transform="";},240);
+    }else{
+      // Keep a visual copy of the outgoing screen while the destination renders beneath it.
+      // The outgoing copy moves immediately, avoiding the old 260ms wait before navigation.
+      const ghost=target.cloneNode(true);
+      ghost.removeAttribute("id");
+      ghost.querySelectorAll("[id]").forEach(node=>node.removeAttribute("id"));
+      ghost.classList.remove("dragging","snap");
+      const rect=target.getBoundingClientRect();
+      Object.assign(ghost.style,{
+        position:"fixed",left:"0",top:"0",width:"100vw",height:"100dvh",
+        margin:"0",zIndex:"9998",overflow:"hidden",pointerEvents:"none",
+        transform:"translate3d("+Math.max(0,dx)+"px,0,0)",
+        transition:"transform 280ms cubic-bezier(.18,.82,.24,1),box-shadow 280ms ease",
+        boxShadow:"-14px 0 34px rgba(0,0,0,.22)",
+        background:"var(--bg,#0D0E0B)"
+      });
+      document.body.appendChild(ghost);
+      target.classList.remove("dragging");target.style.transform="";
+      requestAnimationFrame(()=>{
+        ghost.style.transform="translate3d(100vw,0,0)";
+        requestAnimationFrame(()=>{
+          quickBack=true;try{goBack();}finally{quickBack=false;}
+        });
+      });
+      setTimeout(()=>ghost.remove(),340);
+    }
     dragging=false;el=null;dx=0;
   },{passive:true});
 })();
