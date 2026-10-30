@@ -1524,6 +1524,8 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 @media(max-width:360px){.tr-province-list{grid-template-columns:1fr}.tr-snap-header strong{font-size:17px}}
 /* One unified Travel map: province boundaries and location pins together. */
 #tv-map .mapcard{height:calc(100dvh - 215px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));min-height:350px}
+/* Single unified Travel map; no location/province category toggles. */
+#tv-map .maptools{justify-content:flex-end}
 </style>
 </head>
 <body class="in-hub">
@@ -1565,7 +1567,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
   </section>
   <section id="tv-map" hidden>
     <div class="mapcard"><div id="tMap"></div>
-      <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
+      <div class="maptools"><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
       <div class="years chips" id="trYears"></div></div>
     <div id="trProvinceMapInfo" class="tr-province-map-info" hidden></div>
   </section>
@@ -1719,7 +1721,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.6";
+const APP_VERSION = "7.3.7";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2893,7 +2895,7 @@ const TYPES={ hike:{name:"Hike",c:"#CDF46A",i:'<path d="M3 20l6-10 4 6 3-4 5 8z"
   place:{name:"Visit",c:"#FFD36E",i:'<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'} };
 const tsvg=(t,sz)=>'<svg viewBox="0 0 24 24" width="'+(sz||22)+'" height="'+(sz||22)+'" fill="none" stroke="#12140D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(TYPES[t]||TYPES.place).i+'</svg>';
 const LK=[[5.85,79.6],[9.85,81.9]];
-let LMAP=null, LLAYER=null, trScope="lk", trYear="all", meLatLng=null, meMarker=null;
+let LMAP=null, LLAYER=null, trYear="all", meLatLng=null, meMarker=null;
 
 function loadLeaflet(){
   if(window.L) return Promise.resolve();
@@ -3024,20 +3026,18 @@ function openFullMap(){
   let el=$("fullMap");
   if(!el){ el=document.createElement("div"); el.id="fullMap"; el.className="fullmap";
     el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All places</b>'+
-      '<div class="mseg" id="fmScope"><button data-s="lk">Sri Lanka</button><button data-s="world">World</button></div></div>'+
+      '</div>'+
       '<div id="fmMap"></div><div class="fm-list" id="fmList"></div>';
     document.body.appendChild(el);
     $("fmClose").onclick=closeFullMap;
-    $("fmScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ fScope=b.dataset.s; paintFull(true); });
   }
-  fScope=trScope; el.classList.add("on"); document.body.classList.add("in-fullmap");
+  fScope="lk"; el.classList.add("on"); document.body.classList.add("in-fullmap");
   setTimeout(()=>{ if(!FMAP){ FMAP=L.map("fmMap",{zoomControl:true,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(FMAP); FLAYER=L.layerGroup().addTo(FMAP); }
     FMAP.invalidateSize(); paintFull(true); },60);
 }
 function closeFullMap(){ const el=$("fullMap"); if(el) el.classList.remove("on"); document.body.classList.remove("in-fullmap"); }
 function paintFull(fit){
   const list=mapList(); FLAYER.clearLayers(); fMarkers={};
-  $("fmScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.s===fScope));
   const pts=[];
   list.forEach((t,i)=>{ const c=(TYPES[t.type]||TYPES.place).c;
     fMarkers[t.id]=L.marker([t.lat,t.lng],{icon:numIcon(i+1,c,true),zIndexOffset:100-i}).addTo(FLAYER).on("click",()=>focusRow(t.id)); pts.push([t.lat,t.lng]); });
@@ -3118,7 +3118,7 @@ function focusProvinceShape(name){
 }
 // Always frame the entire island inside the visible map container.
 function fitWholeSriLanka(){
-  if(!LMAP||trView!=="map"||trScope!=="lk")return;
+  if(!LMAP||trView!=="map")return;
   LMAP.invalidateSize({pan:false});
   LMAP.stop();
   LMAP.fitBounds(LK,{padding:[24,24],maxZoom:8,animate:false});
@@ -3176,11 +3176,7 @@ async function renderProvinceMap(){
         .addTo(LLAYER).on("click",()=>openPlan(p.id));
     }
   });
-  if(trScope==="world"){
-    const points=selectedTrips.filter(t=>Number.isFinite(Number(t.lat))&&Number.isFinite(Number(t.lng))).map(t=>[+t.lat,+t.lng]);
-    if(points.length)LMAP.fitBounds(L.latLngBounds(points).pad(.3),{maxZoom:5,animate:false});
-    else LMAP.setView([20,20],2,{animate:false});
-  }else fitWholeSriLanka();
+  fitWholeSriLanka();
 }
 function drawMap(fit,animate){
   if(!LMAP) return; LLAYER.clearLayers();
@@ -3190,12 +3186,7 @@ function drawMap(fit,animate){
     if(t.track&&t.track.length>1){ const line=L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:4,opacity:.9}).addTo(LLAYER); line.on("click",()=>openTrip(t.id)); }
     if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:nameIcon(t.name,c,false,animate?b.length:-1)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
   plans().forEach((p,i)=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:nameIcon(p.name,"#BBA6FF",true,animate?b.length+i:-1)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
-  if(fit!==false){
-    const lkpts=b.filter(x=>x[0]>5.8&&x[0]<9.9&&x[1]>79.5&&x[1]<82);
-    if(trScope==="lk"){ const bb=lkpts.length>1?L.latLngBounds(lkpts).pad(.35):L.latLngBounds(LK);
-      if(animate&&!REDUCED){ LMAP.fitBounds(LK,{animate:false}); setTimeout(()=>LMAP.flyToBounds(bb,{maxZoom:11,duration:1.2}),250); } else LMAP.fitBounds(bb,{maxZoom:11}); }
-    else { const w=b.filter(x=>!(x[0]>5.8&&x[0]<9.9&&x[1]>79.5&&x[1]<82)); if(b.length) LMAP.fitBounds(L.latLngBounds(b).pad(.4),{maxZoom:4}); else LMAP.setView([25,20],2); }
-  }
+  if(fit!==false)fitWholeSriLanka();
 }
 function locateMe(center){
   if(!navigator.geolocation) return;
@@ -3349,7 +3340,7 @@ function openAddPlace(kind){
     } else {
       const d=$("pd").value||"", y=d?+d.slice(0,4):(+$("py").value||null);
       put("trip",{id:"t"+uid(), name:picked.name, date:d, year:y, type:$("pt").value, lat:picked.lat, lng:picked.lng, cc:picked.cc, country:picked.country, province:picked.province||""});
-      closeSheet(); if(picked.cc&&picked.cc!=="LK"){ trScope="world"; $("trScope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.s==="world")); }
+      closeSheet();
       renderTravel(); drawMap(); toast("Place added");
     }
   };
@@ -3395,8 +3386,8 @@ function showBigMap(){
   loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize({pan:false}); renderProvinceMap(); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
     .catch(()=>{ if(first) busyEnd(); $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
-function freshTravelPage(){ trYear="all"; trFilter="all"; trScope="lk"; selectedMapProvince=""; calMonth=null; calSel=null;
-  document.querySelectorAll("#trScope button").forEach(b=>b.classList.toggle("on",b.dataset.s==="lk")); }
+function freshTravelPage(){ trYear="all"; trFilter="all"; selectedMapProvince=""; calMonth=null; calSel=null;
+}
 function travelGo(v){
   rememberScreen(); if(sheetOpen) closeSheet(); freshTravelPage(); trView=v;
   ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
@@ -3661,7 +3652,7 @@ function openApp(id){
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
  $("tripAdd").onclick=()=>openTripForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
-$("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); selectedMapProvince=""; renderProvinceMap(); }); $("pasteOpen").onclick=openPaste;
+$("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
   rememberScreen(); if(sheetOpen) closeSheet();
