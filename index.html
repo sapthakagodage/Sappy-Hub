@@ -1389,6 +1389,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
 	}
 
 .tabs .nav-add{width:54px;height:54px;flex-shrink:0;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:transform .2s ease}.tabs .nav-add:active{transform:scale(.92)}.tabs .nav-add svg{width:26px;height:26px}
+.pocket-backbar{display:flex;align-items:center;min-height:38px;margin:-4px 0 8px}
+.ios-back-button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pocket-backbar .ios-back-button{display:inline-flex;align-items:center;gap:4px;padding:6px 12px 6px 4px;background:transparent;border:0;color:var(--ink);font:inherit;font-size:15px;font-weight:700}
+.pocket-backbar .ios-back-button span{font-size:31px;line-height:20px;font-weight:400}
+.ios-back-button:active{opacity:.65;transform:scale(.97)}
 </style>
 </head>
 <body class="in-hub">
@@ -1414,11 +1419,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <p class="h-foot">Sappy Hub v<span id="hVer"></span></p>
 </div>
 <div id="notiView" class="hubv">
-  <header class="h-top"><button class="hub backbtn" id="notiBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Notifications</div></header>
+  <header class="h-top"><button class="hub backbtn ios-back-button" id="notiBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Notifications</div></header>
   <div id="notiBody"></div>
 </div>
 <div id="travelView" class="hubv">
-  <header class="h-top"><button class="hub backbtn" id="trBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px" id="trTitle">Sappy Travel</div></header>
+  <header class="h-top"><button class="hub backbtn ios-back-button" id="trBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px" id="trTitle">Sappy Travel</div></header>
   <section id="tv-home">
     <div id="trSoon"></div>
     <div class="tr-hero" id="trStats"></div>
@@ -1451,7 +1456,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   </div>
 </nav>
 <div id="setView" class="hubv setv">
-  <header class="h-top"><button class="hub backbtn" id="setBack" aria-label="Back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
+  <header class="h-top"><button class="hub backbtn ios-back-button" id="setBack" data-animated-back aria-label="Go back">‹</button><div class="h-brand" style="flex:1;margin-left:10px">Settings</div></header>
   <section class="set">
     <h2 style="margin-top:0">Look · all apps</h2>
     <div class="card"><div class="seg" id="theme"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
@@ -1487,7 +1492,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     </div>
   </section>
 </div>
-<div class="wrap" id="appView">
+<div class="wrap" id="appView">\n  <div class="pocket-backbar"><button type="button" class="ios-back-button" data-animated-back aria-label="Go back"><span aria-hidden="true">‹</span> Back</button></div>
 
   <header class="bar">
     <h1><span id="title">Overview</span><span class="sync" id="syncDot" title="Cloud sync"></span></h1>
@@ -1587,7 +1592,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.8";
+const APP_VERSION = "7.1.9";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3325,7 +3330,7 @@ function openApp(id){
   if(id==="travel"){ openTravel(); }
 }
 
-$("trBack").onclick=()=>{ if(trView!=="home") travelGo("home"); else showHub(); }; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
+$("trBack").onclick=animatedBack; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
  $("tripAdd").onclick=()=>openTripForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
@@ -3343,8 +3348,8 @@ function closeSettings(){
 }
 $("hubSet").onclick=openSettings;
 $("mapKey").onchange=()=>{ S.mapKey=$("mapKey").value.trim(); persist(); put("cfg",{id:"maps",key:S.mapKey}); if(typeof LMAP!=="undefined" && LMAP){ try{ LMAP.remove(); }catch(e){} LMAP=null; } toast(S.mapKey?"Map key saved":"Using the free maps"); };
-document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=closeNoti;
-$("setBack").onclick=closeSettings;
+document.querySelectorAll(".bell").forEach(b=>b.onclick=openNoti); $("notiBack").onclick=animatedBack;
+$("setBack").onclick=animatedBack;
 
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
@@ -3406,127 +3411,31 @@ function goBack(){
     }
   }finally{ restoringScreen=false; }
 }
-(function(){
-  let sx=0,sy=0,dx=0,active=false,dragging=false,el=null,preview=null,raf=0;
-  const pageEl=()=>{
-    const b=document.body.classList;
-    if(sheetOpen)return null;
-    if(b.contains("in-set"))return $("setView");
-    if(b.contains("in-noti"))return $("notiView");
-    if(b.contains("in-travel"))return $("travelView");
-    if(b.contains("in-hub"))return null;
-    return $("appView");
-  };
-  const backTarget=()=>{
-    const here=currentScreen();
-    for(let i=navTrail.length-1;i>=0;i--)if(navTrail[i]!==here)return navTrail[i];
-    return here.startsWith("travel:")?(here==="travel:home"?"hub":"travel:home"):
-      here.startsWith("pocket:")?(here==="pocket:home"?"hub":"pocket:home"):"hub";
-  };
-  const clearPreview=()=>{
-    if(raf){cancelAnimationFrame(raf);raf=0;}
-    if(preview){preview.remove();preview=null;}
-    if(el){el.classList.remove("ios-front","dragging","ios-gesture-settle");el.style.transform="";el.style.transitionDuration="";}
-  };
-  const reset=()=>{clearPreview();active=false;dragging=false;dx=0;el=null;};
-  const preparePreview=()=>{
-    const saved=backScreenCache.get(backTarget());
-    if(!saved)return;
-    preview=document.createElement("div");
-    preview.className="ios-back-preview";
-    const shell=document.createElement("div");
-    shell.className="ios-preview-content";
-    const clone=saved.node.cloneNode(true);
-    // A clone keeps the original route's CSS-hidden sections, but the cloned
-    // page itself must be made visible even when the current route differs.
-    clone.removeAttribute("hidden");
-    clone.style.setProperty("display","block","important");
-    clone.style.setProperty("visibility","visible","important");
-    clone.style.setProperty("opacity","1","important");
-    clone.style.setProperty("transform","none","important");
-    clone.style.setProperty("animation","none","important");
-    clone.style.minHeight="100vh";
-    shell.appendChild(clone);
-    // Bottom navigation is a sibling of the page, not a child of appView.
-    // Include the matching footer so the entire previous UI is shown.
-    if(saved.route.startsWith("pocket:")||saved.route.startsWith("travel:")){
-      const original=saved.route.startsWith("travel:")?$("travelTabs"):document.querySelector("nav.tabs:not(#travelTabs)");
-      if(original){
-        const nav=original.cloneNode(true);
-        nav.removeAttribute("hidden");
-        nav.style.setProperty("display","block","important");
-        nav.style.setProperty("visibility","visible","important");
-        nav.style.setProperty("position","absolute","important");
-        nav.style.setProperty("bottom","0","important");
-        nav.style.setProperty("left","0","important");
-        nav.style.setProperty("right","0","important");
-        shell.appendChild(nav);
-      }
+// Navigation is button-driven; edge-swipe gesture intentionally disabled.
+function animatedBack(){
+  const b=document.body.classList;
+  const root=b.contains("in-set")?$("setView"):b.contains("in-noti")?$("notiView"):b.contains("in-travel")?$("travelView"):$("appView");
+  if(!root||root.dataset.backAnimating==="1")return;
+  root.dataset.backAnimating="1";
+  const finish=()=>{
+    delete root.dataset.backAnimating;
+    root.style.removeProperty("animation");
+    quickBack=true;
+    try{goBack();}finally{quickBack=false;}
+    const incoming=document.body.classList.contains("in-hub")?$("hubView"):document.body.classList.contains("in-travel")?$("travelView"):document.body.classList.contains("in-set")?$("setView"):$("appView");
+    if(incoming&&incoming.animate&&!REDUCED){
+      incoming.animate([{opacity:.88,transform:"translate3d(-12px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}],{duration:210,easing:"cubic-bezier(.22,1,.36,1)"});
     }
-    preview.appendChild(shell);
-    document.body.appendChild(preview);
-    preview.scrollTop=saved.scrollY;
-    preview.style.transform="translate3d(-24px,0,0)";
   };
-  document.addEventListener("touchstart",e=>{
-    if(e.touches.length!==1){reset();return;}
-    const t=e.touches[0];sx=t.clientX;sy=t.clientY;
-    active=sx<=32&&!document.body.classList.contains("in-hub")&&
-      !e.target.closest("input,textarea,select,[contenteditable=true],.leaflet-container");
-    dragging=false;dx=0;el=active?pageEl():null;
-  },{passive:true});
-  document.addEventListener("touchmove",e=>{
-    if(!active||e.touches.length!==1)return;
-    const t=e.touches[0],x=t.clientX-sx,y=t.clientY-sy;
-    if(!dragging){
-      if(Math.abs(y)>12&&Math.abs(y)>Math.abs(x)){reset();return;}
-      if(x<12)return;
-      if(x<Math.abs(y)*1.3){reset();return;}
-      dragging=true;
-      preparePreview();
-      if(el)el.classList.add("dragging","ios-front");
-    }
-    dx=Math.max(0,Math.min(x,innerWidth));
-    if(raf)cancelAnimationFrame(raf);
-    raf=requestAnimationFrame(()=>{
-      raf=0;
-      if(el)el.style.transform="translate3d("+dx+"px,0,0)";
-      if(preview)preview.style.transform="translate3d("+(-24+24*dx/innerWidth)+"px,0,0)";
-    });
-    if(e.cancelable)e.preventDefault();
-  },{passive:false});
-  document.addEventListener("touchcancel",reset,{passive:true});
-  document.addEventListener("touchend",()=>{
-    if(!active)return;
-    const outgoing=el,shouldBack=dragging&&dx>Math.min(96,innerWidth*.23);
-    const distance=dx;
-    active=false;dragging=false;dx=0;
-    if(raf){cancelAnimationFrame(raf);raf=0;}
-    if(!outgoing){if(shouldBack)goBack();reset();return;}
-    outgoing.classList.remove("dragging");
-    outgoing.classList.add("ios-gesture-settle");
-    if(preview)preview.classList.add("ios-gesture-settle");
-    const duration=shouldBack?Math.max(155,Math.min(280,(innerWidth-distance)*.55)):200;
-    outgoing.style.transitionDuration=duration+"ms";
-    outgoing.style.transform=shouldBack?"translate3d(100vw,0,0)":"translate3d(0,0,0)";
-    if(preview){
-      preview.style.transitionDuration=duration+"ms";
-      preview.style.transform=shouldBack?"translate3d(0,0,0)":"translate3d(-24px,0,0)";
-    }
-    let finished=false;
-    const finish=()=>{
-      if(finished)return;finished=true;
-      outgoing.removeEventListener("transitionend",finish);
-      clearPreview();el=null;
-      if(shouldBack){
-        quickBack=true;
-        try{goBack();}finally{quickBack=false;}
-      }
-    };
-    outgoing.addEventListener("transitionend",finish,{once:true});
-    setTimeout(finish,duration+45);
-  },{passive:true});
-})();;
+  if(REDUCED){finish();return;}
+  const a=root.animate([{opacity:1,transform:"translate3d(0,0,0)"},{opacity:.88,transform:"translate3d(40px,0,0)"}],{duration:175,easing:"cubic-bezier(.4,0,.8,.4)"});
+  a.onfinish=finish;a.oncancel=()=>{delete root.dataset.backAnimating;};
+}
+document.addEventListener("click",e=>{
+  const button=e.target.closest("[data-animated-back]");
+  if(button){e.preventDefault();e.stopImmediatePropagation();animatedBack();}
+});
+;;
 let hiddenAt=0;
 function freshStart(){
   navTrail.length=0;
