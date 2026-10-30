@@ -598,6 +598,9 @@ details summary::-webkit-details-marker{display:none}
 details summary::after{content:"＋";flex:none;color:var(--faint)}
 details[open] summary::after{content:"－"}
 
+/* Compact navigation: only screen-specific actions remain. */
+.tabs .in{justify-content:space-around!important}
+@media (pointer:coarse){.h-top>.backbtn{display:none!important}}
 /* tab bar */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:0 18px calc(12px + env(safe-area-inset-bottom,0px))}
 .tabs .in{max-width:400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;background:var(--nav);
@@ -1377,6 +1380,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 		}
 	}
 
+.tabs .nav-add{width:54px;height:54px;flex-shrink:0;box-shadow:0 6px 18px rgba(0,0,0,.2);transition:transform .2s ease}.tabs .nav-add:active{transform:scale(.92)}.tabs .nav-add svg{width:26px;height:26px}
 </style>
 </head>
 <body class="in-hub">
@@ -1427,12 +1431,13 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <section id="tv-cal" hidden><div id="trCal"></div></section>
   <div style="height:120px"></div>
 </div>
-<button class="tfab2" id="tripAdd" aria-label="Add a trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
 <nav class="tabs" id="travelTabs" aria-label="Travel">
   <div class="in">
     <button class="tab" data-tv="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4zM10 20v-5h4v5"/></svg><span>Travel</span></button>
     <button class="tab" data-tv="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
-    <button class="fab hubfab" id="tvHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
+
+    <button class="fab nav-add" id="tripAdd" aria-label="Add trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <button class="tab" data-tv="plans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg><span>Plan visit</span></button>
     <button class="tab" data-tv="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendar</span></button>
   </div>
@@ -1559,13 +1564,14 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <div class="in">
     <button class="tab" data-v="home" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg><span>Overview</span></button>
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Activity</span></button>
-    <button class="fab hubfab" id="toHub" aria-label="Sappy Hub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg><span>Hub</span></button>
+
+    <button class="fab nav-add" id="fab" aria-label="Add Pocket entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <button class="tab" data-v="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v9H4zM4 10l8-5 8 5M8 13v3M12 13v3M16 13v3"/></svg><span>Savings</span></button>
     <button class="tab" data-v="sms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/></svg><span>Add SMS</span></button>
   </div>
 </nav>
 
-<button class="fabfloat" id="fab" aria-label="Add entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1573,7 +1579,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.1.1";
+const APP_VERSION = "7.1.3";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2537,7 +2543,7 @@ function freshPocketPage(){
   chartMode="months"; selDay=null; selWeek=null; selMonth=null;
   if($("q")) $("q").value="";
 }
-function go(v){ if(sheetOpen) closeSheet();
+function go(v){ rememberScreen(); if(sheetOpen) closeSheet();
   freshPocketPage();   // every page opens fresh: current month, nothing selected, filters cleared
   view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
@@ -2685,7 +2691,7 @@ function markRead(list){ S.notiRead=S.notiRead||{}; list.forEach(i=>S.notiRead[n
 function paintBells(){ const n=notiCount(); document.querySelectorAll(".bellb").forEach(b=>{ b.textContent=n||""; b.hidden=!n; }); }
 let notiFrom="hub";
 function openNoti(){
-  if(sheetOpen) closeSheet();
+  rememberScreen(); if(sheetOpen) closeSheet();
   notiFrom=document.body.classList.contains("in-hub")?"hub":"app";
   document.body.classList.remove("in-hub","in-set"); document.body.classList.add("in-noti"); renderNoti(); window.scrollTo(0,0); enterScreen();
 }
@@ -2814,7 +2820,7 @@ function plans(){ return Object.values(S.plan||{}).filter(live).sort((a,b)=>(a.d
 const tYear=t=>t.date?+t.date.slice(0,4):(t.year||null);
 
 function openTravel(){
-  if(sheetOpen) closeSheet(); freshTravelPage();
+  rememberScreen(); if(sheetOpen) closeSheet(); freshTravelPage();
   document.body.classList.remove("in-hub","in-set","in-noti"); document.body.classList.add("in-travel");
   trView="home"; ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home; document.body.dataset.tv="home";
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv==="home"?"true":"false"));
@@ -3074,7 +3080,7 @@ function showBigMap(){
 function freshTravelPage(){ trYear="all"; trFilter="all"; trScope="lk"; calMonth=null; calSel=null;
   document.querySelectorAll("#trScope button").forEach(b=>b.classList.toggle("on",b.dataset.s==="lk")); }
 function travelGo(v){
-  if(sheetOpen) closeSheet(); freshTravelPage(); trView=v;
+  rememberScreen(); if(sheetOpen) closeSheet(); freshTravelPage(); trView=v;
   ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!==v);
   document.body.dataset.tv=v; $("trTitle").textContent=TNAMES[v];
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv===v?"true":"false"));
@@ -3305,20 +3311,20 @@ function renderHub(){
     return '<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+extra+'</div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>'; }).join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
-function showHub(){ if(sheetOpen) closeSheet(); document.body.classList.remove("in-travel"); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); enterScreen(); }
+function showHub(){ rememberScreen(); if(sheetOpen) closeSheet(); document.body.classList.remove("in-travel","in-set","in-noti"); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); enterScreen(); }
 function openApp(id){
   if(id==="pocket"){ document.body.classList.remove("in-hub","in-travel"); go("home"); }
   if(id==="travel"){ openTravel(); }
 }
-$("toHub").onclick=showHub;
+
 $("trBack").onclick=()=>{ if(trView!=="home") travelGo("home"); else showHub(); }; const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
-$("tvHub").onclick=showHub; $("tripAdd").onclick=()=>openTripForm();
+ $("tripAdd").onclick=()=>openTripForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
 $("trScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{ trScope=b.dataset.s; $("trScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); drawMap(true,true); }); $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
-  if(sheetOpen) closeSheet();
+  rememberScreen(); if(sheetOpen) closeSheet();
   setFrom=document.body.classList.contains("in-hub")?"hub":"app";
   document.body.classList.remove("in-hub"); document.body.classList.add("in-set");
   renderSettings(); window.scrollTo(0,0); enterScreen();
@@ -3335,40 +3341,102 @@ $("setBack").onclick=closeSettings;
 window.addEventListener("hashchange",checkHash);
 checkUpdate("app",APP_VERSION,"version.json");
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden) checkUpdate("app",APP_VERSION,"version.json"); });
-/* ===== swipe from the left edge = back (like iPhone apps) ===== */
+/* ===== contextual navigation + iPhone-style edge swipe ===== */
+const navTrail=[];
+let restoringScreen=false;
+function currentScreen(){
+  const b=document.body.classList;
+  if(b.contains("in-noti")) return "noti";
+  if(b.contains("in-set")) return "settings";
+  if(b.contains("in-hub")) return "hub";
+  if(b.contains("in-travel")) return "travel:"+trView;
+  return "pocket:"+view;
+}
+function rememberScreen(){
+  if(restoringScreen) return;
+  const here=currentScreen();
+  if(navTrail[navTrail.length-1]!==here){ navTrail.push(here); if(navTrail.length>30) navTrail.shift(); }
+}
 function goBack(){
   if(sheetOpen){ closeSheet(); return; }
   if(document.body.classList.contains("in-fullmap")){ closeFullMap(); return; }
-  if(document.body.classList.contains("in-travel") && trView!=="home"){ travelGo("home"); return; }
-  const b=document.body.classList;
-  if(b.contains("in-set")){ closeSettings(); return; }
-  if(b.contains("in-noti")){ closeNoti(); return; }
-  if(b.contains("in-travel")){ showHub(); return; }
-  if(b.contains("in-hub")) return;
-  if(view!=="home"){ go("home"); return; }
-  showHub();
+  const here=currentScreen();
+  let target;
+  while(navTrail.length){ const prev=navTrail.pop(); if(prev!==here){ target=prev; break; } }
+  if(!target){
+    if(here==="hub") return;
+    target=here.startsWith("travel:")?(here==="travel:home"?"hub":"travel:home"):
+      here.startsWith("pocket:")?(here==="pocket:home"?"hub":"pocket:home"):"hub";
+  }
+  restoringScreen=true;
+  try{
+    if(target==="hub") showHub();
+    else if(target==="settings") openSettings();
+    else if(target==="noti") openNoti();
+    else if(target.startsWith("travel:")){
+      if(!document.body.classList.contains("in-travel")) openTravel();
+      travelGo(target.slice(7));
+    }else if(target.startsWith("pocket:")){
+      document.body.classList.remove("in-hub","in-travel","in-set","in-noti");
+      go(target.slice(7));
+    }
+  }finally{ restoringScreen=false; }
 }
 (function(){
-  let sx=0, sy=0, on=false, dx=0, el=null, decided=false;
-  const pageEl=()=>{ const b=document.body.classList; if(sheetOpen) return null; if(b.contains("in-set")) return $("setView"); if(b.contains("in-noti")) return $("notiView"); if(b.contains("in-travel")) return $("travelView"); if(b.contains("in-hub")) return null; return $("appView"); };
-  document.addEventListener("touchstart",e=>{ const t=e.touches[0]; on = t.clientX<28 && !document.body.classList.contains("in-hub"); sx=t.clientX; sy=t.clientY; dx=0; decided=false; el=on?pageEl():null; },{passive:true});
-  document.addEventListener("touchmove",e=>{ if(!on) return; const t=e.touches[0]; dx=Math.max(0,t.clientX-sx); const dy=Math.abs(t.clientY-sy);
-    if(!decided){ if(dy>12 && dy>dx){ on=false; return; } if(dx>8){ decided=true; if(el){ el.classList.add("dragging"); } } }
-    if(decided && el){ el.style.transform="translate3d("+dx+"px,0,0)"; }
+  let sx=0,sy=0,dx=0,active=false,dragging=false,el=null;
+  const pageEl=()=>{
+    const b=document.body.classList;
+    if(sheetOpen) return null;
+    if(b.contains("in-set")) return $("setView");
+    if(b.contains("in-noti")) return $("notiView");
+    if(b.contains("in-travel")) return $("travelView");
+    if(b.contains("in-hub")) return null;
+    return $("appView");
+  };
+  const reset=()=>{ if(el){ el.classList.remove("dragging","snap"); el.style.transform=""; } active=false; dragging=false; dx=0; el=null; };
+  document.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1){reset();return;}
+    const t=e.touches[0]; sx=t.clientX;sy=t.clientY;
+    active=sx<=32 && !document.body.classList.contains("in-hub") &&
+      !e.target.closest("input,textarea,select,[contenteditable=true],.leaflet-container");
+    dragging=false;dx=0;el=active?pageEl():null;
   },{passive:true});
+  document.addEventListener("touchmove",e=>{
+    if(!active||e.touches.length!==1)return;
+    const t=e.touches[0], x=t.clientX-sx, y=t.clientY-sy;
+    if(!dragging){
+      if(Math.abs(y)>12&&Math.abs(y)>Math.abs(x)){reset();return;}
+      if(x<12)return;
+      if(x<Math.abs(y)*1.3){reset();return;}
+      dragging=true;if(el)el.classList.add("dragging");
+    }
+    dx=Math.max(0,x);
+    if(el){el.style.transform="translate3d("+Math.min(dx,innerWidth)+"px,0,0)";}
+    if(e.cancelable)e.preventDefault();
+  },{passive:false});
+  document.addEventListener("touchcancel",reset,{passive:true});
   document.addEventListener("touchend",()=>{
-    if(!on){ return; } on=false;
-    if(!el){ if(dx>80){ quickBack=true; goBack(); quickBack=false; } return; }
-    const W=window.innerWidth, go=dx>W*0.28;
-    el.classList.remove("dragging"); el.classList.add("snap");
-    el.style.transform = go ? "translate3d("+W+"px,0,0)" : "translate3d(0,0,0)";
-    const done=()=>{ el.removeEventListener("transitionend",done); el.classList.remove("snap"); el.style.transform="";
-      if(go){ quickBack=true; goBack(); quickBack=false; } };
-    el.addEventListener("transitionend",done); setTimeout(()=>{ if(el.classList.contains("snap")) done(); },200);
-  });
+    if(!active)return;
+    const target=el, shouldBack=dragging&&dx>Math.min(110,innerWidth*.27);
+    active=false;
+    if(!target){if(shouldBack){quickBack=true;goBack();quickBack=false;}reset();return;}
+    target.classList.remove("dragging");target.classList.add("snap");
+    target.style.transform=shouldBack?"translate3d("+innerWidth+"px,0,0)":"translate3d(0,0,0)";
+    let finished=false;
+    const finish=()=>{
+      if(finished)return;finished=true;
+      target.removeEventListener("transitionend",finish);
+      target.classList.remove("snap");target.style.transform="";
+      if(shouldBack){quickBack=true;try{goBack();}finally{quickBack=false;}}
+    };
+    target.addEventListener("transitionend",finish,{once:true});
+    setTimeout(finish,260);
+    dragging=false;el=null;dx=0;
+  },{passive:true});
 })();
 let hiddenAt=0;
 function freshStart(){
+  navTrail.length=0;
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-set","in-noti","in-travel");
   month=new Date(); month.setDate(1); month.setHours(0,0,0,0); focusCat=null; filter="All"; accFilter="all";
