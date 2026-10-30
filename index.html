@@ -1468,6 +1468,32 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 .tr-province-alert-text strong{font-size:12px;font-weight:800}
 .tr-province-alert-text small{font-size:11px;color:var(--soft);line-height:1.4;font-weight:600}
 .tr-province-alert-arrow{font-size:24px;color:var(--soft);line-height:1}
+
+.tr-map-mode{display:flex;gap:4px;background:var(--card2);border-radius:14px;padding:4px;margin:0 0 9px}
+.tr-map-mode button{flex:1;border:0;background:transparent;color:var(--soft);border-radius:10px;padding:9px 10px;font-weight:800;font-size:13px}
+.tr-map-mode button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+#tv-map .tr-map-mode+.mapcard{height:calc(100dvh - 260px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));min-height:310px}
+.tr-province-map-info{padding:13px 2px 90px}
+.tr-province-map-legend{display:flex;align-items:center;gap:16px;margin:0 0 12px;font-size:12px;color:var(--soft);font-weight:750}
+.tr-province-map-legend span{display:flex;gap:7px;align-items:center}
+.tr-province-map-legend i{width:10px;height:10px;border-radius:3px}
+.tr-province-map-legend i.yes{background:#36B76C}
+.tr-province-map-legend i.no{background:#E36D72}
+.tr-province-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tr-province-item{display:flex;align-items:center;gap:8px;min-width:0;padding:10px;border:1px solid var(--line);border-radius:14px;text-align:left;background:var(--card);color:var(--ink)}
+.tr-province-item.is-selected{outline:2px solid var(--ink);outline-offset:-2px}
+.tr-province-dot{height:10px;width:10px;border-radius:50%;flex:none;background:#E36D72}
+.tr-province-item.is-covered .tr-province-dot{background:#36B76C}
+.tr-province-item-text{display:flex;flex-direction:column;min-width:0;gap:3px;flex:1}
+.tr-province-item-text strong{font-size:11px;font-weight:800;line-height:1.3}
+.tr-province-item-text small{font-size:10px;color:var(--soft);line-height:1.35}
+.tr-province-chevron{color:var(--soft);font-size:17px}
+.tr-province-selected{margin-top:11px;border-radius:16px;padding:13px;background:var(--card)}
+.tr-province-selected>strong{font-size:15px}
+.tr-province-selected p,.tr-province-map-hint{margin:7px 0;color:var(--soft);font-size:12px}
+.tr-province-places{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.tr-province-places button{border:1px solid var(--line);border-radius:999px;background:var(--card2);font-size:12px;padding:7px 10px;color:var(--ink)}
+.tr-province-boundary-note{font-size:12px;font-weight:650;border-radius:12px;background:var(--card);padding:12px;color:var(--soft);margin:0 0 10px}
 </style>
 </head>
 <body class="in-hub">
@@ -1508,9 +1534,11 @@ html.sappy-back-transitioning .fadein{animation:none!important}
     <div id="trTrips"></div>
   </section>
   <section id="tv-map" hidden>
+    <div class="tr-map-mode" id="trMapMode" role="group" aria-label="Map display"><button type="button" data-map-mode="places" class="on">Places</button><button type="button" data-map-mode="provinces">Provinces</button></div>
     <div class="mapcard"><div id="tMap"></div>
       <div class="maptools"><div class="mseg" id="trScope"><button data-s="lk" class="on">Sri Lanka</button><button data-s="world">World</button></div><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
       <div class="years chips" id="trYears"></div></div>
+    <div id="trProvinceMapInfo" class="tr-province-map-info" hidden></div>
   </section>
   <section id="tv-plans" hidden>
     <button class="btn full" id="planAdd" style="margin-bottom:12px">＋ Plan a visit</button>
@@ -1662,7 +1690,7 @@ html.sappy-back-transitioning .fadein{animation:none!important}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.2";
+const APP_VERSION = "7.3.3";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2954,7 +2982,7 @@ function initMap(){
   if(LMAP && !document.getElementById("tMap").classList.contains("leaflet-container")) LMAP=null;
   if(LMAP){ [50,350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms)); return; }
   LMAP=L.map("tMap",{zoomControl:false,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(LMAP);
-  LLAYER=L.layerGroup().addTo(LMAP); LMAP.fitBounds(LK); LMAP.on("click",openFullMap); [350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms));
+  LLAYER=L.layerGroup().addTo(LMAP); LMAP.fitBounds(LK); LMAP.on("click",()=>{if(travelMapMode==="places")openFullMap();}); [350,800].forEach(ms=>setTimeout(()=>LMAP.invalidateSize(),ms));
 }
 function pinIcon(color,dashed){ return L.divIcon({className:"",html:'<div class="pin2'+(dashed?' plan':'')+'" style="--c:'+color+'"></div>',iconSize:[30,38],iconAnchor:[15,36],tooltipAnchor:[0,-34]}); }
 /* ===== numbered pins + full-screen map ===== */
@@ -2998,6 +3026,108 @@ function focusRow(id,fromList){ document.querySelectorAll(".fm-row").forEach(r=>
   const m=fMarkers[id]; if(m){ const el=m.getElement(); if(el){ el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } } }
 
 function nameIcon(name,color,plan,i){ return L.divIcon({className:"",html:'<div class="lpin'+(plan?' plan':'')+'" style="--c:'+color+';--i:'+(i||0)+'"><span class="ldot"></span><span class="lname">'+esc(name)+'</span></div>',iconSize:[0,0],iconAnchor:[0,0]}); }
+// Province coverage is based on saved Sri Lankan trips only. Boundary geometry
+// is sourced from Sri Lanka NSDI; geoBoundaries is a fallback if unavailable.
+let travelMapMode="places", provinceLayer=null, provinceShapesPromise=null, selectedMapProvince="";
+const PROVINCE_GEO_URL="https://gisapps.nsdi.gov.lk/server/rest/services/Srilanka/Boundaries/MapServer/4/query?where=1%3D1&outFields=province_name&returnGeometry=true&outSR=4326&f=geojson";
+function provinceNameFromShape(properties){
+  const p=properties||{};
+  const name=p.province_name||p.Province_Name||p.shapeName||p.name||p.NAME_1||"";
+  return normalizedProvince(name)||LK_PROVINCES.find(x=>String(name).toLowerCase().includes(x.toLowerCase()))||"";
+}
+async function loadProvinceShapes(){
+  if(provinceShapesPromise)return provinceShapesPromise;
+  provinceShapesPromise=(async()=>{
+    let json=null;
+    try{
+      const res=await fetch(PROVINCE_GEO_URL);
+      if(!res.ok)throw Error("province boundaries unavailable");
+      json=await res.json();
+      if(!Array.isArray(json.features)||json.features.length<9)throw Error("incomplete boundaries");
+    }catch(_){
+      const api=await fetch("https://www.geoboundaries.org/api/current/gbOpen/LKA/ADM1/");
+      if(!api.ok)throw Error("province boundaries unavailable");
+      const meta=await api.json();
+      const geo=await fetch(meta.simplifiedGeometryGeoJSON||meta.gjDownloadURL);
+      if(!geo.ok)throw Error("province geometry unavailable");
+      json=await geo.json();
+    }
+    if(!Array.isArray(json.features))throw Error("invalid province boundaries");
+    const features=json.features.filter(f=>provinceNameFromShape(f.properties));
+    if(new Set(features.map(f=>provinceNameFromShape(f.properties))).size!==9)throw Error("incomplete province boundaries");
+    return {type:"FeatureCollection",features};
+  })().catch(e=>{provinceShapesPromise=null;throw e;});
+  return provinceShapesPromise;
+}
+function provinceTrips(p){
+  return trips().filter(t=>(trYear==="all"||tYear(t)===+trYear)&&t.cc==="LK"&&tripProvince(t)===p);
+}
+function renderProvinceDetails(){
+  const box=$("trProvinceMapInfo");
+  if(!box)return;
+  box.hidden=travelMapMode!=="provinces";
+  if(box.hidden)return;
+  const covered=new Set(trips().filter(t=>(trYear==="all"||tYear(t)===+trYear)&&t.cc==="LK").map(tripProvince).filter(Boolean));
+  box.innerHTML='<div class="tr-province-map-legend"><span><i class="yes"></i>Visited</span><span><i class="no"></i>Not visited</span></div>'+
+    '<div class="tr-province-list">'+LK_PROVINCES.map(p=>{
+      const list=provinceTrips(p),done=covered.has(p);
+      return '<button type="button" class="tr-province-item'+(done?' is-covered':'')+(selectedMapProvince===p?' is-selected':'')+'" data-province="'+esc(p)+'"><span class="tr-province-dot"></span><span class="tr-province-item-text"><strong>'+esc(p)+'</strong><small>'+(done?list.length+' saved '+(list.length===1?'place':'places'):'Not visited yet')+'</small></span><span class="tr-province-chevron">›</span></button>';
+    }).join("")+'</div>'+
+    (selectedMapProvince?'<div class="tr-province-selected"><strong>'+esc(selectedMapProvince)+'</strong>'+
+      (provinceTrips(selectedMapProvince).length?'<p>Places visited</p><div class="tr-province-places">'+provinceTrips(selectedMapProvince).map(t=>'<button type="button" data-trip="'+esc(t.id)+'">'+esc(t.name||"Saved place")+'</button>').join("")+'</div>':'<p>No saved places in this province yet.</p>')+'</div>':'<p class="tr-province-map-hint">Tap any province to see your places there.</p>');
+  box.querySelectorAll("[data-province]").forEach(b=>b.onclick=()=>{selectedMapProvince=b.dataset.province;renderProvinceDetails();focusProvinceShape(selectedMapProvince);});
+  box.querySelectorAll("[data-trip]").forEach(b=>b.onclick=()=>openTrip(b.dataset.trip));
+}
+function focusProvinceShape(name){
+  if(!provinceLayer||!LMAP)return;
+  provinceLayer.eachLayer(layer=>{
+    if(provinceNameFromShape(layer.feature&&layer.feature.properties)===name){
+      LMAP.fitBounds(layer.getBounds(),{padding:[26,26],maxZoom:9,animate:true});
+      layer.bringToFront();
+    }
+  });
+}
+async function renderProvinceMap(){
+  if(!LMAP||travelMapMode!=="provinces")return;
+  if(provinceLayer){provinceLayer.remove();provinceLayer=null;}
+  LLAYER.clearLayers();
+  const info=$("trProvinceMapInfo");
+  renderProvinceDetails();
+  LMAP.fitBounds(LK,{padding:[18,18],animate:false});
+  try{
+    const data=await loadProvinceShapes();
+    if(travelMapMode!=="provinces"||!LMAP)return;
+    const covered=new Set(trips().filter(t=>(trYear==="all"||tYear(t)===+trYear)&&t.cc==="LK").map(tripProvince).filter(Boolean));
+    provinceLayer=L.geoJSON(data,{
+      style:f=>{
+        const done=covered.has(provinceNameFromShape(f.properties));
+        return {color:done?"#237B49":"#AA3543",weight:1.5,opacity:1,fillColor:done?"#36B76C":"#E36D72",fillOpacity:.66};
+      },
+      onEachFeature:(feature,layer)=>{
+        const name=provinceNameFromShape(feature.properties);
+        const saved=provinceTrips(name);
+        layer.bindTooltip(name+" · "+(saved.length?saved.length+" saved place"+(saved.length===1?"":"s"):"not visited"),{sticky:true});
+        layer.on("click",e=>{L.DomEvent.stopPropagation(e);selectedMapProvince=name;renderProvinceDetails();});
+      }
+    }).addTo(LMAP);
+    LMAP.fitBounds(provinceLayer.getBounds(),{padding:[16,16],animate:false});
+    if(selectedMapProvince)focusProvinceShape(selectedMapProvince);
+  }catch(e){
+    if(info&&!info.querySelector(".tr-province-boundary-note")){
+      info.insertAdjacentHTML("afterbegin",'<p class="tr-province-boundary-note">Province outlines could not load. Coverage and saved places are listed below.</p>');
+    }
+  }
+}
+function setTravelMapMode(mode){
+  travelMapMode=mode==="provinces"?"provinces":"places";
+  document.querySelectorAll("#trMapMode [data-map-mode]").forEach(b=>b.classList.toggle("on",b.dataset.mapMode===travelMapMode));
+  $("trProvinceMapInfo").hidden=travelMapMode!=="provinces";
+  if(!LMAP){if(travelMapMode==="provinces")renderProvinceDetails();return;}
+  if(provinceLayer){provinceLayer.remove();provinceLayer=null;}
+  if(travelMapMode==="provinces")renderProvinceMap();
+  else drawMap(true,false);
+}
+document.querySelectorAll("#trMapMode [data-map-mode]").forEach(b=>b.onclick=()=>setTravelMapMode(b.dataset.mapMode));
 function drawMap(fit,animate){
   if(!LMAP) return; LLAYER.clearLayers();
   const list=trips().filter(t=>trYear==="all"||tYear(t)===+trYear), b=[], num={};
@@ -3207,7 +3337,7 @@ const TNAMES={home:"Sappy Travel",map:"All places",plans:"Plan a visit",cal:"Cal
 const tKind=t=>(t&&TYPES[t.type])?t.type:"place";
 function showBigMap(){
   const first=!window.L || !LMAP; if(first) busyStart("Loading the map…");
-  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize(); drawMap(true,true); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
+  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize(); if(travelMapMode==="provinces")renderProvinceMap(); else drawMap(true,true); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
     .catch(()=>{ if(first) busyEnd(); $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function freshTravelPage(){ trYear="all"; trFilter="all"; trScope="lk"; calMonth=null; calSel=null;
@@ -3242,7 +3372,7 @@ function renderTravel(){
   const encouragement=remaining===0?"All nine! Sri Lanka explored.":remaining===1?"Just 1 province left to explore!":provinces.size===0?"Your Sri Lanka adventure starts here.":remaining<=3?"So close — only "+remaining+" provinces to go!":remaining+" more provinces waiting for you.";
   const yearOptions=['all'].concat(yrs).map(y=>'<option value="'+y+'"'+(String(trYear)===String(y)?' selected':'')+'>'+(y==="all"?"All years":y)+'</option>').join("");
   $("trStats").innerHTML=
-    '<div class="tr-snap-header"><div><span class="tr-snap-eyebrow">YOUR JOURNEY</span><strong>Travel overview</strong></div><label class="tr-snap-year-label"><span class="sr-only">Travel year</span><select id="travelSummaryYear" aria-label="Select travel year">'+yearOptions+'</select></label></div>'+
+    '<div class="tr-snap-header"><div><span class="tr-snap-eyebrow">YOUR JOURNEY</span><strong>Travel overview</strong></div><label class="tr-snap-year-label"><select id="travelSummaryYear" aria-label="Select travel year">'+yearOptions+'</select></label></div>'+
     '<div class="tr-snap-metrics">'+
       '<div class="tr-snap-metric"><span>Places visited</span><strong class="num">'+uniquePlaces.size+'</strong></div>'+
       '<div class="tr-snap-metric"><span>Countries</span><strong class="num">'+countries.size+'</strong></div>'+
@@ -3254,7 +3384,7 @@ function renderTravel(){
     '</div>';
   $("travelSummaryYear").onchange=e=>{trYear=e.target.value;renderTravel();};
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
-  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{trYear=b.dataset.y;renderTravel();drawMap(true,true);});
+  $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{trYear=b.dataset.y;renderTravel();if(travelMapMode==="provinces")renderProvinceMap();else drawMap(true,true);});
   $("trProvinceAlert").hidden=missing.length===0;
   if(missing.length){
     $("trProvinceAlert").innerHTML='<button type="button" class="tr-province-alert-button" id="trProvinceFix"><span class="tr-province-alert-icon">!</span><span class="tr-province-alert-text"><strong>'+missing.length+' '+(missing.length===1?'trip needs':'trips need')+' a province</strong><small>Complete the location to update your Sri Lanka coverage.</small></span><span class="tr-province-alert-arrow">›</span></button>';
