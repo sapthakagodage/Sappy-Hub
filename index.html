@@ -1726,7 +1726,7 @@ nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.9";
+const APP_VERSION = "7.3.10";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3012,6 +3012,8 @@ function openTravel(){
   trView="home"; ["home","map","plans","cal"].forEach(x=>$("tv-"+x).hidden=x!=="home"); $("trTitle").textContent=TNAMES.home; document.body.dataset.tv="home";
   document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.setAttribute("aria-current",b.dataset.tv==="home"?"true":"false"));
   window.scrollTo(0,0); renderTravel(); enterScreen();
+  // Warm the province request in parallel with Leaflet so Map opens faster.
+  loadProvinceShapes().catch(()=>{});
   loadLeaflet().then(()=>{ locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function initMap(){
@@ -3128,11 +3130,34 @@ function fitWholeSriLanka(){
   LMAP.stop();
   LMAP.fitBounds(LK,{padding:[24,24],maxZoom:8,animate:false});
 }
+// Draw local trip and planned-place data immediately; don't wait for network boundaries.
+function renderTravelMapMarkers(){
+  if(!LMAP||!LLAYER)return;
+  LLAYER.clearLayers();
+  const selectedTrips=trips().filter(t=>trYear==="all"||tYear(t)===+trYear);
+  selectedTrips.forEach(t=>{
+    const c=(TYPES[t.type]||TYPES.place).c;
+    if(t.track&&t.track.length>1){
+      L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:3,opacity:.85}).addTo(LLAYER).on("click",()=>openTrip(t.id));
+    }
+    if(Number.isFinite(Number(t.lat))&&Number.isFinite(Number(t.lng))){
+      L.marker([Number(t.lat),Number(t.lng)],{icon:nameIcon(t.name,c,false,-1)})
+        .addTo(LLAYER).on("click",()=>openTrip(t.id));
+    }
+  });
+  plans().forEach(p=>{
+    if(Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))){
+      L.marker([Number(p.lat),Number(p.lng)],{icon:nameIcon(p.name,"#BBA6FF",true,-1)})
+        .addTo(LLAYER).on("click",()=>openPlan(p.id));
+    }
+  });
+
+}
 async function renderProvinceMap(){
   if(!LMAP||trView!=="map")return;
   const token=++provinceRenderToken;
   if(provinceLayer){provinceLayer.remove();provinceLayer=null;}
-  LLAYER.clearLayers();
+  renderTravelMapMarkers();
   const info=$("trProvinceMapInfo");
   renderProvinceDetails();
   fitWholeSriLanka();
@@ -3162,26 +3187,8 @@ async function renderProvinceMap(){
     }
   }
   if(token!==provinceRenderToken||trView!=="map")return;
-  // The same map always shows trip locations on top of province coverage.
-  // Reusing the trip layer ensures province fills never cover place markers.
-  const selectedTrips=trips().filter(t=>trYear==="all"||tYear(t)===+trYear);
-  selectedTrips.forEach(t=>{
-    const c=(TYPES[t.type]||TYPES.place).c;
-    if(t.track&&t.track.length>1){
-      L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:3,opacity:.85}).addTo(LLAYER).on("click",()=>openTrip(t.id));
-    }
-    if(Number.isFinite(Number(t.lat))&&Number.isFinite(Number(t.lng))){
-      L.marker([Number(t.lat),Number(t.lng)],{icon:nameIcon(t.name,c,false,-1)})
-        .addTo(LLAYER).on("click",()=>openTrip(t.id));
-    }
-  });
-  plans().forEach(p=>{
-    if(Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))){
-      L.marker([Number(p.lat),Number(p.lng)],{icon:nameIcon(p.name,"#BBA6FF",true,-1)})
-        .addTo(LLAYER).on("click",()=>openPlan(p.id));
-    }
-  });
-  fitWholeSriLanka();
+  // Markers are already visible; only the province overlays need fetching.
+
 }
 function drawMap(fit,animate){
   if(!LMAP) return; LLAYER.clearLayers();
@@ -3388,7 +3395,7 @@ const tKind=t=>(t&&TYPES[t.type])?t.type:"place";
 function showBigMap(){
   selectedMapProvince=""; // a new visit to Map always starts from the island overview
   const first=!window.L || !LMAP; if(first) busyStart("Loading the map…");
-  loadLeaflet().then(()=>{ initMap(); setTimeout(()=>{ LMAP.invalidateSize({pan:false}); renderProvinceMap(); locateMe(false); if(first) setTimeout(busyEnd,500); },80); })
+  loadLeaflet().then(()=>{ initMap(); requestAnimationFrame(()=>{ LMAP.invalidateSize({pan:false}); renderProvinceMap(); if(first) busyEnd(); }); })
     .catch(()=>{ if(first) busyEnd(); $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function freshTravelPage(){ trYear="all"; trFilter="all"; selectedMapProvince=""; calMonth=null; calSel=null;
