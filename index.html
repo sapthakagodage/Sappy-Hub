@@ -117,14 +117,14 @@ button:active{transform:scale(.98)}
   display:grid;place-items:center;font-size:26px;font-weight:800;opacity:0;pointer-events:none;z-index:70;transition:opacity .15s}
 /* ===== motion: quick, subtle, professional ===== */
 :root{--ease:cubic-bezier(.2,.8,.2,1)}
-@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes grow{from{clip-path:inset(0 100% 0 0 round 14px)}to{clip-path:inset(0 0 0 0 round 14px)}}
 @keyframes barup{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
-.rise{animation:rise .46s var(--ease) both;animation-delay:calc(var(--i,0) * 55ms)}
-.grow{animation:grow .75s var(--ease) both;animation-delay:calc(var(--i,0) * 60ms + 180ms)}
-.barup{transform-origin:bottom;animation:barup .7s var(--ease) both;animation-delay:calc(var(--i,0) * 60ms + 150ms)}
-.fadein{animation:fadein .35s var(--ease) both}
+.rise{animation:rise .42s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i,0) * 28ms)}
+.grow{animation:grow .58s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i,0) * 35ms + 80ms)}
+.barup{transform-origin:bottom;animation:barup .54s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i,0) * 35ms + 70ms)}
+.fadein{animation:fadein .25s ease-out both}
 .donut-wrap .seg{transition:stroke-dasharray .9s var(--ease),stroke-dashoffset .9s var(--ease)}
 .tab{transition:background .25s var(--ease),color .25s var(--ease)}
 .chip{transition:background .2s var(--ease),color .2s var(--ease)}
@@ -1528,7 +1528,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 #tv-map .maptools{justify-content:flex-end}
 /* Facebook-style bottom navigation: slide away on downward scrolling,
    reappear on upward scrolling. Preserve fixed positioning and safe areas. */
-nav.tabs{transition:transform .38s cubic-bezier(.22,1,.36,1),opacity .3s ease;will-change:transform,opacity}
+nav.tabs{transition:transform .44s cubic-bezier(.22,1,.36,1),opacity .34s ease;will-change:transform,opacity;backface-visibility:hidden}
 nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:0;pointer-events:none}
 @media(prefers-reduced-motion:reduce){nav.tabs{transition:none!important}}
 </style>
@@ -1726,7 +1726,7 @@ nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.11";
+const APP_VERSION = "7.3.12";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2883,9 +2883,9 @@ function enterScreen(){
   const items=[...root.children].filter(x=>!x.hidden && x.offsetParent!==null);
   // header of the app too
   if(!["in-hub","in-set","in-noti","in-travel"].some(c=>document.body.classList.contains(c))) playClass(document.querySelector(".bar"),"fadein",0);
-  items.slice(0,12).forEach((el,i)=>playClass(el,"rise",i));
-  // lists inside a card: rows rise one after another
-  root.querySelectorAll(".list .tx, .nrow, .sub, .fd").forEach((el,i)=>{ if(i<14) playClass(el,"rise",Math.min(i,10)*0.6+2); });
+  items.slice(0,8).forEach((el,i)=>playClass(el,"rise",i));
+  // Keep only the first few visible rows staggered so long lists feel immediate.
+  root.querySelectorAll(".list .tx, .nrow, .sub, .fd").forEach((el,i)=>{ if(i<8 && el.getBoundingClientRect().top<window.innerHeight+50) playClass(el,"rise",Math.min(i,6)*0.5+1); });
   // charts
   root.querySelectorAll(".pb .bar3").forEach((el,i)=>playClass(el,"grow",i));
   root.querySelectorAll(".tb .col i").forEach((el,i)=>playClass(el,"barup",i));
