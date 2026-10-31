@@ -1526,6 +1526,11 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 #tv-map .mapcard{height:calc(100dvh - 215px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));min-height:350px}
 /* Single unified Travel map; no location/province category toggles. */
 #tv-map .maptools{justify-content:flex-end}
+/* Facebook-style bottom navigation: slide away on downward scrolling,
+   reappear on upward scrolling. Preserve fixed positioning and safe areas. */
+nav.tabs{transition:transform .38s cubic-bezier(.22,1,.36,1),opacity .3s ease;will-change:transform,opacity}
+nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:0;pointer-events:none}
+@media(prefers-reduced-motion:reduce){nav.tabs{transition:none!important}}
 </style>
 </head>
 <body class="in-hub">
@@ -1721,7 +1726,7 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.8";
+const APP_VERSION = "7.3.9";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3683,6 +3688,33 @@ checkActiveAppVersion();
 document.addEventListener("visibilitychange",checkActiveAppVersion);
 window.addEventListener("focus",checkActiveAppVersion);
 window.addEventListener("pageshow",checkActiveAppVersion);
+/* Keep bottom nav reachable while reading: down hides, up reveals.
+   Window scroll is used on both Pocket and Travel screens. */
+(function(){
+  let lastY=Math.max(0,window.scrollY||0);
+  let pending=false;
+  const bars=[...document.querySelectorAll("nav.tabs")];
+  function reveal(){bars.forEach(bar=>bar.classList.remove("nav-scroll-hidden"));lastY=Math.max(0,window.scrollY||0);}
+  function process(){
+    pending=false;
+    const y=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
+    const delta=y-lastY;
+    const page=document.documentElement;
+    const maxScroll=Math.max(0,page.scrollHeight-window.innerHeight);
+    const inApp=!document.body.classList.contains("in-hub")&&!document.body.classList.contains("in-set")&&!document.body.classList.contains("in-noti")&&!document.body.classList.contains("in-fullmap");
+    if(!inApp||y<45||maxScroll<100||document.body.classList.contains("in-fullmap")){
+      reveal();return;
+    }
+    if(delta>5&&y>90) bars.forEach(bar=>bar.classList.add("nav-scroll-hidden"));
+    else if(delta< -5) reveal();
+    lastY=y;
+  }
+  window.addEventListener("scroll",()=>{if(!pending){pending=true;requestAnimationFrame(process);}},{passive:true});
+  // New page or returning to a page always starts with its footer visible.
+  document.querySelectorAll('nav.tabs .tab,nav.tabs .nav-add').forEach(b=>b.addEventListener("click",reveal));
+  window.addEventListener("pageshow",reveal);
+  window.addEventListener("resize",reveal,{passive:true});
+})();
 /* ===== contextual navigation + iPhone-style edge swipe ===== */
 const navTrail=[];
 let restoringScreen=false;
