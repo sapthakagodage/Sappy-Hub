@@ -1726,7 +1726,7 @@ nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.10";
+const APP_VERSION = "7.3.11";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3014,7 +3014,9 @@ function openTravel(){
   window.scrollTo(0,0); renderTravel(); enterScreen();
   // Warm the province request in parallel with Leaflet so Map opens faster.
   loadProvinceShapes().catch(()=>{});
-  loadLeaflet().then(()=>{ locateMe(false); }).catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
+  // Do not request precise location automatically on entering Travel.
+  // Geolocation is requested only after an explicit My Location tap.
+  loadLeaflet().catch(()=>{ $("tMap").innerHTML='<div class="empty" style="padding-top:120px">Map needs internet. Your trips are still saved.</div>'; });
 }
 function initMap(){
   if(LMAP && !document.getElementById("tMap").classList.contains("leaflet-container")) LMAP=null;
