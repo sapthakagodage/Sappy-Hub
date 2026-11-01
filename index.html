@@ -1531,6 +1531,13 @@ body,button,input,select,textarea{font-family:"Manrope",-apple-system,BlinkMacSy
 nav.tabs{transition:transform .44s cubic-bezier(.22,1,.36,1),opacity .34s ease;will-change:transform,opacity;backface-visibility:hidden}
 nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:0;pointer-events:none}
 @media(prefers-reduced-motion:reduce){nav.tabs{transition:none!important}}
+/* Stable bottom navigation across empty and populated screens. */
+html,body{min-height:100%;min-height:100dvh}
+#appView,#travelView{min-height:100dvh}
+nav.tabs{position:fixed;bottom:0;left:0;right:0}
+.pocket-period-note{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px;padding:8px 11px;border:1px solid var(--line);background:var(--card);border-radius:13px;font-size:12px;color:var(--soft);font-weight:700}
+.pocket-period-note select{border:0;background:var(--card2);color:var(--ink);border-radius:9px;padding:8px 6px;max-width:58%;font-size:12px;font-weight:750}
+@media(max-width:360px){.pocket-period-note{font-size:11px}.pocket-period-note select{font-size:11px}}
 </style>
 </head>
 <body class="in-hub">
@@ -1637,6 +1644,15 @@ nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:
     </div>
   </header>
 
+  <div id="pocketPeriodNote" class="pocket-period-note">
+    <span id="pocketPeriodDates"></span>
+    <select id="pocketPeriodSelect" aria-label="Expense reporting period">
+      <option value="24">Salary cycle · 24th</option>
+      <option value="23">Salary cycle · 23rd</option>
+      <option value="25">Salary cycle · 25th</option>
+      <option value="calendar">Calendar month</option>
+    </select>
+  </div>
   <!-- HOME -->
   <section id="v-home">
     <div id="soonBox"></div>
@@ -1726,7 +1742,7 @@ nav.tabs.nav-scroll-hidden{transform:translate3d(0,calc(100% + 12px),0);opacity:
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.12";
+const APP_VERSION = "7.3.13";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1805,7 +1821,8 @@ const CATS = {
   "Personal care":{i:"care",  c:"#F7C6E8", k:["salon","saloon","barber","barbershop","hair","haircut","hair cut","beauty","beautician","cosmetic","cosmetics","makeup","make up","skincare","skin care","shampoo","conditioner","perfume","fragrance","parlour","parlor","nail","nails","spa ceylon","the body shop","body shop","nature's secrets","natures secrets","janet","ramani fernando","cosmetics.lk","grooming","dermatolog","sunscreen","lotion"]},
   "Subscriptions":{i:"repeat",c:"#BBA6FF", k:["apple","icloud","itunes","netflix","spotify","youtube","google","facebk","facebook","meta (facebook)","microsoft","openai","chatgpt","anthropic","canva","adobe","zoom","linkedin","prime video","disney","dropbox","notion","github"]},
   "Bills":        {i:"bolt",  c:"#7FE3D3", k:["dialog","mobitel","slt","hutch","airtel","ceb","leco","electricity","water board","nwsdb","insurance","aia","ceylinco","allianz","union assurance","peo tv","billpmt","bill","rent","lease","loan"]},
-  "Health":       {i:"heart", c:"#9CF0BE", k:["pharmacy","pharma","osu sala","healthguard","union chemists","chemist","hospital","asiri","nawaloka","lanka hospital","durdans","hemas","ninewells","clinic","medical","channel","lab","laboratory","dental","eye","optical","vision"]},
+  "My Health":    {i:"heart", c:"#9CF0BE", k:["pharmacy","pharma","osu sala","healthguard","union chemists","chemist","hospital","asiri","nawaloka","lanka hospital","durdans","hemas","ninewells","clinic","medical","channel","lab","laboratory","dental","eye","optical","vision"]},
+  "Parents’ Health":{i:"heart", c:"#A8D5FF", k:[]},
   "Education":    {i:"cap",   c:"#F6C9A6", k:["school","university","uni ","institute","college","academy","course","udemy","coursera","exam","tuition","bcs","cima","acca","esoft","nibm","sliit","iit"]},
   "Cash":         {i:"cash",  c:"#D9DBD2", k:["atm","cash withdrawal","withdrawal","cdm","crm"]},
   "Transfers":    {i:"swap",  c:"#C2C7BB", k:["transfer","ceft","slips","fund tr","lankapay","justpay","own account"]},
@@ -1814,13 +1831,14 @@ const CATS = {
   "Income":       {i:"income",c:"#CDF46A", k:[]},
   "Fixed deposit":{i:"bank",  c:"#7FD6FF", k:[]}
 };
-const PICK = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Personal care","Subscriptions","Bills","Health","Education","Cash","Transfers"];
+const PICK = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Personal care","Subscriptions","Bills","My Health","Parents’ Health","Education","Cash","Transfers"];
 const SPEND = PICK.concat(["Other"]);
 const catLabel=c=>c==="Other"?"Not sorted yet":c;
+const pocketCat=t=>t.cat==="Health"?"My Health":t.cat; // Legacy Health stays in storage.
 const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back"]);
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
-const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
+const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","My Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
 
 /* =============== helpers =============== */
 const $ = id => document.getElementById(id);
@@ -1981,7 +1999,7 @@ function parseSms(raw){
 function guessCat(t){
   if(t.isFd) return "Fixed deposit";
   const key=t.merchant.toLowerCase();
-  if(S.rules[key]) return S.rules[key];
+  if(S.rules[key]) return S.rules[key]==="Health"?"My Health":S.rules[key];
   if(t.type==="in"){ if(/own ?a\/?c|own account|\bfcy\b|conversion/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
   if(t.isTransfer) return "Transfers";
   if(/\bfcy\b|conversion|currency exch|foreign exch/i.test(t.where||"")) return "Transfers";
@@ -2179,19 +2197,36 @@ function checkHash(){
 }
 
 /* =============== view state =============== */
-let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
+let view="home", month=new Date(); month=pocketMonthNow();
 let focusCat=null, filter="All", accFilter="all";
 const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
 function renderSms(){ const sk=Object.values(S.skip).filter(live).length; $("skipRow").hidden=!sk; $("skipD").textContent=sk+" SMS couldn’t be read. Send one to Claude to improve reading."; }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
-const inMonth = t => { const d=new Date(t.ts); return d.getFullYear()===month.getFullYear()&&d.getMonth()===month.getMonth(); };
+const POCKET_PERIOD_KEY="sappy.pocket.period";
+let pocketPeriod=(()=>{try{const s=localStorage.getItem(POCKET_PERIOD_KEY);return ["calendar","23","24","25"].includes(s)?s:"24";}catch(e){return "24";}})();
+const cycleDay=()=>pocketPeriod==="calendar"?1:Number(pocketPeriod);
+function pocketMonthNow(){
+  const d=new Date(),day=cycleDay();
+  return new Date(d.getFullYear(),d.getMonth()+(day>1&&d.getDate()>=day?1:0),1);
+}
+function pocketBounds(y=month.getFullYear(),m=month.getMonth()){
+  const day=cycleDay();
+  return day===1?[new Date(y,m,1),new Date(y,m+1,1)]:[new Date(y,m-1,day),new Date(y,m,day)];
+}
+function pocketPeriodLabel(){
+  const [a,b]=pocketBounds(),fmtDay=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  return pocketPeriod==="calendar"?"Calendar month":fmtDay(a)+" – "+fmtDay(new Date(b.getTime()-86400000));
+}
+function pocketDayIndex(t){const [a,b]=pocketBounds();const d=new Date(t.ts);if(d<a||d>=b)return -1;return Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-a)/86400000);}
+const inMonth = t => { const [a,b]=pocketBounds(); return t.ts>=a.getTime()&&t.ts<b.getTime(); };
 
 function render(){
   paintBells();
   if(document.body.classList.contains("in-hub")){ renderHub(); }
   $("title").textContent=TITLES[view];
   $("mswitch").hidden = !(view==="home"||view==="activity");
-  $("mlabel").textContent=month.toLocaleDateString("en-GB",{month:"short",year:"numeric"});
+  $("mlabel").textContent=month.toLocaleDateString("en-GB",{month:"short",year:"numeric"}); 
+  if($("pocketPeriodNote")){$("pocketPeriodNote").hidden=!(view==="home"||view==="activity");$("pocketPeriodDates").textContent=pocketPeriodLabel();$("pocketPeriodSelect").value=pocketPeriod;}
   if(view==="home") renderHome();
   if(view==="activity") renderActivity();
   if(view==="savings") renderSavings();
@@ -2203,9 +2238,10 @@ function render(){
 function monthSpend(y,m){
   let total=0; const by={};
   let back=0;
-  Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
+  const [start,end]=pocketBounds(y,m);
+  Object.values(S.tx).forEach(t=>{ if(!live(t)||t.ts<start.getTime()||t.ts>=end.getTime()) return;
     if(isLooseBack(t)){ back+=lkrOf(t); return; }   // waits until linked to a payment
-    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=myShare(t); total+=v; by[t.cat]=(by[t.cat]||0)+v; });
+    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=myShare(t); total+=v; by[pocketCat(t)]=(by[pocketCat(t)]||0)+v; });
   return {total,gross:total,back,by};
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
@@ -2256,15 +2292,15 @@ function renderHome(){
   const net=spent;
   const fdOut=mt.filter(t=>t.type==="out"&&t.cat==="Fixed deposit").reduce((s,t)=>s+lkrOf(t),0);
   const left=inc-spent-fdOut;
-  const by={}; out.forEach(t=>by[t.cat]=(by[t.cat]||0)+myShare(t));
+  const by={}; out.forEach(t=>by[pocketCat(t)]=(by[pocketCat(t)]||0)+myShare(t));
   const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
   const mName=month.toLocaleDateString("en-GB",{month:"long"});
-  const now=new Date(), isCur=now.getFullYear()===month.getFullYear()&&now.getMonth()===month.getMonth();
-  const days=isCur?now.getDate():new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+  const now=new Date(), [periodStart,periodEnd]=pocketBounds(), isCur=now>=periodStart&&now<periodEnd;
+  const days=isCur?Math.max(1,Math.floor((now-periodStart)/86400000)+1):Math.max(1,Math.round((periodEnd-periodStart)/86400000));
   const pm=new Date(month.getFullYear(),month.getMonth()-1,1), pv=monthSpend(pm.getFullYear(),pm.getMonth()).total;
 
   // lime hero: spent on top, balance + came in below
-  $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"});
+  $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"})+(pocketPeriod==="calendar"?"":" cycle");
   $("cVal").textContent=fmt(Math.round(net)); $("cVal").dataset.count=Math.round(net);
   $("cSub").textContent=out.length?out.length+" payments · "+rs(net/days)+" a day":"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
@@ -2405,9 +2441,10 @@ function listInto(el, list, emptyMsg, flat){
 
 /* ---------- activity ---------- */
 let chartMode="months", selDay=null, selWeek=null, selMonth=null;
-function daySpend(y,m){ const n=new Date(y,m+1,0).getDate(), a=new Array(n).fill(0);
-  Object.values(S.tx).forEach(t=>{ if(!live(t)) return; const d=new Date(t.ts); if(d.getFullYear()!==y||d.getMonth()!==m) return;
-    if(t.type==="out"&&!NOT_SPENDING.has(t.cat)) a[d.getDate()-1]+=myShare(t); });
+function daySpend(y,m){ const [start,end]=pocketBounds(y,m),n=Math.round((end-start)/86400000),a=new Array(n).fill(0);
+  Object.values(S.tx).forEach(t=>{if(!live(t)||t.ts<start.getTime()||t.ts>=end.getTime())return;
+    const d=new Date(t.ts),ix=Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-start)/86400000);
+    if(ix>=0&&ix<n&&t.type==="out"&&!NOT_SPENDING.has(t.cat))a[ix]+=myShare(t);});
   return a; }
 function renderTrend(){
   $("tcSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===chartMode));
@@ -2468,9 +2505,9 @@ function renderActivity(){
   $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
   const q=$("q").value.trim().toLowerCase();
   let list=txList().filter(inMonth);
-  if(chartMode==="days" && selDay) list=list.filter(t=>new Date(t.ts).getDate()===selDay);
+  if(chartMode==="days" && selDay) list=list.filter(t=>pocketDayIndex(t)===selDay-1);
   if(chartMode==="weeks" && selWeek!=null){ const b=document.querySelector('#trend .tb[data-w="'+selWeek+'"] .m'); const r=b?b.textContent.split("–").map(Number):null;
-    if(r) list=list.filter(t=>{ const d=new Date(t.ts).getDate(); return d>=r[0]&&d<=(r[1]||r[0]); }); }
+    if(r) list=list.filter(t=>{ const d=pocketDayIndex(t)+1; return d>=r[0]&&d<=(r[1]||r[0]); }); }
   if(accFilter!=="all") list=list.filter(t=>accKey(t)===accFilter);
   if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
@@ -2560,7 +2597,7 @@ function catPicker(list, cur){ return '<div class="pick" id="pk">'+list.map(c=>'
 function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").forEach(b=>b.onclick=()=>{ pk.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); onPick(b.dataset.c); }); }
 
 function openCat(c){
-  const list=txList().filter(t=>inMonth(t)&&t.cat===c);
+  const list=txList().filter(t=>inMonth(t)&&pocketCat(t)===c);
   if(c==="Paid back"){ const tot=list.reduce((a,t)=>a+lkrOf(t),0);
     openSheet('<div class="catHead"><span class="ic" style="background:'+CATS[c].c+'">'+icon(c,26)+'</span><div><h2>Friends paid back</h2><div class="note" style="margin:0">'+month.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+' · '+rs(tot)+'</div></div></div><p class="note">Taken off your spending. Not counted as income.</p><div class="list" id="catList"></div>');
     const el=$("catList"); el.innerHTML=list.map(txHtml).join(""); el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id)); return; }
@@ -2578,7 +2615,7 @@ function openCat(c){
 function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
 function openTx(id,edit){
   if(!edit && isUnsorted(S.tx[id])){ openSort(id); return; }
-  const t=S.tx[id]; if(!t) return; let cat=t.cat;
+  const t=S.tx[id]; if(!t) return; let cat=pocketCat(t);
   const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
   let topSel=t.topup||"";
   const cats = t.type==="in"?["Income","Paid back","Transfers"]:[...PICK,"Fixed deposit"];
@@ -2619,7 +2656,7 @@ function openTx(id,edit){
       toast("Added to Savings. Tap it there to set the rate."); closeSheet(); return;
     }
     if($("rem")&&$("rem").checked){ const k=name.toLowerCase(); S.rules[k]=cat; saveRules();
-      Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&o.cat!==cat).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
+      Object.values(S.tx).filter(o=>live(o)&&o.id!==t.id&&o.merchant.toLowerCase()===k&&pocketCat(o)!==cat).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
     if(askBal){ toast("Saved. Now set the "+askBal.split("|")[0]+" balance"); setTimeout(()=>openSetBal(askBal),350); return; }
     closeSheet(); toast("Saved");
   };
@@ -2684,7 +2721,7 @@ let tt; function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add(
 
 /* =============== wiring =============== */
 function freshPocketPage(){
-  month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
+  month=pocketMonthNow();
   focusCat=null; filter="All"; accFilter="all";
   chartMode="months"; selDay=null; selWeek=null; selMonth=null;
   if($("q")) $("q").value="";
@@ -2697,6 +2734,11 @@ document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.
 $("fab").onclick=openAdd;
 $("prev").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()-1); focusCat=null; render(); };
 $("next").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()+1); focusCat=null; render(); };
+$("pocketPeriodSelect").onchange=e=>{
+  pocketPeriod=e.target.value;
+  try{localStorage.setItem(POCKET_PERIOD_KEY,pocketPeriod);}catch(_){}
+  month=pocketMonthNow();selDay=null;selWeek=null;selMonth=null;focusCat=null;render();
+};
 $("q").oninput=renderActivity;
 $("tcSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{ chartMode=b.dataset.m; selDay=null; selWeek=null; selMonth=null; renderActivity(); if(!REDUCED) document.querySelectorAll("#trend .col i").forEach((el,i)=>playClass(el,"barup",Math.min(i,20)*0.4)); });
 
@@ -3838,7 +3880,7 @@ function freshStart(){
   navTrail.length=0;
   if(sheetOpen) closeSheet();
   document.body.classList.remove("in-set","in-noti","in-travel");
-  month=new Date(); month.setDate(1); month.setHours(0,0,0,0); focusCat=null; filter="All"; accFilter="all";
+  month=pocketMonthNow(); focusCat=null; filter="All"; accFilter="all";
   chartMode="months"; selDay=null; selWeek=null; selMonth=null;
   view="home"; document.body.classList.remove("on-savings"); ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!=="home");
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v==="home"?"true":"false"));
