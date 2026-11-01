@@ -1806,6 +1806,7 @@ const ICON = {
   back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'
 };
 function icon(cat, size){
+  if(cat==="Health")cat="My Health";
   const c=CATS[cat]||CATS.Other;
   return '<svg viewBox="0 0 24 24" width="'+(size||20)+'" height="'+(size||20)+'" fill="none" stroke="#12140D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[c.i]+'</svg>';
 }
@@ -1833,7 +1834,7 @@ const CATS = {
 };
 const PICK = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","Fun","Shopping","Personal care","Subscriptions","Bills","My Health","Parents’ Health","Education","Cash","Transfers"];
 const SPEND = PICK.concat(["Other"]);
-const catLabel=c=>c==="Other"?"Not sorted yet":c;
+const catLabel=c=>c==="Other"?"Not sorted yet":c==="Health"?"My Health":c;
 const pocketCat=t=>t.cat==="Health"?"My Health":t.cat; // Legacy Health stays in storage.
 const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back"]);
 const CAT_RE = {};
@@ -2425,9 +2426,9 @@ function timeAgo(ts){ const d=Math.floor((Date.now()-ts)/864e5); return d<=0?"To
 function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(ts);d.setHours(0,0,0,0); const n=(t-d)/864e5;
   return n===0?"Today":n===1?"Yesterday":new Date(ts).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"}); }
 function txHtml(t){
-  const c=CATS[t.cat]||CATS.Other, pos=t.type==="in";
+  const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(t.cat))+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="out"&&(t.split>1||backMap()[t.id])?'<div class="o num share">your share '+rs(myShare(t))+'</div>':'')+(t.type==="in"&&t.cat==="Paid back"&&!(t.linkTo&&live(S.tx[t.linkTo]))?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(t.cat))+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="out"&&(t.split>1||backMap()[t.id])?'<div class="o num share">your share '+rs(myShare(t))+'</div>':'')+(t.type==="in"&&t.cat==="Paid back"&&!(t.linkTo&&live(S.tx[t.linkTo]))?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -3634,7 +3635,7 @@ function openLink(id){
   cur.forEach(cid=>{ if(!sug.some(t=>t.id===cid)) sug.unshift(S.tx[cid]); });
   const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));   // most likely payment ticked
   const P=lkrOf(p);
-  const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[t.cat]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
+  const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
   openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Tick every payment it covers — e.g. lunch and drinks.</div>'+
     (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
       :'<div class="note" style="margin-top:12px">No payments in the month before this. It isn’t taken off your spending.</div>')+
