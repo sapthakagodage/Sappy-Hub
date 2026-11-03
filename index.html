@@ -244,7 +244,11 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-type-picker button.on{background:#8FDDFF;color:#11212a;border-color:#8FDDFF}
 .rc-form-actions{display:flex;gap:9px;margin:18px 0 8px}.rc-form-actions .btn{flex:1;min-width:0;min-height:48px}
 .rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
-.rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}.rc-upload input{width:100%;max-width:100%}
+.rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}
+.travel-recap-action{background:#8FDDFF!important;color:#10242b!important;border:1px solid rgba(37,91,104,.24)!important;border-radius:18px!important;min-height:54px;font-size:15px;letter-spacing:-.01em;box-shadow:0 6px 22px rgba(67,162,197,.12);position:relative;margin:2px 0 6px}
+.travel-recap-action:after{content:"↗";position:absolute;right:19px;top:50%;transform:translateY(-50%);font-size:21px;font-weight:500}
+.travel-recap-action:active{transform:scale(.99);filter:brightness(.95)}
+#tEdit,#tDel{min-height:47px;border-radius:16px;font-size:13px}.rc-upload input{width:100%;max-width:100%}
 .tripstudio{background:#080f15!important}.ts-preview{padding:3px 0;align-items:center;justify-content:center}
 .ts-preview canvas{width:auto;height:auto;max-width:100%!important;max-height:100%!important;object-fit:contain;border:1px solid rgba(215,243,250,.17);border-radius:14px}
 .ts-actions button{border-radius:13px;min-height:43px}
@@ -1790,7 +1794,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.22";
+const APP_VERSION = "7.3.23";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3360,8 +3364,8 @@ function openTrip(id){
     ((t.type==='hike'||t.type==='walk')?'<div><span>Steps</span><b class="num">'+(t.steps==null?'—':fmt(t.steps))+'</b></div>'+
     '<div><span>Calories</span><b class="num">'+(t.calories==null?'—':fmt(t.calories)+' kcal')+'</b></div>':'')+'</div>'+
     '<div id="tHome" class="fromhome" hidden></div>'+
-    '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
-    '<div class="btns"><button class="btn soft" id="tEdit" style="flex:1">✎ Edit trip details</button><button class="btn warn" id="tDel">Delete trip</button></div>');
+    '<div class="btns" style="margin-top:16px;margin-bottom:10px"><button class="btn soft" id="tEdit" style="flex:1">Edit trip</button><button class="btn warn" id="tDel">Delete trip</button></div>'+
+    '<button class="btn full travel-recap-action" id="tStudio">Create trip recap</button>');
   miniMap($("tdMap"),t);
   $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
@@ -3638,6 +3642,8 @@ function tsDraw(stage=4){
  tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:97,225,"800 23px Manrope,Arial","#baf1ff");
  tsRound(ctx,w-242,sq?45:64,180,48,24,"rgba(9,29,40,.83)");
  tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:97,150,"800 22px Manrope,Arial","#d0f67f");
+ ctx.fillStyle="#c9f171";ctx.fillRect(60,sq?227:609,45,4);
+ tsText(ctx,"THE JOURNEY",121,sq?235:618,300,"900 20px Manrope,Arial","#e7f3ee");
  tsText(ctx,t.name||"My journey",60,sq?328:736,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
  tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
  if(stage===0)return;
@@ -3654,6 +3660,7 @@ function tsDraw(stage=4){
  }
  const greenY=metricTop+(walk?(sq?94:143):0),greenH=sq?101:142;
  tsRound(ctx,m,greenY,inner,greenH,24,"#c9f171");
+ ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(m+5,greenY+5,inner-10,greenH-10,20);ctx.stroke();
  if(walk){
   tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:38),inner*.45,"800 20px Manrope,Arial","#315137");
   tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:38),inner*.42,"800 20px Manrope,Arial","#315137");
