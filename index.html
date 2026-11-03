@@ -3492,33 +3492,95 @@ function tsDrawRouteMap(ctx,t,x,y,w,h){
  ctx.fillStyle="#193e46";ctx.font="800 23px Arial";ctx.fillText(t.track?.length>1?"RECORDED GPS ROUTE":"DRIVING ROUTE",x+25,y+32);
  ctx.font="600 17px Arial";ctx.fillText("Illustrated route based on coordinates",x+25,y+h-18);ctx.restore();
 }
+function tsText(ctx,str,x,y,max,font="700 24px Manrope,Arial",color="#e8f5f8"){
+ ctx.font=font;ctx.fillStyle=color;let v=String(str??"");while(v.length>1&&ctx.measureText(v).width>max)v=v.slice(0,-2)+"…";ctx.fillText(v,x,y);
+}
+function tsDrawMapPanel(ctx,t,x,y,w,h){
+ ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
+ ctx.fillStyle="#b5d3d2";ctx.fillRect(x,y,w,h);
+ if(t._route){
+  const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
+  ctx.fillStyle="#e9f0eb";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
+ }else{
+  const raw=t.track?.length>1?t.track:t.drivePath?.length>1?t.drivePath:
+   (t.startLat!=null&&t.startLng!=null&&t.endLat!=null&&t.endLng!=null?[[t.startLat,t.startLng],[t.endLat,t.endLng]]:[]);
+  const pts=raw.filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));
+  ctx.strokeStyle="rgba(255,255,255,.38)";ctx.lineWidth=3;
+  for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(x+i*w/8,y);ctx.lineTo(x+i*w/8,y+h);ctx.stroke();}
+  for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(x,y+i*h/6);ctx.lineTo(x+w,y+i*h/6);ctx.stroke();}
+  if(pts.length>=2){
+   const lats=pts.map(p=>+p[0]),lons=pts.map(p=>+p[1]);
+   const center=(Math.min(...lats)+Math.max(...lats))/2,cos=Math.max(.08,Math.cos(center*Math.PI/180));
+   const minX=Math.min(...lons)*cos,maxX=Math.max(...lons)*cos,minY=Math.min(...lats),maxY=Math.max(...lats);
+   const scale=Math.min((w-140)/Math.max(.000001,maxX-minX),(h-95)/Math.max(.000001,maxY-minY));
+   const xy=p=>[x+w/2+(+p[1]*cos-(minX+maxX)/2)*scale,y+h/2-(+p[0]-(minY+maxY)/2)*scale];
+   ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);if(i===0)ctx.moveTo(...q);else ctx.lineTo(...q);});
+   ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#f7ffff";ctx.lineWidth=16;ctx.stroke();
+   if(pts.length===2)ctx.setLineDash([12,13]);
+   ctx.strokeStyle="#176d84";ctx.lineWidth=8;ctx.stroke();ctx.setLineDash([]);
+   [pts[0],pts[pts.length-1]].forEach((p,i)=>{const q=xy(p);ctx.beginPath();ctx.arc(q[0],q[1],13,0,2*Math.PI);ctx.fillStyle=i?"#cff36f":"#12677e";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="white";ctx.stroke();});
+  }else{
+   tsText(ctx,"ADD FROM & TO TO SEE YOUR ROUTE",x+30,y+h/2, w-60,"800 24px Manrope,Arial","#285563");
+  }
+ }
+ const routeKind=t._route?"HUAWEI HEALTH ROUTE":t.track?.length>1?"RECORDED GPS":t.drivePath?.length>1?"DRIVING ROUTE":t.startLat!=null&&t.endLat!=null?"FROM / TO PREVIEW":"JOURNEY MAP";
+ ctx.fillStyle="rgba(9,30,41,.89)";ctx.fillRect(x,y,w,55);
+ tsText(ctx,routeKind,x+22,y+35,w-45,"800 22px Manrope,Arial","#f3fcfd");
+ const from=t.startName||"Start",to=t.endName||t.loc||"Destination";
+ ctx.fillStyle="rgba(10,28,37,.92)";ctx.fillRect(x,y+h-58,w,58);
+ tsText(ctx,from,x+20,y+h-20,w*.44,"800 21px Manrope,Arial","#9deaff");
+ ctx.font="800 25px Manrope,Arial";ctx.fillStyle="#d5f676";ctx.fillText("→",x+w/2-15,y+h-20);
+ tsText(ctx,to,x+w*.57,y+h-20,w*.4,"800 21px Manrope,Arial","#eaf8f1");
+ ctx.restore();
+}
 function tsDraw(stage=4){
- const c=$("tsCanvas"),ctx=c.getContext("2d"),t=tsCurrent;if(!t)return;
- const w=1080,h=tsFormat==="story"?1920:1080;c.width=w;c.height=h;
- const sq=h===1080;ctx.fillStyle="#0d151b";ctx.fillRect(0,0,w,h);
- const hero=sq?410:900;
- if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);else{let g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#163e4e");g.addColorStop(1,"#091218");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
- let sh=ctx.createLinearGradient(0,0,0,hero+80);sh.addColorStop(0,"rgba(3,11,17,.18)");sh.addColorStop(.45,"rgba(3,11,17,.2)");sh.addColorStop(1,"#0d151b");ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+90);
- ctx.fillStyle="#8fddff";ctx.font="800 28px Manrope,Arial";ctx.fillText("✦  SAPPY TRAVEL  /  MY JOURNEY",65,88);
- ctx.fillStyle="white";const titleY=sq?260:610;tsWrap(ctx,t.name,65,titleY,960,sq?68:84,sq?76:94,2);
- ctx.fillStyle="#d0e0e6";ctx.font="600 28px Manrope,Arial";ctx.fillText([t.loc,t.date?niceDate(t.date):""].filter(Boolean).join("  •  ").slice(0,65),68,titleY+(sq?112:132));
- if(stage<1)return;
- const top=sq?445:975,gap=14,margin=65,tileW=(w-2*margin-gap)/2,tileH=sq?96:185;
- const vals=[[(t.dist==null?"—":fmt(t.dist,t.dist<10?1:0))+(t.dist==null?"":" km"),"WALK DISTANCE"],[fmtDur(t.dur??t.moving),"WALK TIME"],[t.steps==null?"—":fmt(t.steps),"STEPS"],[t.calories==null?"—":fmt(t.calories)+" kcal","CALORIES"]];
- vals.forEach((a,i)=>{const x=margin+(i%2)*(tileW+gap),y=top+Math.floor(i/2)*(tileH+gap);
- tsRound(ctx,x,y,tileW,tileH,24,"#1e3039");ctx.fillStyle="#8fddff";ctx.font="800 "+(sq?34:52)+"px Manrope,Arial";ctx.fillText(a[0],x+24,y+(sq?48:86));ctx.fillStyle="#a6bdc6";ctx.font="800 21px Manrope,Arial";ctx.fillText(a[1],x+24,y+tileH-24);});
- if(stage<2)return;
- const below=top+2*(tileH+gap)+(sq?12:42);
- ctx.fillStyle="#e8f4f6";ctx.font="800 29px Manrope,Arial";ctx.fillText("THE ROUTE & MEMORIES",margin,below);
- const shotY=below+24,shotH=sq?210:340;
- if(t._route){tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#edf1ec");ctx.save();ctx.beginPath();ctx.roundRect(margin,shotY,w-2*margin,shotH,22);ctx.clip();tsCover(ctx,t._route,margin,shotY,w-2*margin,shotH);ctx.restore();}
-  else if(t.drivePath?.length>1||t.track?.length>1)tsDrawRouteMap(ctx,t,margin,shotY,w-2*margin,shotH);
- else{tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#1b2d35");ctx.strokeStyle="#8fddff";ctx.lineWidth=4;ctx.setLineDash([14,12]);ctx.beginPath();ctx.moveTo(margin+50,shotY+shotH*.75);ctx.bezierCurveTo(370,shotY+12,690,shotY+shotH,980,shotY+40);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#b7cbd4";ctx.font="700 23px Arial";ctx.fillText((t.startName||"START").slice(0,22),margin+30,shotY+shotH-30);ctx.textAlign="right";ctx.fillText((t.endName||t.loc||"FINISH").slice(0,22),w-margin-30,shotY+shotH-30);ctx.textAlign="left";ctx.font="500 17px Arial";ctx.fillText("Illustrative route · add Huawei screenshot for actual GPS",margin+30,shotY+28);}
- if(stage<3)return;
- const places=(t.stops||[]).map(v=>v.name).filter(Boolean);
- const placeY=shotY+shotH+(sq?28:42);
- ctx.fillStyle="#a6bdc6";ctx.font="700 23px Manrope,Arial";ctx.fillText([t.startName,t.endName||t.loc].filter(Boolean).join(" → ").slice(0,70),margin,placeY);ctx.font="600 21px Manrope,Arial";ctx.fillText(t.drive?.km!=null?("DRIVE  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60)):(places.length?places.slice(0,sq?2:4).join(" • ").slice(0,70):"Trip memories"),margin,placeY+27);
- ctx.fillStyle="#8fddff";ctx.font="800 26px Manrope,Arial";ctx.fillText("MADE WITH SAPPY TRAVEL",margin,h-45);
+ const c=$("tsCanvas"),t=tsCurrent;if(!c||!t)return;
+ const ctx=c.getContext("2d"),sq=tsFormat==="square",w=1080,h=sq?1080:1920;
+ if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;
+ const wrap=c.parentElement;if(wrap){const aw=Math.max(1,wrap.clientWidth-4),ah=Math.max(1,wrap.clientHeight-4),scale=Math.min(aw/w,ah/h);c.style.width=Math.round(w*scale)+"px";c.style.height=Math.round(h*scale)+"px";}
+ ctx.fillStyle="#08131b";ctx.fillRect(0,0,w,h);
+ const hero=sq?432:875;
+ if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);
+ else{let g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#2f7684");g.addColorStop(.55,"#164355");g.addColorStop(1,"#0b1b28");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
+ const sh=ctx.createLinearGradient(0,0,0,hero+100);sh.addColorStop(0,"rgba(1,10,17,.12)");sh.addColorStop(.35,"rgba(1,10,17,.05)");sh.addColorStop(.68,"rgba(1,10,17,.72)");sh.addColorStop(1,"#08131b");
+ ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+100);
+ tsRound(ctx,60,sq?45:64,265,48,24,"rgba(9,29,40,.83)");
+ tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:97,225,"800 23px Manrope,Arial","#baf1ff");
+ tsRound(ctx,w-242,sq?45:64,180,48,24,"rgba(9,29,40,.83)");
+ tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:97,150,"800 22px Manrope,Arial","#d0f67f");
+ tsText(ctx,t.name||"My journey",60,sq?290:662,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
+ tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?339:730,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
+ if(stage===0)return;
+ const walk=t.type==="hike"||t.type==="walk",m=60,gap=14,inner=w-m*2;
+ const metricTop=sq?450:895;
+ const stats=walk?[
+  ["WALKING DISTANCE",t.dist==null?"—":fmt(t.dist,1)+" km"],
+  ["WALKING TIME",fmtDur(t.dur??t.moving)],
+  ["STEPS",t.steps==null?"—":fmt(t.steps)],
+  ["CALORIES",t.calories==null?"—":fmt(t.calories)+" kcal"]]:[];
+ const cellW=(inner-gap)/2,cellH=sq?94:157;
+ if(walk){
+  stats.forEach((pair,i)=>{const x=m+(i%2)*(cellW+gap),y=metricTop+Math.floor(i/2)*(cellH+gap);
+   tsRound(ctx,x,y,cellW,cellH,20,"#162e3a");
+   tsText(ctx,pair[0],x+22,y+(sq?32:45),cellW-44,"800 19px Manrope,Arial","#8fb8c2");
+   tsText(ctx,pair[1],x+22,y+(sq?72:111),cellW-44,sq?"900 34px Manrope,Arial":"900 48px Manrope,Arial","#ffffff");
+  });
+ }
+ const driveY=walk?(metricTop+cellH*2+gap+(sq?12:22)):metricTop+(sq?5:15),driveH=sq?77:114;
+ tsRound(ctx,m,driveY,inner,driveH,22,"#c9f171");
+ tsText(ctx,"DRIVE · FROM → TO",m+22,driveY+(sq?25:37),inner-44,"800 19px Manrope,Arial","#234236");
+ tsText(ctx,t.drive?.km!=null?fmt(t.drive.km,1)+" km":"—",m+22,driveY+(sq?59:87),inner*.45,sq?"900 31px Manrope,Arial":"900 44px Manrope,Arial","#112a2d");
+ tsText(ctx,t.drive?.min!=null?fmtDur(t.drive.min*60):"Time unavailable",m+inner*.53,driveY+(sq?59:87),inner*.43,sq?"800 28px Manrope,Arial":"800 41px Manrope,Arial","#112a2d");
+ if(stage===1)return;
+ const mapY=driveY+driveH+(sq?15:24),mapH=sq?(walk?175:345):(walk?352:610);
+ tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
+ if(stage===2)return;
+ const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?31:49);
+ if(places.length)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,textY,inner,"700 21px Manrope,Arial","#bcd1d8");
+ else tsText(ctx,(t.startName&&t.endName? t.startName+"  →  "+t.endName:"Every journey is a story."),m,textY,inner,"700 23px Manrope,Arial","#bdd6dd");
+ ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,h-(sq?64:88));ctx.lineTo(w-m,h-(sq?64:88));ctx.stroke();
+ tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:40),400,"900 25px Manrope,Arial","#9ce9fa");
+ ctx.textAlign="right";tsText(ctx,"KEEP EXPLORING",w-m,h-(sq?30:40),300,"800 20px Manrope,Arial","#a6bec4");ctx.textAlign="left";
 }
 async function openTripStudio(id){
  const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
