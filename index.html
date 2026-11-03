@@ -216,7 +216,9 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .tr-snap-header{align-items:center!important}
 .tr-snap-year-label{display:flex!important;align-items:center;align-self:center;margin:0!important;line-height:1!important}
 .tr-snap-year-label select{display:block;height:36px!important;min-height:36px!important;line-height:20px!important;margin:0!important;padding:8px 29px 8px 12px!important;vertical-align:middle}
-.tr-snap-year-label:after{top:50%!important;transform:translateY(-55%);line-height:1!important}
+.tr-snap-year-label:after{content:""!important;width:8px!important;height:8px!important;box-sizing:border-box;display:block;border:0!important;border-right:2px solid #8FDDFF!important;border-bottom:2px solid #8FDDFF!important;top:calc(50% - 5px)!important;right:12px!important;transform:rotate(45deg)!important;line-height:normal!important}
+.tr-snap-year-label{height:36px!important;align-items:center!important}
+.tr-snap-year-label select{height:36px!important;min-height:36px!important;appearance:none!important;-webkit-appearance:none!important}
 #trYears .chip{display:inline-flex;align-items:center;min-height:36px;line-height:20px}
 .rc-map{height:210px;border-radius:18px;overflow:hidden;background:var(--card2);margin:12px 0}
 .trip{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
@@ -1759,7 +1761,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.16";
+const APP_VERSION = "7.3.17";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3015,6 +3017,14 @@ async function geocode(q){
 }
 async function revGeo(lat,lng){ try{ const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=en&lat="+lat+"&lon="+lng); const o=await r.json();
   const a=o.address||{}; return {name:a.village||a.town||a.city||a.county||a.state||"Trip", cc:(a.country_code||"").toUpperCase(), country:a.country||"", province:(a.country_code||"").toUpperCase()==="LK"?provinceFromAddress(a.state,a.county):""}; }catch(e){ return {name:"Trip",cc:"",country:""}; } }
+async function recapRoadRoute(a,b){
+ try{const u="https://router.project-osrm.org/route/v1/driving/"+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=full&geometries=geojson";
+ const r=await fetch(u);if(!r.ok)throw Error("route");
+ const j=await r.json(),d=j.routes?.[0];if(!d)return null;
+ const pts=(d.geometry?.coordinates||[]).map(p=>[p[1],p[0]]).filter(p=>p.every(Number.isFinite));
+ return {km:Math.round(d.distance/100)/10,min:Math.max(1,Math.round(d.duration/60)),path:pts.length>2?simplify(pts,170).map(p=>[+p[0].toFixed(5),+p[1].toFixed(5)]):null};
+ }catch(e){return null;}
+}
 async function driveRoute(a,b){ try{ const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=false"); const j=await r.json();
   if(j.routes&&j.routes[0]) return {km:Math.round(j.routes[0].distance/100)/10, min:Math.round(j.routes[0].duration/60)}; }catch(e){} return null; }
 
@@ -3314,12 +3324,16 @@ function openTrip(id){
     (tripLoc(t)?'<div class="tloc">📍 '+esc(tripLoc(t))+'</div>':'')+
     '<div class="tdmap" id="tdMap"></div>'+
     '<div class="tgrid"><div><span>Date</span><b>'+(t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"Not set")+'</b></div>'+
-    '<div><span>Time on trail</span><b class="num">'+fmtDur(t.moving)+'</b></div>'+
-    '<div><span>From home</span><b class="num" id="tFromKm">…</b></div><div><span>Drive time</span><b class="num" id="tFromMin">…</b></div></div>'+
-    '<div id="tHome" class="fromhome" hidden><span>From home</span><b>…</b></div>'+
+    '<div><span>Walking distance</span><b class="num">'+(t.dist==null?'—':fmt(t.dist,1)+' km')+'</b></div>'+
+    '<div><span>Walking time</span><b class="num">'+fmtDur(t.dur??t.moving)+'</b></div>'+
+    '<div><span>Driving distance (From → To)</span><b class="num" id="tFromKm">'+(t.drive?.km!=null?fmt(t.drive.km,1)+' km':'—')+'</b></div>'+
+    '<div><span>Driving time (From → To)</span><b class="num" id="tFromMin">'+(t.drive?.min!=null?fmtDur(t.drive.min*60):'—')+'</b></div>'+
+    '<div><span>Steps</span><b class="num">'+(t.steps==null?'—':fmt(t.steps))+'</b></div>'+
+    '<div><span>Calories</span><b class="num">'+(t.calories==null?'—':fmt(t.calories)+' kcal')+'</b></div></div>'+
+    '<div id="tHome" class="fromhome" hidden></div>'+
     '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
     '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit trip details</button><button class="btn soft" id="tDel">Delete</button></div>');
-  miniMap($("tdMap"),t); showFromHome(t);
+  miniMap($("tdMap"),t); if(t.startLat==null&&t.endLat==null&&t.lat!=null)showFromHome(t);
   $("tStudio").onclick=()=>openRecapForm(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
@@ -3378,14 +3392,16 @@ function openRecapForm(id=null,planId=null){
  field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
  '<label class="fl2"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
- '<label class="fl2"><span>Distance (km)</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
- '<label class="fl2"><span>Duration (minutes)</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
+ '<label class="fl2"><span>Walking distance (km) · manual</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
+ '<label class="fl2"><span>Walking time (minutes) · manual</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
  '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
  '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
  '<h3 style="margin:15px 0 8px">Journey & map</h3>'+
  field("From","rcFrom",t.startName||"","Starting location")+'<div class="results" id="rcFromResults"></div>'+
  field("To","rcTo",t.endName||t.loc||"","Destination")+'<div class="results" id="rcToResults"></div>'+
- '<p class="note">Select location search results to place map pins. The connecting line is illustrative, not the actual route.</p><div class="rc-map" id="rcMap"></div>'+
+ '<p class="note">Select From and To to calculate driving distance and time. Walking details are manual.</p><div class="rc-map" id="rcMap"></div>'+
+ '<div class="tgrid"><div><span>Driving distance</span><b id="rcRoadKm">'+(t.drive?.km!=null?fmt(t.drive.km,1)+" km":"—")+'</b></div><div><span>Driving time</span><b id="rcRoadTime">'+(t.drive?.min!=null?fmtDur(t.drive.min*60):"—")+'</b></div></div>'+
+ '<p class="note" id="rcRoadStatus">Select both locations to calculate a road route.</p>'+
  '<label class="fl2"><span>Places visited (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Viewpoint&#10;Tower">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
  '<label class="fl2"><span>Main scenic photo</span><input class="inp" type="file" id="rcPhoto" accept="image/*"></label>'+
  (t.photo?'<p class="note">✓ Photo saved; upload another to replace</p>':'')+
@@ -3393,20 +3409,29 @@ function openRecapForm(id=null,planId=null){
  (t.routeShot?'<p class="note">✓ Route screenshot saved; upload another to replace</p>':'')+
  '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & create recap</button>');
  const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
- let m=null,markers=[],path=null;
+ let m=null,markers=[],path=null,road=t.drive||null,roadPath=t.drivePath||null,routeRequest=0;
+ const calculateRoad=async()=>{const ticket=++routeRequest;road=null;roadPath=null;
+ if(!coords.from||!coords.to){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";redraw();return;}
+ $("rcRoadKm").textContent="…";$("rcRoadTime").textContent="…";$("rcRoadStatus").textContent="Calculating driving route…";
+ const d=await recapRoadRoute(coords.from,coords.to);if(ticket!==routeRequest||!$("rcRoadKm"))return;
+ road=d?{km:d.km,min:d.min}:null;roadPath=d?.path||null;
+ $("rcRoadKm").textContent=d?fmt(d.km,1)+" km":"Unavailable";
+ $("rcRoadTime").textContent=d?fmtDur(d.min*60):"Unavailable";
+ $("rcRoadStatus").textContent=d?"Driving estimates are based on road routing.":"Routing service unavailable. Please try again.";redraw();
+ };
  const redraw=()=>{if(!m)return;markers.forEach(x=>m.removeLayer(x));markers=[];if(path){m.removeLayer(path);path=null;}
   if(coords.from)markers.push(L.marker(coords.from,{icon:pinIcon("#8FDDFF")}).addTo(m).bindPopup("Start"));
   if(coords.to)markers.push(L.marker(coords.to,{icon:pinIcon("#CDF46A")}).addTo(m).bindPopup("Destination"));
-  if(coords.from&&coords.to){path=L.polyline([coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
+  if(coords.from&&coords.to){path=L.polyline(roadPath?.length?roadPath:[coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:roadPath?.length?null:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
   else if(coords.from||coords.to)m.setView(coords.from||coords.to,11);else m.setView([7.8731,80.7718],7);};
  loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});tileLayer().addTo(m);redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
  for(const which of ["from","to"]){
   const inp=$(which==="from"?"rcFrom":"rcTo"),box=$(which==="from"?"rcFromResults":"rcToResults");let timer;
-  inp.oninput=()=>{coords[which]=null;redraw();clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
+  inp.oninput=()=>{coords[which]=null;road=null;roadPath=null;redraw();if($("rcRoadKm")){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";}clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
    timer=setTimeout(async()=>{box.innerHTML='<div class="note">Searching…</div>';try{const results=await geocode(query);if(!box.isConnected||inp.value.trim()!==query)return;
     box.innerHTML=results.slice(0,5).map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">No matches</div>';
     box.querySelectorAll("button").forEach(button=>button.onclick=()=>{const o=results[+button.dataset.i];coords[which]=[+o.lat,+o.lng];inp.value=o.full.split(",").slice(0,3).map(x=>x.trim()).join(", ");box.innerHTML='<div class="note">✓ Pinned on map</div>';
-     if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});redraw();});
+     if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});redraw();calculateRoad();});
    }catch(e){box.innerHTML='<div class="note">Search unavailable. Enter a name manually.</div>';}} ,450);
   };
  }
@@ -3420,7 +3445,7 @@ function openRecapForm(id=null,planId=null){
   Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:num("rcDist"),dur:mins==null?null:Math.round(mins*60),
    moving:mins==null?null:Math.round(mins*60),steps:num("rcSteps"),calories:num("rcCalories"),
    startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
-   endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
+   endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,drive:road,drivePath:roadPath,driveFrom:coords.from?coords.from.join(","):null,
    stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),source:"Huawei Health (manual)",planId:planId||t.planId||null});
   if(coords.to){t.lat=coords.to[0];t.lng=coords.to[1];t.loc=to||t.loc;}else if(to)t.loc=to;
   put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
