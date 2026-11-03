@@ -220,7 +220,22 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .tr-snap-year-label{height:36px!important;align-items:center!important}
 .tr-snap-year-label select{height:36px!important;min-height:36px!important;appearance:none!important;-webkit-appearance:none!important}
 #trYears .chip{display:inline-flex;align-items:center;min-height:36px;line-height:20px}
-.rc-map{height:210px;border-radius:18px;overflow:hidden;background:var(--card2);margin:12px 0}
+.rc-map{height:220px;border-radius:20px;overflow:hidden;background:var(--card2);margin:12px 0;border:1px solid var(--line)}
+.rc-form-top{padding:18px;border:1px solid var(--line);border-radius:22px;background:var(--card2);margin-bottom:17px}
+.rc-kicker{text-transform:uppercase;letter-spacing:.11em;color:var(--soft);font-size:10px;font-weight:900;margin-bottom:8px}
+.rc-section{font-size:13px;font-weight:900;display:flex;align-items:center;gap:9px;margin:20px 0 12px}
+.rc-section:before{content:"";display:block;width:5px;height:17px;border-radius:10px;background:#8FDDFF}
+.rc-metric-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rc-type-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.rc-type-picker button{border:1px solid var(--line);color:var(--ink);font-weight:900;font-size:13px;background:var(--card);padding:13px 6px;border-radius:14px}
+.rc-type-picker button.on{background:#8FDDFF;color:#11212a;border-color:#8FDDFF}
+.rc-form-actions{display:flex;gap:9px;margin:18px 0 8px}.rc-form-actions .btn{flex:1;min-width:0;min-height:48px}
+.rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
+.rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}.rc-upload input{width:100%;max-width:100%}
+.tripstudio{background:#080f15!important}.ts-preview{padding:3px 0;align-items:center;justify-content:center}
+.ts-preview canvas{width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain;border:1px solid rgba(215,243,250,.17);border-radius:14px}
+.ts-actions button{border-radius:13px;min-height:43px}
+@media(max-width:390px){.ts-head strong{font-size:15px}.ts-actions button{font-size:11px;padding:11px 9px}.tripstudio{padding-left:8px;padding-right:8px}}
 .trip{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
 .trip .ti{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;color:#12140D}
 .trip .ti svg{width:22px;height:22px}
@@ -613,7 +628,7 @@ body.in-travel .sheet:not(.on){transform:translateY(130%)}
 .field select{background-image:linear-gradient(45deg,transparent 50%,var(--soft) 50%),linear-gradient(135deg,var(--soft) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
 .btn{border:0;border-radius:999px;padding:14px 20px;font-weight:800;background:var(--lime);color:var(--on-lime)}
 .btn.soft{background:var(--card2);color:var(--ink)}
-.btn.warn{background:none;color:var(--neg);padding-left:0}
+.btn.warn{background:rgba(220,70,80,.1);color:var(--neg);border:1px solid rgba(220,70,80,.24);border-radius:999px;padding:14px 20px}
 .btn.full{width:100%}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 code{background:var(--card2);border-radius:6px;padding:1px 6px;font-size:14px;word-break:break-all}
@@ -1761,7 +1776,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.17";
+const APP_VERSION = "7.3.18";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3324,15 +3339,15 @@ function openTrip(id){
     (tripLoc(t)?'<div class="tloc">📍 '+esc(tripLoc(t))+'</div>':'')+
     '<div class="tdmap" id="tdMap"></div>'+
     '<div class="tgrid"><div><span>Date</span><b>'+(t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"Not set")+'</b></div>'+
-    '<div><span>Walking distance</span><b class="num">'+(t.dist==null?'—':fmt(t.dist,1)+' km')+'</b></div>'+
-    '<div><span>Walking time</span><b class="num">'+fmtDur(t.dur??t.moving)+'</b></div>'+
+    ((t.type==='hike'||t.type==='walk')?'<div><span>Walking distance</span><b class="num">'+(t.dist==null?'—':fmt(t.dist,1)+' km')+'</b></div>'+
+    '<div><span>Walking time</span><b class="num">'+fmtDur(t.dur??t.moving)+'</b></div>':'')+
     '<div><span>Driving distance (From → To)</span><b class="num" id="tFromKm">'+(t.drive?.km!=null?fmt(t.drive.km,1)+' km':'—')+'</b></div>'+
     '<div><span>Driving time (From → To)</span><b class="num" id="tFromMin">'+(t.drive?.min!=null?fmtDur(t.drive.min*60):'—')+'</b></div>'+
-    '<div><span>Steps</span><b class="num">'+(t.steps==null?'—':fmt(t.steps))+'</b></div>'+
-    '<div><span>Calories</span><b class="num">'+(t.calories==null?'—':fmt(t.calories)+' kcal')+'</b></div></div>'+
+    ((t.type==='hike'||t.type==='walk')?'<div><span>Steps</span><b class="num">'+(t.steps==null?'—':fmt(t.steps))+'</b></div>'+
+    '<div><span>Calories</span><b class="num">'+(t.calories==null?'—':fmt(t.calories)+' kcal')+'</b></div>':'')+'</div>'+
     '<div id="tHome" class="fromhome" hidden></div>'+
     '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
-    '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit trip details</button><button class="btn soft" id="tDel">Delete</button></div>');
+    '<div class="btns"><button class="btn soft" id="tEdit" style="flex:1">✎ Edit trip details</button><button class="btn warn" id="tDel">Delete trip</button></div>');
   miniMap($("tdMap"),t);
   $("tStudio").onclick=()=>openRecapForm(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
@@ -3388,26 +3403,29 @@ function openRecapForm(id=null,planId=null){
  const t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),type:"hike"},old||{});
  if(p&&!old)Object.assign(t,{loc:p.loc||p.name,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,province:p.province||"",endName:p.name,endLat:p.lat,endLng:p.lng});
  const v=k=>t[k]==null?"":String(t[k]),field=(name,k,val,ph)=>'<label class="fl2"><span>'+name+'</span><input class="inp" id="'+k+'" value="'+esc(val)+'" placeholder="'+ph+'"></label>';
- openSheet('<h2>✦ Create a trip recap</h2><p class="note">Add or update your Huawei Health numbers, places and photos.</p>'+
+ openSheet('<div class="rc-form-top"><div class="rc-kicker">Sappy Travel · Memories</div><h2 style="margin:0 0 5px">'+(id?'Edit your trip':'Create a trip recap')+'</h2><p class="note" style="margin:0">A beautiful story starts with the right details.</p><div class="rc-type-picker" id="rcTypePicker" role="group" aria-label="Trip type">'+Object.keys(TYPES).map(k=>'<button type="button" data-type="'+k+'" class="'+(t.type===k?'on':'')+'" aria-pressed="'+(t.type===k)+'">'+TYPES[k].name+'</button>').join("")+'</div></div>'+
  field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
  '<label class="fl2"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
- '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+ '<div class="rc-section" id="rcWorkoutTitle">Workout details from Huawei Health</div><div id="rcWorkoutFields" class="rc-metric-fields">'+
  '<label class="fl2"><span>Walking distance (km) · manual</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
  '<label class="fl2"><span>Walking time (minutes) · manual</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
  '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
  '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
- '<h3 style="margin:15px 0 8px">Journey & map</h3>'+
+ '<div class="rc-section">Journey & map</div>'+
  field("From","rcFrom",t.startName||"","Starting location")+'<div class="results" id="rcFromResults"></div>'+
  field("To","rcTo",t.endName||t.loc||"","Destination")+'<div class="results" id="rcToResults"></div>'+
  '<p class="note">Select From and To to calculate driving distance and time. Walking details are manual.</p><div class="rc-map" id="rcMap"></div>'+
  '<div class="tgrid"><div><span>Driving distance</span><b id="rcRoadKm">'+(t.drive?.km!=null?fmt(t.drive.km,1)+" km":"—")+'</b></div><div><span>Driving time</span><b id="rcRoadTime">'+(t.drive?.min!=null?fmtDur(t.drive.min*60):"—")+'</b></div></div>'+
  '<p class="note" id="rcRoadStatus">Select both locations to calculate a road route.</p>'+
  '<label class="fl2"><span>Places visited (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Viewpoint&#10;Tower">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
- '<label class="fl2"><span>Main scenic photo</span><input class="inp" type="file" id="rcPhoto" accept="image/*"></label>'+
+ '<div class="rc-section">Memories & photos</div><label class="rc-upload"><span>Scenic cover photo</span><input type="file" id="rcPhoto" accept="image/*"></label>'+
  (t.photo?'<p class="note">✓ Photo saved; upload another to replace</p>':'')+
- '<label class="fl2"><span>Huawei route screenshot (optional)</span><input class="inp" type="file" id="rcRoute" accept="image/*"></label>'+
+ '<label class="rc-upload"><span>Huawei Health route screenshot · optional</span><input type="file" id="rcRoute" accept="image/*"></label>'+
  (t.routeShot?'<p class="note">✓ Route screenshot saved; upload another to replace</p>':'')+
- '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & create recap</button>');
+ '<div class="rc-form-actions"><button class="btn soft" id="rcCancel" type="button">Cancel</button><button class="btn" id="rcSave" type="button" style="background:#8FDDFF;color:#12140D">Save & preview →</button></div>');
+ const setType=kind=>{t.type=kind;document.querySelectorAll('#rcTypePicker button').forEach(b=>{const on=b.dataset.type===kind;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});const workout=kind==='hike'||kind==='walk';$("rcWorkoutTitle").hidden=!workout;$("rcWorkoutFields").hidden=!workout;};
+ document.querySelectorAll('#rcTypePicker button').forEach(b=>b.onclick=()=>setType(b.dataset.type));
+ setType(TYPES[t.type]?t.type:'hike');$("rcCancel").onclick=()=>closeSheet();
  const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
  let m=null,markers=[],path=null,road=t.drive||null,roadPath=t.drivePath||null,routeRequest=0,routePending=null;
  const calculateRoad=async()=>{const ticket=++routeRequest;road=null;roadPath=null;
@@ -3443,8 +3461,8 @@ function openRecapForm(id=null,planId=null){
   catch(e){return toast("Could not prepare the image");}
   if(routePending)await routePending;
   const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim();
-  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:num("rcDist"),dur:mins==null?null:Math.round(mins*60),
-   moving:mins==null?null:Math.round(mins*60),steps:num("rcSteps"),calories:num("rcCalories"),
+  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:t.type==='place'?null:num("rcDist"),dur:t.type==='place'||mins==null?null:Math.round(mins*60),
+   moving:t.type==='place'||mins==null?null:Math.round(mins*60),steps:t.type==='place'?null:num("rcSteps"),calories:t.type==='place'?null:num("rcCalories"),
    startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
    endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,drive:road,drivePath:roadPath,driveFrom:coords.from?coords.from.join(","):null,
    stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),source:"Huawei Health (manual)",planId:planId||t.planId||null});
