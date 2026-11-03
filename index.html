@@ -3528,7 +3528,9 @@ function tsTileLoad(z,x,y){
   let k=0;
   const next=()=>{if(k>=urls.length)return resolve(null);
    const im=new Image();im.crossOrigin="anonymous";const address=urls[k++];
-   im.onload=()=>resolve(im);im.onerror=next;im.src=address;
+   let complete=false;const timeout=setTimeout(()=>finish(false),6500);
+   const finish=ok=>{if(complete)return;complete=true;clearTimeout(timeout);im.onload=null;im.onerror=null;if(ok)resolve(im);else next();};
+   im.onload=()=>finish(true);im.onerror=()=>finish(false);im.src=address;
   };
   next();
  });
@@ -3658,7 +3660,7 @@ function tsDraw(stage=4){
   tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
   mapY+=driveH+15;
  }
- const mapH=sq?(walk?195:335):(walk?480:680);
+ const mapH=sq?(walk?195:335):(walk?480:625);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
  const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:39);
@@ -3671,7 +3673,7 @@ function tsDraw(stage=4){
 }
 let tsLoadingMaps=false;
 async function tsPrepareMaps(t,id){
- if(!t||t._route)return;
+ if(!t)return;
  tsLoadingMaps=true;
  const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
  const [story,square]=await Promise.all([
