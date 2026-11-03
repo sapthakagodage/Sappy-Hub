@@ -3333,7 +3333,7 @@ function openTrip(id){
     '<div id="tHome" class="fromhome" hidden></div>'+
     '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
     '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit trip details</button><button class="btn soft" id="tDel">Delete</button></div>');
-  miniMap($("tdMap"),t); if(t.startLat==null&&t.endLat==null&&t.lat!=null)showFromHome(t);
+  miniMap($("tdMap"),t);
   $("tStudio").onclick=()=>openRecapForm(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
@@ -3409,11 +3409,11 @@ function openRecapForm(id=null,planId=null){
  (t.routeShot?'<p class="note">✓ Route screenshot saved; upload another to replace</p>':'')+
  '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & create recap</button>');
  const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
- let m=null,markers=[],path=null,road=t.drive||null,roadPath=t.drivePath||null,routeRequest=0;
+ let m=null,markers=[],path=null,road=t.drive||null,roadPath=t.drivePath||null,routeRequest=0,routePending=null;
  const calculateRoad=async()=>{const ticket=++routeRequest;road=null;roadPath=null;
  if(!coords.from||!coords.to){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";redraw();return;}
  $("rcRoadKm").textContent="…";$("rcRoadTime").textContent="…";$("rcRoadStatus").textContent="Calculating driving route…";
- const d=await recapRoadRoute(coords.from,coords.to);if(ticket!==routeRequest||!$("rcRoadKm"))return;
+ const pending=recapRoadRoute(coords.from,coords.to);routePending=pending;const d=await pending;if(ticket!==routeRequest||!$("rcRoadKm"))return;routePending=null;
  road=d?{km:d.km,min:d.min}:null;roadPath=d?.path||null;
  $("rcRoadKm").textContent=d?fmt(d.km,1)+" km":"Unavailable";
  $("rcRoadTime").textContent=d?fmtDur(d.min*60):"Unavailable";
@@ -3441,6 +3441,7 @@ function openRecapForm(id=null,planId=null){
   for(const key of ["rcDist","rcMinutes","rcSteps","rcCalories"]){let x=num(key);if(x!=null&&(!Number.isFinite(x)||x<0))return toast("Check the numbers");}
   try{if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);}
   catch(e){return toast("Could not prepare the image");}
+  if(routePending)await routePending;
   const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim();
   Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:num("rcDist"),dur:mins==null?null:Math.round(mins*60),
    moving:mins==null?null:Math.round(mins*60),steps:num("rcSteps"),calories:num("rcCalories"),
