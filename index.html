@@ -212,7 +212,13 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .mseg button.on{background:var(--lime);color:#12140D}
 .mbtn{width:38px;height:38px;border-radius:50%;border:0;background:rgba(13,14,11,.82);color:#F3F5EE;display:grid;place-items:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .mbtn svg{width:18px;height:18px}
-.years{display:flex;gap:6px;overflow-x:auto;padding:10px;scrollbar-width:none}
+.years{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:6px 10px;scrollbar-width:none}
+.tr-snap-header{align-items:center!important}
+.tr-snap-year-label{display:flex!important;align-items:center;align-self:center;margin:0!important;line-height:1!important}
+.tr-snap-year-label select{display:block;height:36px!important;min-height:36px!important;line-height:20px!important;margin:0!important;padding:8px 29px 8px 12px!important;vertical-align:middle}
+.tr-snap-year-label:after{top:50%!important;transform:translateY(-55%);line-height:1!important}
+#trYears .chip{display:inline-flex;align-items:center;min-height:36px;line-height:20px}
+.rc-map{height:210px;border-radius:18px;overflow:hidden;background:var(--card2);margin:12px 0}
 .trip{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
 .trip .ti{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;color:#12140D}
 .trip .ti svg{width:22px;height:22px}
@@ -1753,7 +1759,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.15";
+const APP_VERSION = "7.3.16";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3311,11 +3317,11 @@ function openTrip(id){
     '<div><span>Time on trail</span><b class="num">'+fmtDur(t.moving)+'</b></div>'+
     '<div><span>From home</span><b class="num" id="tFromKm">…</b></div><div><span>Drive time</span><b class="num" id="tFromMin">…</b></div></div>'+
     '<div id="tHome" class="fromhome" hidden><span>From home</span><b>…</b></div>'+
-    '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a beautiful trip recap</button>'+
-    '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit</button><button class="btn soft" id="tDel">Delete</button></div>');
+    '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
+    '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit trip details</button><button class="btn soft" id="tDel">Delete</button></div>');
   miniMap($("tdMap"),t); showFromHome(t);
-  $("tStudio").onclick=()=>openTripStudio(t.id);
-  $("tEdit").onclick=()=>openTripForm(t.id);
+  $("tStudio").onclick=()=>openRecapForm(t.id);
+  $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
 }
 function openTripForm(id){
@@ -3362,51 +3368,61 @@ function openTripForm(id){
   };
 }
 
-function openAddTrip(){
-  openSheet('<h2>Add a trip</h2><p class="note">Save your journey, then turn it into a beautiful story or reel-like recap. No live tracking needed.</p>'+
-    '<button class="card setlink" id="aStudio" style="background:#8FDDFF;color:#12140D;margin:10px 0 8px"><span><b>✦ Create trip recap</b><span style="color:#30434a">Huawei Health numbers, photos & route screenshot</span></span><span class="chev">›</span></button>'+
-    '<button class="card setlink" id="aGpx" style="background:var(--card2);margin:0 0 8px"><span><b>Import a GPX route</b><span>Optional · if you already have a route file</span></span><span class="chev">›</span></button>'+
-    '<button class="card setlink" id="aPlace" style="background:var(--card2);margin:0"><span><b>Add a place</b><span>For places you visited without workout data</span></span><span class="chev">›</span></button>'+
-    '<input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>');
-  $("aStudio").onclick=()=>openRecapForm();
-  $("aGpx").onclick=()=>$("gpxFile").click();
-  $("gpxFile").onchange=async e=>{ const f=e.target.files[0];if(!f)return;try{const g=parseGpx(await f.text());if(g.pts.length<2)return toast("No route in file");await saveTrack(g.pts,g.name);}catch(e){toast("Could not read route");}};
-  $("aPlace").onclick=()=>openAddPlace("trip");
-}
-/* Sappy Travel Recap Studio — manually supplied Huawei Health stats & screenshots. */
+function openAddTrip(){openRecapForm();}
 function openRecapForm(id=null,planId=null){
- const old=id&&S.trip[id],p=planId&&S.plan[planId],t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),year:new Date().getFullYear(),type:"hike"},old||{});
- const val=n=>t[n]==null?"":String(t[n]);
- openSheet('<h2>✦ Trip Recap Studio</h2><p class="note">Copy the numbers from Huawei Health, add a scenic photo and optionally your route screenshot.</p>'+
- '<label class="fl2"><span>Trip name</span><input class="inp" id="rcName" placeholder="e.g. Ambuluwawa Adventure" value="'+esc(t.name)+'"></label>'+
+ const old=id&&S.trip[id],p=planId&&S.plan[planId];
+ const t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),type:"hike"},old||{});
+ if(p&&!old)Object.assign(t,{loc:p.loc||p.name,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,province:p.province||"",endName:p.name,endLat:p.lat,endLng:p.lng});
+ const v=k=>t[k]==null?"":String(t[k]),field=(name,k,val,ph)=>'<label class="fl2"><span>'+name+'</span><input class="inp" id="'+k+'" value="'+esc(val)+'" placeholder="'+ph+'"></label>';
+ openSheet('<h2>✦ Create a trip recap</h2><p class="note">Add or update your Huawei Health numbers, places and photos.</p>'+
+ field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
  '<label class="fl2"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
- '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
- '<label class="fl2"><span>Distance (km)</span><input class="inp" type="number" min="0" step=".01" id="rcDist" placeholder="8.4" value="'+esc(val("dist"))+'"></label>'+
- '<label class="fl2"><span>Duration (minutes)</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" placeholder="155" value="'+(t.dur?Math.round(t.dur/60):"")+'"></label>'+
- '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" placeholder="12450" value="'+esc(val("steps"))+'"></label>'+
- '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" placeholder="580" value="'+esc(val("calories"))+'"></label></div>'+
- '<label class="fl2"><span>Location / area</span><input class="inp" id="rcLoc" placeholder="Kandy, Sri Lanka" value="'+esc(t.loc||"")+'"></label>'+
- '<label class="fl2"><span>Visited places (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Ambuluwawa Tower&#10;Gampola viewpoint">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
- '<label class="fl2"><span>Main scenic photo</span><input class="inp" id="rcPhoto" type="file" accept="image/*"></label>'+
- (t.photo?'<p class="note">✓ Scenic photo already saved — upload to replace</p>':'')+
- '<label class="fl2"><span>Huawei route screenshot (optional)</span><input class="inp" id="rcRoute" type="file" accept="image/*"></label>'+
- (t.routeShot?'<p class="note">✓ Route screenshot already saved — upload to replace</p>':'')+
- '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & preview recap ↗</button>');
+ '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+ '<label class="fl2"><span>Distance (km)</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
+ '<label class="fl2"><span>Duration (minutes)</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
+ '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
+ '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
+ '<h3 style="margin:15px 0 8px">Journey & map</h3>'+
+ field("From","rcFrom",t.startName||"","Starting location")+'<div class="results" id="rcFromResults"></div>'+
+ field("To","rcTo",t.endName||t.loc||"","Destination")+'<div class="results" id="rcToResults"></div>'+
+ '<p class="note">Select location search results to place map pins. The connecting line is illustrative, not the actual route.</p><div class="rc-map" id="rcMap"></div>'+
+ '<label class="fl2"><span>Places visited (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Viewpoint&#10;Tower">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
+ '<label class="fl2"><span>Main scenic photo</span><input class="inp" type="file" id="rcPhoto" accept="image/*"></label>'+
+ (t.photo?'<p class="note">✓ Photo saved; upload another to replace</p>':'')+
+ '<label class="fl2"><span>Huawei route screenshot (optional)</span><input class="inp" type="file" id="rcRoute" accept="image/*"></label>'+
+ (t.routeShot?'<p class="note">✓ Route screenshot saved; upload another to replace</p>':'')+
+ '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & create recap</button>');
+ const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
+ let m=null,markers=[],path=null;
+ const redraw=()=>{if(!m)return;markers.forEach(x=>m.removeLayer(x));markers=[];if(path){m.removeLayer(path);path=null;}
+  if(coords.from)markers.push(L.marker(coords.from,{icon:pinIcon("#8FDDFF")}).addTo(m).bindPopup("Start"));
+  if(coords.to)markers.push(L.marker(coords.to,{icon:pinIcon("#CDF46A")}).addTo(m).bindPopup("Destination"));
+  if(coords.from&&coords.to){path=L.polyline([coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
+  else if(coords.from||coords.to)m.setView(coords.from||coords.to,11);else m.setView([7.8731,80.7718],7);};
+ loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});tileLayer().addTo(m);redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
+ for(const which of ["from","to"]){
+  const inp=$(which==="from"?"rcFrom":"rcTo"),box=$(which==="from"?"rcFromResults":"rcToResults");let timer;
+  inp.oninput=()=>{coords[which]=null;redraw();clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
+   timer=setTimeout(async()=>{box.innerHTML='<div class="note">Searching…</div>';try{const results=await geocode(query);if(!box.isConnected||inp.value.trim()!==query)return;
+    box.innerHTML=results.slice(0,5).map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">No matches</div>';
+    box.querySelectorAll("button").forEach(button=>button.onclick=()=>{const o=results[+button.dataset.i];coords[which]=[+o.lat,+o.lng];inp.value=o.full.split(",").slice(0,3).map(x=>x.trim()).join(", ");box.innerHTML='<div class="note">✓ Pinned on map</div>';
+     if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});redraw();});
+   }catch(e){box.innerHTML='<div class="note">Search unavailable. Enter a name manually.</div>';}} ,450);
+  };
+ }
  $("rcSave").onclick=async()=>{
-  const name=$("rcName").value.trim();if(!name)return toast("Please add a trip name");
-  const num=id=>{const x=$(id).value;return x===""?null:Number(x)};
-  for(const id of ["rcDist","rcMinutes","rcSteps","rcCalories"]){const v=num(id);if(v!=null&&(!Number.isFinite(v)||v<0))return toast("Check the workout numbers");}
-  try{
-   if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);
-   if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);
-  }catch(e){return toast("Could not prepare that image");}
-  const date=$("rcDate").value;
-  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),loc:$("rcLoc").value.trim(),
-   dist:num("rcDist"),dur:num("rcMinutes")==null?null:Math.round(num("rcMinutes")*60),
-   moving:num("rcMinutes")==null?null:Math.round(num("rcMinutes")*60),
-   steps:num("rcSteps"),calories:num("rcCalories"),
-   stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),
-   source:"Huawei Health (manual)",planId:planId||t.planId||null});
+  const name=$("rcName").value.trim();if(!name)return toast("Add a trip name");
+  const num=k=>$(k).value===""?null:Number($(k).value);
+  for(const key of ["rcDist","rcMinutes","rcSteps","rcCalories"]){let x=num(key);if(x!=null&&(!Number.isFinite(x)||x<0))return toast("Check the numbers");}
+  try{if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);}
+  catch(e){return toast("Could not prepare the image");}
+  const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim();
+  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:num("rcDist"),dur:mins==null?null:Math.round(mins*60),
+   moving:mins==null?null:Math.round(mins*60),steps:num("rcSteps"),calories:num("rcCalories"),
+   startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
+   endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
+   stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),source:"Huawei Health (manual)",planId:planId||t.planId||null});
+  if(coords.to){t.lat=coords.to[0];t.lng=coords.to[1];t.loc=to||t.loc;}else if(to)t.loc=to;
   put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
  };
 }
@@ -3436,11 +3452,11 @@ function tsDraw(stage=4){
  ctx.fillStyle="#e8f4f6";ctx.font="800 29px Manrope,Arial";ctx.fillText("THE ROUTE & MEMORIES",margin,below);
  const shotY=below+24,shotH=sq?170:340;
  if(t._route){tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#edf1ec");ctx.save();ctx.beginPath();ctx.roundRect(margin,shotY,w-2*margin,shotH,22);ctx.clip();tsCover(ctx,t._route,margin,shotY,w-2*margin,shotH);ctx.restore();}
- else{tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#1b2d35");ctx.strokeStyle="#47616b";ctx.lineWidth=4;ctx.setLineDash([14,12]);ctx.beginPath();ctx.moveTo(margin+50,shotY+shotH*.75);ctx.bezierCurveTo(370,shotY+12,690,shotY+shotH,980,shotY+40);ctx.stroke();ctx.setLineDash([]);}
+ else{tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#1b2d35");ctx.strokeStyle="#8fddff";ctx.lineWidth=4;ctx.setLineDash([14,12]);ctx.beginPath();ctx.moveTo(margin+50,shotY+shotH*.75);ctx.bezierCurveTo(370,shotY+12,690,shotY+shotH,980,shotY+40);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle="#b7cbd4";ctx.font="700 23px Arial";ctx.fillText((t.startName||"START").slice(0,22),margin+30,shotY+shotH-30);ctx.textAlign="right";ctx.fillText((t.endName||t.loc||"FINISH").slice(0,22),w-margin-30,shotY+shotH-30);ctx.textAlign="left";ctx.font="500 17px Arial";ctx.fillText("Illustrative route · add Huawei screenshot for actual GPS",margin+30,shotY+28);}
  if(stage<3)return;
  const places=(t.stops||[]).map(v=>v.name).filter(Boolean);
  const placeY=shotY+shotH+(sq?28:42);
- ctx.fillStyle="#a6bdc6";ctx.font="700 25px Manrope,Arial";ctx.fillText(places.length?places.slice(0,sq?2:4).join("   •   ").slice(0,70):"Every journey has a story.",margin,placeY);
+ ctx.fillStyle="#a6bdc6";ctx.font="700 23px Manrope,Arial";ctx.fillText([t.startName,t.endName||t.loc].filter(Boolean).join(" → ").slice(0,70),margin,placeY);ctx.font="600 21px Manrope,Arial";ctx.fillText(places.length?places.slice(0,sq?2:4).join(" • ").slice(0,70):"Trip memories",margin,placeY+27);
  ctx.fillStyle="#8fddff";ctx.font="800 26px Manrope,Arial";ctx.fillText("MADE WITH SAPPY TRAVEL",margin,h-45);
 }
 async function openTripStudio(id){
@@ -3810,7 +3826,7 @@ function openApp(id){
 
  const __oldTrBack=showHub;  $("planAdd").onclick=()=>openPlanForm();
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
- $("tripAdd").onclick=()=>openTripForm();
+ $("tripAdd").onclick=()=>openRecapForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
 $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
