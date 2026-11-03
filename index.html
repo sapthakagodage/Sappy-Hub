@@ -227,6 +227,18 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-section:before{content:"";display:block;width:5px;height:17px;border-radius:10px;background:#8FDDFF}
 .rc-metric-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .rc-metric-fields[hidden],.rc-section[hidden]{display:none!important}
+/* Shared Travel date fields: Safari's native date control must fill its row and align left. */
+.travel-date-field{display:block;min-width:0;width:100%;margin:0 0 13px;text-align:left}
+.travel-date-field>span{display:block;text-align:left}
+.travel-date-field input[type="date"]{box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;min-height:48px;margin:0;text-align:left;text-align-last:left;direction:ltr;padding:12px 14px!important;border-radius:14px;-webkit-appearance:none;appearance:none}
+.travel-date-field input[type="date"]::-webkit-date-and-time-value{text-align:left;min-height:1.4em;line-height:1.4em}
+.travel-date-field input[type="date"]::-webkit-datetime-edit{text-align:left;display:inline-flex;align-items:center;padding:0}
+.travel-date-field input[type="date"]::-webkit-calendar-picker-indicator{margin-left:auto;opacity:.8}
+#sheetBody .travel-type-field{margin:0 0 14px}
+#sheetBody .travel-type-field .inp{min-height:48px;border-radius:14px}
+#sheetBody .travel-plan-top{background:var(--card2);border:1px solid var(--line);border-radius:22px;padding:18px;margin-bottom:17px}
+#sheetBody .travel-plan-top h2{margin:0}
+
 .rc-type-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
 .rc-type-picker button{border:1px solid var(--line);color:var(--ink);font-weight:900;font-size:13px;background:var(--card);padding:13px 6px;border-radius:14px}
 .rc-type-picker button.on{background:#8FDDFF;color:#11212a;border-color:#8FDDFF}
@@ -1778,7 +1790,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.20";
+const APP_VERSION = "7.3.21";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3407,7 +3419,7 @@ function openRecapForm(id=null,planId=null){
  const v=k=>t[k]==null?"":String(t[k]),field=(name,k,val,ph)=>'<label class="fl2"><span>'+name+'</span><input class="inp" id="'+k+'" value="'+esc(val)+'" placeholder="'+ph+'"></label>';
  openSheet('<div class="rc-form-top"><div class="rc-kicker">Sappy Travel · Memories</div><h2 style="margin:0 0 5px">'+(id?'Edit your trip':'Create a trip recap')+'</h2><p class="note" style="margin:0">A beautiful story starts with the right details.</p><div class="rc-type-picker" id="rcTypePicker" role="group" aria-label="Trip type">'+Object.keys(TYPES).map(k=>'<button type="button" data-type="'+k+'" class="'+(t.type===k?'on':'')+'" aria-pressed="'+(t.type===k)+'">'+TYPES[k].name+'</button>').join("")+'</div></div>'+
  field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
- '<label class="fl2"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
+ '<label class="fl2 travel-date-field"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
  '<div class="rc-section" id="rcWorkoutTitle">Workout details from Huawei Health</div><div id="rcWorkoutFields" class="rc-metric-fields">'+
  '<label class="fl2"><span>Walking distance (km) · manual</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
  '<label class="fl2"><span>Walking time (minutes) · manual</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
@@ -3878,24 +3890,27 @@ function placeSearch(t,nameId){
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
 }
 function openPlanForm(id){
-  const p=id?Object.assign({},S.plan[id]):{id:"p"+uid(),type:"hike",date:""};
-  if(!TYPES[p.type]) p.type="place";
-  const sec=p.trail||0, h=sec?Math.floor(sec/3600):"", m=sec?Math.round((sec%3600)/60):"";
-  openSheet('<h2>'+(id?"Edit visit":"Plan a visit")+'</h2>'+
-    '<label class="fl2"><span>Place</span><input class="inp" id="pq" placeholder="Search, e.g. Knuckles" autocomplete="off" value="'+esc(p.loc||"")+'"></label><div class="results" id="pres"></div>'+
-    '<label class="fl2"><span>Name</span><input class="inp" id="fName" value="'+esc(p.name||"")+'" placeholder="e.g. Knuckles range hike"></label>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><label class="fl2"><span>Date</span><input class="inp" type="date" id="fDate" value="'+esc(p.date||"")+'"></label>'+
-    '<label class="fl2"><span>Type</span>'+typeSelect(p.type)+'</label></div>'+trailFields(h,m,p.type==="place")+
-    '<button class="btn full" id="fSave">Save</button>');
+  const p=id?Object.assign({},S.plan[id]):{id:"p"+uid(),type:"place",date:""};
+  if(!TYPES[p.type])p.type="place";
+  openSheet('<div class="travel-plan-top"><div class="rc-kicker">Sappy Travel · Upcoming</div><h2>'+(id?'Edit planned visit':'Plan a visit')+'</h2><p class="note" style="margin:7px 0 0">Save the destination and date now. Add walking details when you create the trip recap.</p></div>'+
+    '<label class="fl2"><span>Destination</span><input class="inp" id="pq" placeholder="Search, e.g. Knuckles" autocomplete="off" value="'+esc(p.loc||"")+'"></label><div class="results" id="pres"></div>'+
+    '<label class="fl2"><span>Trip name</span><input class="inp" id="fName" value="'+esc(p.name||"")+'" placeholder="e.g. Knuckles mountain hike"></label>'+
+    '<label class="fl2 travel-date-field"><span>Planned date</span><input class="inp" type="date" id="fDate" value="'+esc(p.date||"")+'"></label>'+
+    '<label class="fl2 travel-type-field"><span>Trip type</span>'+typeSelect(p.type)+'</label>'+
+    '<div class="rc-form-actions"><button class="btn soft" id="fCancel" type="button">Cancel</button><button class="btn" id="fSave" type="button" style="background:#8FDDFF;color:#12140D">Save planned visit</button></div>');
   placeSearch(p,"fName");
-  $("fType").onchange=()=>{ $("trailBox").hidden=$("fType").value==="place"; };
+  $("fCancel").onclick=()=>closeSheet();
   $("fSave").onclick=async()=>{
-    const name=$("fName").value.trim(); if(!name) return toast("Add a name"); if(p.lat==null) return toast("Search and pick the place");
-    const type=$("fType").value, trail=type==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
-    Object.assign(p,{name,date:$("fDate").value||"",type,trail});
+    const name=$("fName").value.trim();if(!name)return toast("Add a trip name");
+    if(p.lat==null)return toast("Search and select a destination");
+    Object.assign(p,{name,date:$("fDate").value||"",type:$("fType").value});
+    delete p.trail;delete p.climb;
     const home=(S.travelHome&&S.travelHome.lat)?[S.travelHome.lat,S.travelHome.lng]:(typeof meLatLng!=="undefined"?meLatLng:null);
-    if(home && (!p.drive || p.driveFrom!==home.join(","))){ p.straight=Math.round(hav(home,[p.lat,p.lng])); try{ p.drive=await withBusy("Working out the route…",()=>driveRoute(home,[p.lat,p.lng])); p.driveFrom=home.join(","); }catch(e){} }
-    put("plan",p); closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast(id?"Saved":"Visit planned");
+    if(home&&(!p.drive||p.driveFrom!==home.join(","))){
+      p.straight=Math.round(hav(home,[p.lat,p.lng]));
+      try{p.drive=await withBusy("Working out the road route…",()=>driveRoute(home,[p.lat,p.lng]));p.driveFrom=home.join(",");}catch(e){}
+    }
+    put("plan",p);closeSheet();renderPlans();renderTravel();drawMap(false);toast(id?"Planned visit updated":"Visit planned");
   };
 }
 function openPlan(id){
@@ -3904,11 +3919,11 @@ function openPlan(id){
   openSheet('<div class="catHead"><span class="ic" style="background:'+TYPES[k].c+'">'+tsvg(k,26)+'</span><div><h2>'+esc(p.name)+'</h2><div class="note" style="margin:0">Next visit · '+TYPES[k].name+'</div></div></div>'+
     (p.loc?'<div class="tloc">📍 '+esc(p.loc)+'</div>':'')+'<div class="tdmap" id="tdMap"></div>'+
     '<div class="tgrid"><div><span>Date</span><b>'+esc(niceDate(p.date))+(d!=null&&d>=0?'<small style="display:block;font-size:12px;color:var(--soft)">'+whenWords(d)+'</small>':'')+'</b></div>'+
-    (k!=="place"?'<div><span>Time on trail</span><b class="num">'+(p.trail?fmtDur(p.trail):'—')+'</b></div>':'<div><span>Type</span><b>Visit</b></div>')+
-    '<div><span>From home</span><b class="num">'+(p.drive?fmt(p.drive.km,p.drive.km<100?1:0)+' km':(p.straight?fmt(p.straight)+' km':'—'))+'</b></div><div><span>Drive time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div></div>'+
+    '<div><span>Trip type</span><b>'+TYPES[k].name+'</b></div>'+
+    '<div><span>Driving distance</span><b class="num">'+(p.drive?fmt(p.drive.km,p.drive.km<100?1:0)+' km':(p.straight?fmt(p.straight)+' km direct':'—'))+'</b></div><div><span>Driving time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div></div>'+
     (!home?'<button class="btn soft full" id="plHome" style="margin-bottom:10px">Set my current location as Home</button>':'')+
     '<button class="btn full" id="plRecap" style="background:#8FDDFF;color:#12140D;margin-bottom:10px">✦ Make trip recap</button>'+
-    '<div class="btns"><button class="btn" id="plEdit" style="flex:1">Edit</button><button class="btn soft" id="plDone">Done it ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
+    '<div class="btns"><button class="btn soft" id="plEdit" style="flex:1">Edit plan</button><button class="btn soft" id="plDone">Completed ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
   miniMap($("tdMap"),{type:k,lat:p.lat,lng:p.lng});
   if($("plHome")) $("plHome").onclick=()=>navigator.geolocation.getCurrentPosition(async pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; persist(); put("cfg",{id:"travel",home:S.travelHome});
       for(const q of plans()){ const h=[S.travelHome.lat,S.travelHome.lng]; const n=Object.assign({},q,{straight:Math.round(hav(h,[q.lat,q.lng]))}); try{ n.drive=await driveRoute(h,[q.lat,q.lng]); n.driveFrom=h.join(","); }catch(e){} put("plan",n); }
@@ -3916,7 +3931,7 @@ function openPlan(id){
   $("plRecap").onclick=()=>openRecapForm(null,p.id);
   $("plEdit").onclick=()=>openPlanForm(p.id);
   $("plDone").onclick=()=>{ remove("plan",p.id); const date=p.date&&daysTo(p.date)<=0?p.date:ymd(Date.now());
-    put("trip",{id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,moving:p.trail||0,drive:p.drive,driveFrom:p.driveFrom});
+    put("trip",{id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,drive:p.drive,driveFrom:p.driveFrom});
     closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast("Moved to your trips. Add a photo there."); };
   $("plDel").onclick=()=>{ if(!confirm("Delete this planned visit?")) return; remove("plan",p.id); closeSheet(); renderPlans(); renderTravel(); drawMap(false); };
 }
