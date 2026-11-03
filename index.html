@@ -1778,7 +1778,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.19";
+const APP_VERSION = "7.3.20";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3620,14 +3620,14 @@ function tsDraw(stage=4){
  const hero=sq?432:875;
  if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);
  else{const g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#2f7684");g.addColorStop(.55,"#164355");g.addColorStop(1,"#0b1b28");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
- const sh=ctx.createLinearGradient(0,0,0,hero+100);sh.addColorStop(0,"rgba(1,10,17,.12)");sh.addColorStop(.35,"rgba(1,10,17,.05)");sh.addColorStop(.68,"rgba(1,10,17,.72)");sh.addColorStop(1,"#08131b");
+ const sh=ctx.createLinearGradient(0,0,0,hero+100);sh.addColorStop(0,"rgba(1,10,17,.12)");sh.addColorStop(.55,"rgba(1,10,17,.04)");sh.addColorStop(.82,"rgba(1,10,17,.61)");sh.addColorStop(1,"#08131b");
  ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+100);
  tsRound(ctx,60,sq?45:64,265,48,24,"rgba(9,29,40,.83)");
  tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:97,225,"800 23px Manrope,Arial","#baf1ff");
  tsRound(ctx,w-242,sq?45:64,180,48,24,"rgba(9,29,40,.83)");
  tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:97,150,"800 22px Manrope,Arial","#d0f67f");
- tsText(ctx,t.name||"My journey",60,sq?290:662,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
- tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?339:730,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
+ tsText(ctx,t.name||"My journey",60,sq?328:736,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
+ tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
  if(stage===0)return;
  const walk=t.type==="hike"||t.type==="walk",m=60,gap=14,inner=w-m*2;
  const metricTop=sq?450:895;
@@ -3660,7 +3660,7 @@ function tsDraw(stage=4){
   tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
   mapY+=driveH+15;
  }
- const mapH=sq?(walk?195:335):(walk?480:625);
+ const mapH=sq?(walk?195:295):(walk?480:625);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
  const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:39);
