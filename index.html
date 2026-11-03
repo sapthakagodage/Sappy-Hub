@@ -1769,7 +1769,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
   <div class="ts-actions">
     <button id="tsStory" class="on">Story 9:16</button><button id="tsSquare">Post 1:1</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
   </div>
-  <p class="ts-note">Play recap for screen recording. Tap the preview to stop playback. Huawei route screenshots are optional.</p>
+  <p class="ts-note" id="tsMapStatus">Preparing your trip recap…</p>
 </div>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
@@ -1778,7 +1778,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.18";
+const APP_VERSION = "7.3.19";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3505,42 +3505,108 @@ function tsDrawRouteMap(ctx,t,x,y,w,h){
 function tsText(ctx,str,x,y,max,font="700 24px Manrope,Arial",color="#e8f5f8"){
  ctx.font=font;ctx.fillStyle=color;let v=String(str??"");while(v.length>1&&ctx.measureText(v).width>max)v=v.slice(0,-2)+"…";ctx.fillText(v,x,y);
 }
-function tsDrawMapPanel(ctx,t,x,y,w,h){
- ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
- ctx.fillStyle="#b5d3d2";ctx.fillRect(x,y,w,h);
- if(t._route){
-  const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
-  ctx.fillStyle="#e9f0eb";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
- }else{
-  const raw=t.track?.length>1?t.track:t.drivePath?.length>1?t.drivePath:
-   (t.startLat!=null&&t.startLng!=null&&t.endLat!=null&&t.endLng!=null?[[t.startLat,t.startLng],[t.endLat,t.endLng]]:[]);
-  const pts=raw.filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));
-  ctx.strokeStyle="rgba(255,255,255,.38)";ctx.lineWidth=3;
-  for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(x+i*w/8,y);ctx.lineTo(x+i*w/8,y+h);ctx.stroke();}
-  for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(x,y+i*h/6);ctx.lineTo(x+w,y+i*h/6);ctx.stroke();}
-  if(pts.length>=2){
-   const lats=pts.map(p=>+p[0]),lons=pts.map(p=>+p[1]);
-   const center=(Math.min(...lats)+Math.max(...lats))/2,cos=Math.max(.08,Math.cos(center*Math.PI/180));
-   const minX=Math.min(...lons)*cos,maxX=Math.max(...lons)*cos,minY=Math.min(...lats),maxY=Math.max(...lats);
-   const scale=Math.min((w-140)/Math.max(.000001,maxX-minX),(h-95)/Math.max(.000001,maxY-minY));
-   const xy=p=>[x+w/2+(+p[1]*cos-(minX+maxX)/2)*scale,y+h/2-(+p[0]-(minY+maxY)/2)*scale];
-   ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);if(i===0)ctx.moveTo(...q);else ctx.lineTo(...q);});
-   ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#f7ffff";ctx.lineWidth=16;ctx.stroke();
-   if(pts.length===2)ctx.setLineDash([12,13]);
-   ctx.strokeStyle="#176d84";ctx.lineWidth=8;ctx.stroke();ctx.setLineDash([]);
-   [pts[0],pts[pts.length-1]].forEach((p,i)=>{const q=xy(p);ctx.beginPath();ctx.arc(q[0],q[1],13,0,2*Math.PI);ctx.fillStyle=i?"#cff36f":"#12677e";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="white";ctx.stroke();});
-  }else{
-   tsText(ctx,"ADD FROM & TO TO SEE YOUR ROUTE",x+30,y+h/2, w-60,"800 24px Manrope,Arial","#285563");
+/* A real raster map is pre-rendered with CORS-enabled map tiles before the recap is exported.
+   The route overlay and labels are drawn onto the same canvas, so sharing preserves them. */
+const tsMercator=(lat,lng,z)=>{
+ const n=256*Math.pow(2,z),p=Math.max(-85,Math.min(85,+lat))*Math.PI/180;
+ return [(+lng+180)/360*n,(1-Math.log(Math.tan(p)+1/Math.cos(p))/Math.PI)/2*n];
+};
+function tsRoutePoints(t){
+ const raw=(t.track?.length>1?t.track:t.drivePath?.length>1?t.drivePath:null);
+ if(raw)return raw.map(p=>[+p[0],+p[1]]).filter(p=>p.every(Number.isFinite));
+ const a=t.startLat!=null&&t.startLng!=null?[+t.startLat,+t.startLng]:null;
+ const b=t.endLat!=null&&t.endLng!=null?[+t.endLat,+t.endLng]:
+   (t.lat!=null&&t.lng!=null?[+t.lat,+t.lng]:null);
+ return [a,b].filter(p=>p&&p.every(Number.isFinite));
+}
+function tsTileLoad(z,x,y){
+ const urls=[
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/"+z+"/"+y+"/"+x,
+  "https://a.basemaps.cartocdn.com/light_all/"+z+"/"+x+"/"+y+".png"
+ ];
+ return new Promise(resolve=>{
+  let k=0;
+  const next=()=>{if(k>=urls.length)return resolve(null);
+   const im=new Image();im.crossOrigin="anonymous";const address=urls[k++];
+   im.onload=()=>resolve(im);im.onerror=next;im.src=address;
+  };
+  next();
+ });
+}
+async function tsBuildTileMap(t,w,h){
+ const pts=tsRoutePoints(t);if(!pts.length)return null;
+ const all=pts.slice();
+ const lats=all.map(p=>p[0]),lons=all.map(p=>p[1]);
+ let z=11;
+ if(all.length>1){
+  for(z=14;z>=2;z--){
+   const q=all.map(p=>tsMercator(p[0],p[1],z));
+   const xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);
+   if(Math.max(...xs)-Math.min(...xs)<w*.68&&Math.max(...ys)-Math.min(...ys)<h*.60)break;
   }
  }
- const routeKind=t._route?"HUAWEI HEALTH ROUTE":t.track?.length>1?"RECORDED GPS":t.drivePath?.length>1?"DRIVING ROUTE":t.startLat!=null&&t.endLat!=null?"FROM / TO PREVIEW":"JOURNEY MAP";
- ctx.fillStyle="rgba(9,30,41,.89)";ctx.fillRect(x,y,w,55);
- tsText(ctx,routeKind,x+22,y+35,w-45,"800 22px Manrope,Arial","#f3fcfd");
- const from=t.startName||"Start",to=t.endName||t.loc||"Destination";
- ctx.fillStyle="rgba(10,28,37,.92)";ctx.fillRect(x,y+h-58,w,58);
- tsText(ctx,from,x+20,y+h-20,w*.44,"800 21px Manrope,Arial","#9deaff");
- ctx.font="800 25px Manrope,Arial";ctx.fillStyle="#d5f676";ctx.fillText("→",x+w/2-15,y+h-20);
- tsText(ctx,to,x+w*.57,y+h-20,w*.4,"800 21px Manrope,Arial","#eaf8f1");
+ z=Math.max(2,Math.min(14,z));
+ const q=all.map(p=>tsMercator(p[0],p[1],z)),xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);
+ const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+ const left=cx-w/2,top=cy-h/2,firstX=Math.floor(left/256),lastX=Math.floor((left+w)/256);
+ const firstY=Math.floor(top/256),lastY=Math.floor((top+h)/256),maxIndex=Math.pow(2,z);
+ const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
+ ctx.fillStyle="#cddbd5";ctx.fillRect(0,0,w,h);
+ const jobs=[];
+ for(let xx=firstX;xx<=lastX;xx++)for(let yy=firstY;yy<=lastY;yy++){
+  if(yy<0||yy>=maxIndex)continue;
+  jobs.push({x:xx,y:yy,p:tsTileLoad(z,((xx%maxIndex)+maxIndex)%maxIndex,yy)});
+ }
+ const results=await Promise.all(jobs.map(async j=>({...j,img:await j.p})));
+ const loaded=results.filter(v=>v.img);
+ if(loaded.length<Math.max(1,Math.ceil(results.length*.75)))return null;
+ for(const r of results){if(!r.img)continue;ctx.drawImage(r.img,Math.round(r.x*256-left),Math.round(r.y*256-top),257,257);}
+ const toXY=p=>{const xy=tsMercator(p[0],p[1],z);return [xy[0]-left,xy[1]-top];};
+ if(pts.length>1){
+  ctx.beginPath();pts.forEach((p,i)=>{const v=toXY(p);if(!i)ctx.moveTo(v[0],v[1]);else ctx.lineTo(v[0],v[1]);});
+  ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.strokeStyle="#fff";ctx.lineWidth=11;ctx.stroke();
+  if(pts.length===2)ctx.setLineDash([12,10]);
+  ctx.strokeStyle="#008aa8";ctx.lineWidth=6;ctx.stroke();ctx.setLineDash([]);
+ }
+ [pts[0],pts.length>1?pts[pts.length-1]:null].forEach((p,i)=>{
+  if(!p)return;const a=toXY(p);ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);
+  ctx.fillStyle=i?"#b2ed55":"#087994";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="#fff";ctx.stroke();
+ });
+ ctx.fillStyle="rgba(255,255,255,.88)";ctx.fillRect(0,h-21,w,21);
+ ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Map tiles © Esri / CARTO · OpenStreetMap contributors",8,h-6);
+ return c;
+}
+function tsDrawMapPanel(ctx,t,x,y,w,h){
+ ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
+ ctx.fillStyle="#bdd5d2";ctx.fillRect(x,y,w,h);
+ const prepared=tsFormat==="square"?t._mapSquare:t._mapStory;
+ if(prepared)ctx.drawImage(prepared,x,y,w,h);
+ else if(t._route){
+  const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
+  ctx.fillStyle="#e5eee8";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
+ }else{
+  const pts=tsRoutePoints(t);
+  ctx.strokeStyle="rgba(255,255,255,.4)";ctx.lineWidth=2;
+  for(let i=1;i<9;i++){ctx.beginPath();ctx.moveTo(x+i*w/9,y);ctx.lineTo(x+i*w/9,y+h);ctx.stroke();}
+  for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(x,y+i*h/6);ctx.lineTo(x+w,y+i*h/6);ctx.stroke();}
+  if(pts.length>1){
+   const a=pts.map(p=>p[0]),b=pts.map(p=>p[1]),cos=Math.max(.1,Math.cos((Math.min(...a)+Math.max(...a))/2*Math.PI/180));
+   const x0=Math.min(...b)*cos,x1=Math.max(...b)*cos,y0=Math.min(...a),y1=Math.max(...a);
+   const k=Math.min((w-140)/Math.max(.000001,x1-x0),(h-100)/Math.max(.000001,y1-y0));
+   ctx.beginPath();pts.forEach((p,i)=>{const px=x+w/2+(p[1]*cos-(x0+x1)/2)*k,py=y+h/2-(p[0]-(y0+y1)/2)*k;if(!i)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
+   ctx.lineCap="round";ctx.strokeStyle="#f4fcff";ctx.lineWidth=12;ctx.stroke();
+   ctx.strokeStyle="#007c9d";ctx.lineWidth=6;ctx.stroke();
+  }
+  tsText(ctx,"Map tiles unavailable",x+20,y+h/2,w-40,"800 22px Manrope,Arial","#315762");
+ }
+ const label=prepared?"ROAD MAP · FROM / TO":t._route?"HUAWEI HEALTH ROUTE":"ROUTE PREVIEW";
+ ctx.fillStyle="rgba(9,30,41,.88)";ctx.fillRect(x,y,w,51);
+ tsText(ctx,label,x+20,y+33,w-40,"800 21px Manrope,Arial","#fff");
+ ctx.fillStyle="rgba(9,30,41,.92)";ctx.fillRect(x,y+h-60,w,60);
+ tsText(ctx,t.startName||"Start",x+20,y+h-22,w*.4,"800 21px Manrope,Arial","#99e8fd");
+ ctx.fillStyle="#d5f676";ctx.font="800 26px Manrope,Arial";ctx.fillText("→",x+w*.49,y+h-22);
+ tsText(ctx,t.endName||t.loc||"Destination",x+w*.57,y+h-22,w*.38,"800 21px Manrope,Arial","#edfbe2");
  ctx.restore();
 }
 function tsDraw(stage=4){
@@ -3551,7 +3617,7 @@ function tsDraw(stage=4){
  ctx.fillStyle="#08131b";ctx.fillRect(0,0,w,h);
  const hero=sq?432:875;
  if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);
- else{let g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#2f7684");g.addColorStop(.55,"#164355");g.addColorStop(1,"#0b1b28");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
+ else{const g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#2f7684");g.addColorStop(.55,"#164355");g.addColorStop(1,"#0b1b28");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
  const sh=ctx.createLinearGradient(0,0,0,hero+100);sh.addColorStop(0,"rgba(1,10,17,.12)");sh.addColorStop(.35,"rgba(1,10,17,.05)");sh.addColorStop(.68,"rgba(1,10,17,.72)");sh.addColorStop(1,"#08131b");
  ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+100);
  tsRound(ctx,60,sq?45:64,265,48,24,"rgba(9,29,40,.83)");
@@ -3563,34 +3629,59 @@ function tsDraw(stage=4){
  if(stage===0)return;
  const walk=t.type==="hike"||t.type==="walk",m=60,gap=14,inner=w-m*2;
  const metricTop=sq?450:895;
- const stats=walk?[
-  ["WALKING DISTANCE",t.dist==null?"—":fmt(t.dist,1)+" km"],
-  ["WALKING TIME",fmtDur(t.dur??t.moving)],
-  ["STEPS",t.steps==null?"—":fmt(t.steps)],
-  ["CALORIES",t.calories==null?"—":fmt(t.calories)+" kcal"]]:[];
- const cellW=(inner-gap)/2,cellH=sq?94:157;
  if(walk){
-  stats.forEach((pair,i)=>{const x=m+(i%2)*(cellW+gap),y=metricTop+Math.floor(i/2)*(cellH+gap);
+  const metrics=[["STEPS",t.steps==null?"—":fmt(t.steps)],["CALORIES",t.calories==null?"—":fmt(t.calories)+" kcal"]];
+  const cellW=(inner-gap)/2,cellH=sq?80:125;
+  metrics.forEach((pair,i)=>{const x=m+i*(cellW+gap),y=metricTop;
    tsRound(ctx,x,y,cellW,cellH,20,"#162e3a");
-   tsText(ctx,pair[0],x+22,y+(sq?32:45),cellW-44,"800 19px Manrope,Arial","#8fb8c2");
-   tsText(ctx,pair[1],x+22,y+(sq?72:111),cellW-44,sq?"900 34px Manrope,Arial":"900 48px Manrope,Arial","#ffffff");
+   tsText(ctx,pair[0],x+22,y+(sq?28:41),cellW-44,"800 19px Manrope,Arial","#8fb8c2");
+   tsText(ctx,pair[1],x+22,y+(sq?64:92),cellW-44,sq?"900 33px Manrope,Arial":"900 45px Manrope,Arial","#ffffff");
   });
  }
- const driveY=walk?(metricTop+cellH*2+gap+(sq?12:22)):metricTop+(sq?5:15),driveH=sq?77:114;
- tsRound(ctx,m,driveY,inner,driveH,22,"#c9f171");
- tsText(ctx,"DRIVE · FROM → TO",m+22,driveY+(sq?25:37),inner-44,"800 19px Manrope,Arial","#234236");
- tsText(ctx,t.drive?.km!=null?fmt(t.drive.km,1)+" km":"—",m+22,driveY+(sq?59:87),inner*.45,sq?"900 31px Manrope,Arial":"900 44px Manrope,Arial","#112a2d");
- tsText(ctx,t.drive?.min!=null?fmtDur(t.drive.min*60):"Time unavailable",m+inner*.53,driveY+(sq?59:87),inner*.43,sq?"800 28px Manrope,Arial":"800 41px Manrope,Arial","#112a2d");
+ const greenY=metricTop+(walk?(sq?94:143):0),greenH=sq?101:142;
+ tsRound(ctx,m,greenY,inner,greenH,24,"#c9f171");
+ if(walk){
+  tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:38),inner*.45,"800 20px Manrope,Arial","#315137");
+  tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:38),inner*.42,"800 20px Manrope,Arial","#315137");
+  tsText(ctx,t.dist!=null?fmt(t.dist,1)+" km":"—",m+24,greenY+(sq?76:106),inner*.43,sq?"900 44px Manrope,Arial":"900 61px Manrope,Arial","#132b25");
+  tsText(ctx,fmtDur(t.dur??t.moving),m+inner*.53,greenY+(sq?76:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
+ }else{
+  tsText(ctx,"DESTINATION VISITED",m+24,greenY+(sq?31:43),inner-48,"800 22px Manrope,Arial","#315137");
+  tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
+ }
  if(stage===1)return;
- const mapY=driveY+driveH+(sq?15:24),mapH=sq?(walk?175:345):(walk?352:610);
+ let mapY=greenY+greenH+18;
+ if(t.drive?.km!=null){
+  const driveH=sq?47:70;
+  tsRound(ctx,m,mapY,inner,driveH,18,"#1c3440");
+  tsText(ctx,"DRIVE",m+18,mapY+(sq?29:44),110,"800 19px Manrope,Arial","#9fbdc5");
+  tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
+  mapY+=driveH+15;
+ }
+ const mapH=sq?(walk?195:335):(walk?480:680);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
- const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?31:49);
+ const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:39);
  if(places.length)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,textY,inner,"700 21px Manrope,Arial","#bcd1d8");
- else tsText(ctx,(t.startName&&t.endName? t.startName+"  →  "+t.endName:"Every journey is a story."),m,textY,inner,"700 23px Manrope,Arial","#bdd6dd");
- ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,h-(sq?64:88));ctx.lineTo(w-m,h-(sq?64:88));ctx.stroke();
+ else tsText(ctx,(t.startName&&t.endName?t.startName+"  →  "+t.endName:"Every journey is a story."),m,textY,inner,"700 23px Manrope,Arial","#bdd6dd");
+ const footerY=h-(sq?64:88);
+ ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,footerY);ctx.lineTo(w-m,footerY);ctx.stroke();
  tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:40),400,"900 25px Manrope,Arial","#9ce9fa");
  ctx.textAlign="right";tsText(ctx,"KEEP EXPLORING",w-m,h-(sq?30:40),300,"800 20px Manrope,Arial","#a6bec4");ctx.textAlign="left";
+}
+let tsLoadingMaps=false;
+async function tsPrepareMaps(t,id){
+ if(!t||t._route)return;
+ tsLoadingMaps=true;
+ const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
+ const [story,square]=await Promise.all([
+  tsBuildTileMap(t,960,480).catch(()=>null),
+  tsBuildTileMap(t,960,195).catch(()=>null)
+ ]);
+ if(!tsCurrent||tsCurrent.id!==id)return;
+ t._mapStory=story;t._mapSquare=square;tsLoadingMaps=false;
+ if(note)note.textContent=(story||square)?"Map ready · pins and route included in the image":"Map tiles unavailable · showing the route preview";
+ tsDraw();
 }
 async function openTripStudio(id){
  const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
@@ -3598,6 +3689,7 @@ async function openTripStudio(id){
  $("tripStudio").hidden=false;closeSheet();
  const [hero,route]=await Promise.all([tsImage(t.photo),tsImage(t.routeShot)]);
  if(!tsCurrent||tsCurrent.id!==id)return;tsCurrent._hero=hero;tsCurrent._route=route;tsDraw();
+ await tsPrepareMaps(tsCurrent,id);
 }
 function tsClose(){tsStop();$("tripStudio").hidden=true;tsCurrent=null;}
 $("tsClose").onclick=tsClose;
@@ -3608,7 +3700,9 @@ $("tsPlay").onclick=()=>{if(tsTimer){tsStop();tsDraw();return;}
  tsDraw(0);tsTimer=setInterval(()=>{tsStage++;if(tsStage>4){tsStage=0;}tsDraw(tsStage);},2300);
 };
 $("tsCanvas").onclick=()=>{if(tsTimer){tsStop();tsDraw();}};
-$("tsShare").onclick=()=>{if(!tsCurrent)return;tsStop();tsDraw(4);$("tsCanvas").toBlob(async blob=>{
+$("tsShare").onclick=async()=>{if(!tsCurrent)return;
+ if(tsLoadingMaps){toast("Preparing the route map…");return;}
+ tsStop();tsDraw(4);$("tsCanvas").toBlob(async blob=>{
  if(!blob)return toast("Could not export image");const f=new File([blob],"sappy-travel-"+(tsCurrent.date||"trip")+(tsFormat==="story"?"-story":"-post")+".png",{type:"image/png"});
  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:tsCurrent.name});return;}catch(e){if(e.name==="AbortError")return;}}
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
