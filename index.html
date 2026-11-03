@@ -226,6 +226,7 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-section{font-size:13px;font-weight:900;display:flex;align-items:center;gap:9px;margin:20px 0 12px}
 .rc-section:before{content:"";display:block;width:5px;height:17px;border-radius:10px;background:#8FDDFF}
 .rc-metric-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rc-metric-fields[hidden],.rc-section[hidden]{display:none!important}
 .rc-type-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
 .rc-type-picker button{border:1px solid var(--line);color:var(--ink);font-weight:900;font-size:13px;background:var(--card);padding:13px 6px;border-radius:14px}
 .rc-type-picker button.on{background:#8FDDFF;color:#11212a;border-color:#8FDDFF}
@@ -233,7 +234,7 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
 .rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}.rc-upload input{width:100%;max-width:100%}
 .tripstudio{background:#080f15!important}.ts-preview{padding:3px 0;align-items:center;justify-content:center}
-.ts-preview canvas{width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain;border:1px solid rgba(215,243,250,.17);border-radius:14px}
+.ts-preview canvas{width:auto;height:auto;max-width:100%!important;max-height:100%!important;object-fit:contain;border:1px solid rgba(215,243,250,.17);border-radius:14px}
 .ts-actions button{border-radius:13px;min-height:43px}
 @media(max-width:390px){.ts-head strong{font-size:15px}.ts-actions button{font-size:11px;padding:11px 9px}.tripstudio{padding-left:8px;padding-right:8px}}
 .trip{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
@@ -3349,7 +3350,7 @@ function openTrip(id){
     '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a trip recap</button>'+
     '<div class="btns"><button class="btn soft" id="tEdit" style="flex:1">✎ Edit trip details</button><button class="btn warn" id="tDel">Delete trip</button></div>');
   miniMap($("tdMap"),t);
-  $("tStudio").onclick=()=>openRecapForm(t.id);
+  $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
 }
@@ -3445,7 +3446,7 @@ function openRecapForm(id=null,planId=null){
  loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});tileLayer().addTo(m);redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
  for(const which of ["from","to"]){
   const inp=$(which==="from"?"rcFrom":"rcTo"),box=$(which==="from"?"rcFromResults":"rcToResults");let timer;
-  inp.oninput=()=>{coords[which]=null;road=null;roadPath=null;redraw();if($("rcRoadKm")){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";}clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
+  inp.oninput=()=>{routeRequest++;coords[which]=null;road=null;roadPath=null;redraw();if($("rcRoadKm")){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";}clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
    timer=setTimeout(async()=>{box.innerHTML='<div class="note">Searching…</div>';try{const results=await geocode(query);if(!box.isConnected||inp.value.trim()!==query)return;
     box.innerHTML=results.slice(0,5).map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">No matches</div>';
     box.querySelectorAll("button").forEach(button=>button.onclick=()=>{const o=results[+button.dataset.i];coords[which]=[+o.lat,+o.lng];inp.value=o.full.split(",").slice(0,3).map(x=>x.trim()).join(", ");box.innerHTML='<div class="note">✓ Pinned on map</div>';
