@@ -272,6 +272,7 @@ body:not(.in-travel) .tfab{display:none}
 #trTrips{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #trTrips .empty{grid-column:1/-1}
 .tdot{position:absolute;top:10px;left:10px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center}
+.trip-type-badge{position:absolute;right:10px;top:10px;color:#f7ffff;border:1px solid rgba(255,255,255,.25);background:rgba(5,20,28,.75);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900;letter-spacing:.015em;backdrop-filter:blur(8px)}
 .tname{position:absolute;left:12px;right:12px;bottom:11px;font-size:15px;font-weight:800;line-height:1.2;letter-spacing:-.01em;text-shadow:0 1px 8px rgba(0,0,0,.5);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ttile{position:relative;display:block;width:100%;aspect-ratio:1/1;border:0;border-radius:24px;overflow:hidden;background-size:cover;background-position:center;text-align:left;padding:0;color:#fff;box-shadow:var(--shadow)}
@@ -3318,7 +3319,7 @@ function tripLoc(t){ return t.loc || t.country || ""; }
 function tripTile(t){
   const T0=TYPES[t.type]||TYPES.place;
   const bg0=t.photo?'background-image:url('+t.photo+')':'background:linear-gradient(140deg,'+T0.c+' 0%,#23261F 115%)';
-  return '<button class="ttile" data-id="'+esc(t.id)+'" style="'+bg0+'"><span class="tshade"></span><span class="tdot" style="background:'+T0.c+'">'+tsvg(t.type,12)+'</span><span class="tname">'+esc(t.name)+'</span></button>';
+  return '<button class="ttile" data-id="'+esc(t.id)+'" style="'+bg0+'"><span class="tshade"></span><span class="tdot" style="background:'+T0.c+'">'+tsvg(t.type,12)+'</span><span class="trip-type-badge">'+esc(T0.name)+'</span><span class="tname">'+esc(t.name)+'</span></button>';
 }
 function tripTileOld(t){
   const T=TYPES[t.type]||TYPES.place, when=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):(t.year||"");
@@ -3461,6 +3462,14 @@ function openRecapForm(id=null,planId=null){
   try{if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);}
   catch(e){return toast("Could not prepare the image");}
   if(routePending)await routePending;
+   for(const [kind,key] of [["from","rcFrom"],["to","rcTo"]]){
+     if(coords[kind]||!$(key).value.trim())continue;
+     try{const matches=await geocode($(key).value.trim());const o=matches[0];if(!o)continue;
+       coords[kind]=[+o.lat,+o.lng];
+       if(kind==="to")Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,province:o.province||""});
+     }catch(e){}
+   }
+   if(coords.from&&coords.to&&!road){const d=await recapRoadRoute(coords.from,coords.to);if(d){road={km:d.km,min:d.min};roadPath=d.path;}}
   const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim();
   Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:t.type==='place'?null:num("rcDist"),dur:t.type==='place'||mins==null?null:Math.round(mins*60),
    moving:t.type==='place'||mins==null?null:Math.round(mins*60),steps:t.type==='place'?null:num("rcSteps"),calories:t.type==='place'?null:num("rcCalories"),
