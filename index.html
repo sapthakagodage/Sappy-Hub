@@ -179,6 +179,19 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,.sheet::-webkit-scrollbar,.raw::
 .sumtile b{display:block;font-size:24px;font-weight:800;color:var(--lime);letter-spacing:-.02em;margin-top:2px}
 :root[data-theme="light"] .sumtile{background:#12140D}
 /* ===================== Sappy Travel ===================== */
+.tripstudio{position:fixed;inset:0;z-index:190;background:#0b0e12;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px calc(env(safe-area-inset-bottom,0px) + 12px);color:#fff}
+.tripstudio[hidden]{display:none!important}
+.ts-head{width:min(100%,480px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 2px 12px}
+.ts-head strong{font-size:17px;letter-spacing:-.02em}.ts-head button,.ts-actions button{border:0;border-radius:999px;padding:11px 16px;background:#242b32;color:white;font-weight:800;font-size:13px}
+.ts-head .ts-close{background:#8fddff;color:#10171b}
+.ts-preview{min-height:0;flex:1;width:min(100%,480px);display:flex;justify-content:center;align-items:center;overflow:hidden}
+.ts-preview canvas{display:block;max-width:100%;max-height:100%;object-fit:contain;border-radius:16px;box-shadow:0 20px 60px #0008}
+.ts-actions{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;width:min(100%,480px);padding-top:12px}
+.ts-actions button.on,.ts-actions button.primary{background:#8fddff;color:#111a20}
+.ts-note{text-align:center;color:#9ba7ad;font-size:11px;margin:7px 0 0;max-width:480px}
+.ts-animate .ts-head,.ts-animate .ts-actions,.ts-animate .ts-note{opacity:0;pointer-events:none}
+.ts-animate .ts-preview canvas{border-radius:0}
+
 body.in-travel #travelView{display:block}
 body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-travel #setView, body.in-travel #notiView, body.in-travel .fabfloat{display:none!important}
 .leaflet-container{z-index:0;isolation:isolate;background:var(--card2);font:inherit}
@@ -1725,6 +1738,14 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 </nav>
 
 
+<div id="tripStudio" class="tripstudio" hidden>
+  <div class="ts-head"><strong>✦ Trip Recap Studio</strong><button class="ts-close" id="tsClose">Done ✕</button></div>
+  <div class="ts-preview"><canvas id="tsCanvas" width="1080" height="1920" aria-label="Trip recap preview"></canvas></div>
+  <div class="ts-actions">
+    <button id="tsStory" class="on">Story 9:16</button><button id="tsSquare">Post 1:1</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
+  </div>
+  <p class="ts-note">Play recap for screen recording. Tap the preview to stop playback. Huawei route screenshots are optional.</p>
+</div>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1732,7 +1753,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.14";
+const APP_VERSION = "7.3.15";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3290,8 +3311,10 @@ function openTrip(id){
     '<div><span>Time on trail</span><b class="num">'+fmtDur(t.moving)+'</b></div>'+
     '<div><span>From home</span><b class="num" id="tFromKm">…</b></div><div><span>Drive time</span><b class="num" id="tFromMin">…</b></div></div>'+
     '<div id="tHome" class="fromhome" hidden><span>From home</span><b>…</b></div>'+
+    '<button class="btn full" style="background:#8FDDFF;color:#12140D;margin:10px 0" id="tStudio">✦ Create a beautiful trip recap</button>'+
     '<div class="btns"><button class="btn" id="tEdit" style="flex:1">Edit</button><button class="btn soft" id="tDel">Delete</button></div>');
   miniMap($("tdMap"),t); showFromHome(t);
+  $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openTripForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
 }
@@ -3340,16 +3363,107 @@ function openTripForm(id){
 }
 
 function openAddTrip(){
-  openSheet('<h2>Add a trip</h2><p class="note">Hikes and walks from Huawei Health / Strava: export the activity as a GPX file and import it. Distance, time, pace, climb and the route fill in automatically.</p>'+
-    '<button class="card setlink" id="aGpx" style="background:var(--card2);margin:10px 0 8px"><span><b>Import GPX file</b><span>Route, distance, pace, time, climb</span></span><span class="chev">›</span></button>'+
-    '<button class="card setlink" id="aPlace" style="background:var(--card2);margin:0 0 8px"><span><b>Add a place</b><span>For past trips, e.g. Scotland</span></span><span class="chev">›</span></button>'+
-    '<button class="card setlink" id="aRec" style="background:var(--card2);margin:0"><span><b>Record now</b><span>Keep the app open on screen while you walk</span></span><span class="chev">›</span></button>'+
+  openSheet('<h2>Add a trip</h2><p class="note">Save your journey, then turn it into a beautiful story or reel-like recap. No live tracking needed.</p>'+
+    '<button class="card setlink" id="aStudio" style="background:#8FDDFF;color:#12140D;margin:10px 0 8px"><span><b>✦ Create trip recap</b><span style="color:#30434a">Huawei Health numbers, photos & route screenshot</span></span><span class="chev">›</span></button>'+
+    '<button class="card setlink" id="aGpx" style="background:var(--card2);margin:0 0 8px"><span><b>Import a GPX route</b><span>Optional · if you already have a route file</span></span><span class="chev">›</span></button>'+
+    '<button class="card setlink" id="aPlace" style="background:var(--card2);margin:0"><span><b>Add a place</b><span>For places you visited without workout data</span></span><span class="chev">›</span></button>'+
     '<input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>');
+  $("aStudio").onclick=()=>openRecapForm();
   $("aGpx").onclick=()=>$("gpxFile").click();
-  $("gpxFile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ const g=parseGpx(await f.text()); if(g.pts.length<2) return toast("No route found in that file"); await saveTrack(g.pts,g.name); }catch(err){ toast("Couldn’t read that GPX file"); } };
+  $("gpxFile").onchange=async e=>{ const f=e.target.files[0];if(!f)return;try{const g=parseGpx(await f.text());if(g.pts.length<2)return toast("No route in file");await saveTrack(g.pts,g.name);}catch(e){toast("Could not read route");}};
   $("aPlace").onclick=()=>openAddPlace("trip");
-  $("aRec").onclick=()=>{ closeSheet(); startRec(); };
 }
+/* Sappy Travel Recap Studio — manually supplied Huawei Health stats & screenshots. */
+function openRecapForm(id=null,planId=null){
+ const old=id&&S.trip[id],p=planId&&S.plan[planId],t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),year:new Date().getFullYear(),type:"hike"},old||{});
+ const val=n=>t[n]==null?"":String(t[n]);
+ openSheet('<h2>✦ Trip Recap Studio</h2><p class="note">Copy the numbers from Huawei Health, add a scenic photo and optionally your route screenshot.</p>'+
+ '<label class="fl2"><span>Trip name</span><input class="inp" id="rcName" placeholder="e.g. Ambuluwawa Adventure" value="'+esc(t.name)+'"></label>'+
+ '<label class="fl2"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
+ '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+ '<label class="fl2"><span>Distance (km)</span><input class="inp" type="number" min="0" step=".01" id="rcDist" placeholder="8.4" value="'+esc(val("dist"))+'"></label>'+
+ '<label class="fl2"><span>Duration (minutes)</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" placeholder="155" value="'+(t.dur?Math.round(t.dur/60):"")+'"></label>'+
+ '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" placeholder="12450" value="'+esc(val("steps"))+'"></label>'+
+ '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" placeholder="580" value="'+esc(val("calories"))+'"></label></div>'+
+ '<label class="fl2"><span>Location / area</span><input class="inp" id="rcLoc" placeholder="Kandy, Sri Lanka" value="'+esc(t.loc||"")+'"></label>'+
+ '<label class="fl2"><span>Visited places (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Ambuluwawa Tower&#10;Gampola viewpoint">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
+ '<label class="fl2"><span>Main scenic photo</span><input class="inp" id="rcPhoto" type="file" accept="image/*"></label>'+
+ (t.photo?'<p class="note">✓ Scenic photo already saved — upload to replace</p>':'')+
+ '<label class="fl2"><span>Huawei route screenshot (optional)</span><input class="inp" id="rcRoute" type="file" accept="image/*"></label>'+
+ (t.routeShot?'<p class="note">✓ Route screenshot already saved — upload to replace</p>':'')+
+ '<button class="btn full" id="rcSave" style="background:#8FDDFF;color:#12140D">Save & preview recap ↗</button>');
+ $("rcSave").onclick=async()=>{
+  const name=$("rcName").value.trim();if(!name)return toast("Please add a trip name");
+  const num=id=>{const x=$(id).value;return x===""?null:Number(x)};
+  for(const id of ["rcDist","rcMinutes","rcSteps","rcCalories"]){const v=num(id);if(v!=null&&(!Number.isFinite(v)||v<0))return toast("Check the workout numbers");}
+  try{
+   if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);
+   if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);
+  }catch(e){return toast("Could not prepare that image");}
+  const date=$("rcDate").value;
+  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),loc:$("rcLoc").value.trim(),
+   dist:num("rcDist"),dur:num("rcMinutes")==null?null:Math.round(num("rcMinutes")*60),
+   moving:num("rcMinutes")==null?null:Math.round(num("rcMinutes")*60),
+   steps:num("rcSteps"),calories:num("rcCalories"),
+   stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),
+   source:"Huawei Health (manual)",planId:planId||t.planId||null});
+  put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
+ };
+}
+let tsCurrent=null,tsFormat="story",tsTimer=null,tsStage=0;
+function tsStop(){if(tsTimer){clearInterval(tsTimer);tsTimer=null;}const b=$("tsPlay");if(b)b.textContent="▶ Play recap";$("tripStudio").classList.remove("ts-animate");}
+function tsImage(src){return new Promise(resolve=>{if(!src)return resolve(null);const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>resolve(null);i.src=src;});}
+function tsCover(ctx,img,x,y,w,h){if(!img)return;const k=Math.max(w/img.width,h/img.height),cw=w/k,ch=h/k;ctx.drawImage(img,(img.width-cw)/2,(img.height-ch)/2,cw,ch,x,y,w,h);}
+function tsRound(ctx,x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function tsWrap(ctx,str,x,y,maxWidth,size,lineHeight,maxLines=2){ctx.font="800 "+size+"px Manrope,Arial";let a=String(str||"My journey").split(/\s+/),line="",lines=[];for(const word of a){let test=(line?line+" ":"")+word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);lines.slice(0,maxLines).forEach((v,i)=>ctx.fillText(v,x,y+i*lineHeight));return Math.min(lines.length,maxLines);}
+function tsDraw(stage=4){
+ const c=$("tsCanvas"),ctx=c.getContext("2d"),t=tsCurrent;if(!t)return;
+ const w=1080,h=tsFormat==="story"?1920:1080;c.width=w;c.height=h;
+ const sq=h===1080;ctx.fillStyle="#0d151b";ctx.fillRect(0,0,w,h);
+ const hero=sq?500:900;
+ if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);else{let g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#163e4e");g.addColorStop(1,"#091218");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
+ let sh=ctx.createLinearGradient(0,0,0,hero+80);sh.addColorStop(0,"rgba(3,11,17,.18)");sh.addColorStop(.45,"rgba(3,11,17,.2)");sh.addColorStop(1,"#0d151b");ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+90);
+ ctx.fillStyle="#8fddff";ctx.font="800 28px Manrope,Arial";ctx.fillText("✦  SAPPY TRAVEL  /  MY JOURNEY",65,88);
+ ctx.fillStyle="white";const titleY=sq?340:610;tsWrap(ctx,t.name,65,titleY,960,sq?68:84,sq?76:94,2);
+ ctx.fillStyle="#d0e0e6";ctx.font="600 28px Manrope,Arial";ctx.fillText([t.loc,t.date?niceDate(t.date):""].filter(Boolean).join("  •  ").slice(0,65),68,titleY+(sq?112:132));
+ if(stage<1)return;
+ const top=sq?530:975,gap=14,margin=65,tileW=(w-2*margin-gap)/2,tileH=sq?132:185;
+ const vals=[[(t.dist==null?"—":fmt(t.dist,t.dist<10?1:0))+(t.dist==null?"":" km"),"DISTANCE"],[fmtDur(t.dur||t.moving),"DURATION"],[t.steps==null?"—":fmt(t.steps),"STEPS"],[t.calories==null?"—":fmt(t.calories)+" kcal","CALORIES"]];
+ vals.forEach((a,i)=>{const x=margin+(i%2)*(tileW+gap),y=top+Math.floor(i/2)*(tileH+gap);
+ tsRound(ctx,x,y,tileW,tileH,24,"#1e3039");ctx.fillStyle="#8fddff";ctx.font="800 "+(sq?39:52)+"px Manrope,Arial";ctx.fillText(a[0],x+24,y+(sq?62:86));ctx.fillStyle="#a6bdc6";ctx.font="800 21px Manrope,Arial";ctx.fillText(a[1],x+24,y+tileH-24);});
+ if(stage<2)return;
+ const below=top+2*(tileH+gap)+(sq?18:42);
+ ctx.fillStyle="#e8f4f6";ctx.font="800 29px Manrope,Arial";ctx.fillText("THE ROUTE & MEMORIES",margin,below);
+ const shotY=below+24,shotH=sq?170:340;
+ if(t._route){tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#edf1ec");ctx.save();ctx.beginPath();ctx.roundRect(margin,shotY,w-2*margin,shotH,22);ctx.clip();tsCover(ctx,t._route,margin,shotY,w-2*margin,shotH);ctx.restore();}
+ else{tsRound(ctx,margin,shotY,w-2*margin,shotH,22,"#1b2d35");ctx.strokeStyle="#47616b";ctx.lineWidth=4;ctx.setLineDash([14,12]);ctx.beginPath();ctx.moveTo(margin+50,shotY+shotH*.75);ctx.bezierCurveTo(370,shotY+12,690,shotY+shotH,980,shotY+40);ctx.stroke();ctx.setLineDash([]);}
+ if(stage<3)return;
+ const places=(t.stops||[]).map(v=>v.name).filter(Boolean);
+ const placeY=shotY+shotH+(sq?28:42);
+ ctx.fillStyle="#a6bdc6";ctx.font="700 25px Manrope,Arial";ctx.fillText(places.length?places.slice(0,sq?2:4).join("   •   ").slice(0,70):"Every journey has a story.",margin,placeY);
+ ctx.fillStyle="#8fddff";ctx.font="800 26px Manrope,Arial";ctx.fillText("MADE WITH SAPPY TRAVEL",margin,h-45);
+}
+async function openTripStudio(id){
+ const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
+ $("tsStory").classList.add("on");$("tsSquare").classList.remove("on");
+ $("tripStudio").hidden=false;closeSheet();
+ const [hero,route]=await Promise.all([tsImage(t.photo),tsImage(t.routeShot)]);
+ if(!tsCurrent||tsCurrent.id!==id)return;tsCurrent._hero=hero;tsCurrent._route=route;tsDraw();
+}
+function tsClose(){tsStop();$("tripStudio").hidden=true;tsCurrent=null;}
+$("tsClose").onclick=tsClose;
+$("tsStory").onclick=()=>{tsStop();tsFormat="story";$("tsStory").classList.add("on");$("tsSquare").classList.remove("on");tsDraw();};
+$("tsSquare").onclick=()=>{tsStop();tsFormat="square";$("tsSquare").classList.add("on");$("tsStory").classList.remove("on");tsDraw();};
+$("tsPlay").onclick=()=>{if(tsTimer){tsStop();tsDraw();return;}
+ tsStage=0;$("tripStudio").classList.add("ts-animate");$("tsPlay").textContent="Stop";
+ tsDraw(0);tsTimer=setInterval(()=>{tsStage++;if(tsStage>4){tsStage=0;}tsDraw(tsStage);},2300);
+};
+$("tsCanvas").onclick=()=>{if(tsTimer){tsStop();tsDraw();}};
+$("tsShare").onclick=()=>{if(!tsCurrent)return;tsStop();tsDraw(4);$("tsCanvas").toBlob(async blob=>{
+ if(!blob)return toast("Could not export image");const f=new File([blob],"sappy-travel-"+(tsCurrent.date||"trip")+(tsFormat==="story"?"-story":"-post")+".png",{type:"image/png"});
+ if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:tsCurrent.name});return;}catch(e){if(e.name==="AbortError")return;}}
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+ },"image/png");};
 async function saveTrack(pts,name){
   const st=trackStats(pts), type=guessType(st), first=pts[0], last=pts[pts.length-1];
   const g=await revGeo(last[0],last[1]);
@@ -3548,11 +3662,13 @@ function openPlan(id){
     (k!=="place"?'<div><span>Time on trail</span><b class="num">'+(p.trail?fmtDur(p.trail):'—')+'</b></div>':'<div><span>Type</span><b>Visit</b></div>')+
     '<div><span>From home</span><b class="num">'+(p.drive?fmt(p.drive.km,p.drive.km<100?1:0)+' km':(p.straight?fmt(p.straight)+' km':'—'))+'</b></div><div><span>Drive time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div></div>'+
     (!home?'<button class="btn soft full" id="plHome" style="margin-bottom:10px">Set my current location as Home</button>':'')+
+    '<button class="btn full" id="plRecap" style="background:#8FDDFF;color:#12140D;margin-bottom:10px">✦ Make trip recap</button>'+
     '<div class="btns"><button class="btn" id="plEdit" style="flex:1">Edit</button><button class="btn soft" id="plDone">Done it ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
   miniMap($("tdMap"),{type:k,lat:p.lat,lng:p.lng});
   if($("plHome")) $("plHome").onclick=()=>navigator.geolocation.getCurrentPosition(async pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; persist(); put("cfg",{id:"travel",home:S.travelHome});
       for(const q of plans()){ const h=[S.travelHome.lat,S.travelHome.lng]; const n=Object.assign({},q,{straight:Math.round(hav(h,[q.lat,q.lng]))}); try{ n.drive=await driveRoute(h,[q.lat,q.lng]); n.driveFrom=h.join(","); }catch(e){} put("plan",n); }
       toast("Home set"); openPlan(id); renderPlans(); },()=>toast("Allow location for this app first"));
+  $("plRecap").onclick=()=>openRecapForm(null,p.id);
   $("plEdit").onclick=()=>openPlanForm(p.id);
   $("plDone").onclick=()=>{ remove("plan",p.id); const date=p.date&&daysTo(p.date)<=0?p.date:ymd(Date.now());
     put("trip",{id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,moving:p.trail||0,drive:p.drive,driveFrom:p.driveFrom});
