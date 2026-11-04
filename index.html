@@ -1590,6 +1590,9 @@ html,body{min-height:100%;min-height:100dvh}
 #appView,#travelView{min-height:100dvh}
 nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .pocket-period-note{display:flex;align-items:center;margin:0 2px 12px;padding:0 4px;color:var(--soft);font-size:12px;font-weight:650;letter-spacing:.005em}
+/* Differentiate ComBank subtly inside the shared HNB + ComBank activity timeline. */
+.tx.bank-combank .c{color:#86B9EB}
+.bank-indicator{display:inline-block;vertical-align:middle;width:6px;height:6px;border-radius:50%;background:#86B9EB;margin:0 5px 1px 0}
 </style>
 </head>
 <body class="in-hub">
@@ -1742,7 +1745,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
       <div class="row" style="padding:0;border:0"><div><div class="k">Add an SMS</div><div class="d">For a bank message that didn’t come through</div></div><button class="btn" id="pasteOpen">Add</button></div>
     </div>
     <div class="card" id="skipRow" hidden><div class="row" style="padding:0;border:0"><div><div class="k">Couldn’t read</div><div class="d" id="skipD"></div></div><button class="btn soft" id="skipRetry">Try again</button></div></div>
-    <p class="note" style="margin:14px 6px">New bank SMS are added automatically. Use this only if one was missed. Messages already added are ignored.</p>
+    <p class="note" style="margin:14px 6px">Missed a card alert? Add its SMS here. Each recurring charge is tracked separately without duplicates. For ComBank USD alerts, your iPhone Message automation must also accept messages containing USD.</p>
   </section>
 
   <section id="v-savings" hidden>
@@ -1794,7 +1797,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.25";
+const APP_VERSION = "7.3.26";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1928,7 +1931,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 11;
+const PARSER_VERSION = 12;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -1959,8 +1962,11 @@ function parseSms(raw){
   let type = (iC>=0 && (iD<0 || iC<iD) && !isFd) ? "in" : "out";
   if(iC<0 && iD<0 && /\bcr\b/.test(L)) type="in";
 
+  // Commercial Bank debit card alerts can contain only a USD charge and no balance.
+  const combankCard=/^dear cardholder,?\s*purchase at\s+(.+?)\s+for\s+(?:USD|US\$|LKR|RS\.?|AUD|A\$)\s*[\d,]+(?:\.\d{1,2})?\s+on\s+\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}/i.exec(s);
   // "Reason:" field (HNB and others)
   let merchant="", isBill=false, isTransfer=false, where="";
+  if(combankCard){merchant=combankCard[1].trim();where=merchant;}
   const rm = s.match(/\breason\s*[:\-]\s*(.+?)(?=\s+(?:bal|avl|av\.|available|protect|hotline|call|do not)\b|$)/i);
   if(rm){
     const reason=rm[1]; where=reason;
@@ -2025,7 +2031,11 @@ function parseSms(raw){
   let acct="";
   const am=s.match(/(?:a\/?c|acc(?:t|ount)?)(?:\s*no\.?)?\s*[:.#]?\s*([0-9Xx*]{4,24})/i);
   if(am){ const t=am[1].match(/(\d{2})$/); if(t) acct=t[1]; }
-  if(!acct){ const cm=s.match(/card(?:\s*(?:no|ending|number|ending with))?[^0-9]{0,14}\d{2}(\d{2})\b/i); if(cm) acct=cm[1]; }
+  if(!acct){
+    const cm=s.match(/(?:debit|credit)?\s*card\s+(?:ending(?:\s+with)?|no\.?|number)\s*[:#-]?\s*[Xx*#]*(\d{4})\b/i);
+    if(cm)acct=cm[1].slice(-2);
+    else{const old=s.match(/card(?:\s*(?:no|ending|number|ending with))?[^0-9]{0,14}\d{2}(\d{2})\b/i);if(old)acct=old[1];}
+  }
 
   // bank — decided from the hotline / sender text, never from the Reason or Location (e.g. a transfer TO ComBank)
   let bank="";
@@ -2037,7 +2047,7 @@ function parseSms(raw){
     else if(/\bhnb\b|hatton/i.test(own)) bank="HNB";
     else if(/\bboc\b|bank of ceylon/i.test(own)) bank="BOC";
     else if(/commbank|commonwealth|\bcba\b/i.test(own)) bank="CommBank AU";
-    else if(/^dear cardholder,.*has been authori[sz]ed on your (debit|credit) card ending/i.test(s)) bank="ComBank";
+    else if(combankCard&&/has been authori[sz]ed on your (?:debit|credit) card/i.test(s)) bank="ComBank";
   }
   if(!bank && acct && S.bankByAcct && S.bankByAcct[acct]) bank=S.bankByAcct[acct];
   if(!bank) bank="Bank";
@@ -2479,7 +2489,7 @@ function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(pocketCat(t)))+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(pocketCat(t)))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
