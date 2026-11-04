@@ -1794,7 +1794,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.24";
+const APP_VERSION = "7.3.25";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2479,7 +2479,7 @@ function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(pocketCat(t)))+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="out"&&(t.split>1||backMap()[t.id]||t.paidDirect||t.expectedBack)?'<div class="o num share">your cost '+rs(myShare(t))+'</div>':'')+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(pocketCat(t)))+' · '+esc(t.bank||"Manual")+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">'+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -2678,7 +2678,7 @@ function openTx(id,edit){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
-    (t.type==="out"&&!NOT_SPENDING.has(t.cat)?'<div class="sharebar"><div><span>Your actual expense</span><b class="num">'+rs(myShare(t))+'</b><i>'+(backMap()[t.id]?'Received back '+rs(backMap()[t.id])+' · ':'')+(t.paidDirect?'Other person paid '+rs(t.paidDirect)+' directly · ':'')+(t.expectedBack?'Expected back '+rs(t.expectedBack)+' · ':'')+'Based on what you paid and actually received</i></div><button class="btn soft" id="txShare">Details</button></div>':'')+
+    
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Change":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
@@ -2690,7 +2690,6 @@ function openTx(id,edit){
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
-  if($("txShare")) $("txShare").onclick=()=>openSplit(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); } });
@@ -4013,13 +4012,13 @@ function openLink(id){
   const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));   // most likely payment ticked
   const P=lkrOf(p);
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
-  openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Tick every payment it covers — e.g. lunch and drinks.</div>'+
+  openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Choose the payment this refund belongs to. Only the amount received is deducted.</div>'+
     (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
       :'<div class="note" style="margin-top:12px">No payments in the month before this. It isn’t taken off your spending.</div>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>'+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{ document.querySelectorAll("#lkList .lrow").forEach(b=>{ const on=sel.has(b.dataset.id); b.classList.toggle("sel",on); b.querySelector(".tick").textContent=on?"✓":""; });
-    if($("lkSum")){ const tot=[...sel].reduce((a,k)=>a+lkrOf(S.tx[k]),0); $("lkSum").textContent=sel.size?sel.size+" payment"+(sel.size>1?"s":"")+" · "+rs(tot):"Tick at least one"; }
+    if($("lkSum")){ const tot=[...sel].reduce((a,k)=>a+lkrOf(S.tx[k]),0); $("lkSum").textContent=sel.size?sel.size+" payment"+(sel.size>1?"s":"")+" · "+rs(tot)+" · Refund "+rs(Math.min(P,tot)):"Select a payment"; }
     if($("lkSave")) $("lkSave").textContent=sel.size>1?"Link to "+sel.size+" payments":"Link"; };
   document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{ const k=b.dataset.id; sel.has(k)?sel.delete(k):sel.add(k); paint(); });
   paint();
@@ -4031,42 +4030,6 @@ function openLink(id){
 }
 
 function nextLink(){ const l=looseBacks().filter(p=>backSuggestions(p).length); if(l.length && !sheetOpen) openLink(l[0].id); }
-function openSplit(id){
-  const t=S.tx[id];if(!t||t.type!=="out")return;
-  let n=t.split||0;
-  const opts=[0,2,3,4,5,6,8,10], paid=lkrOf(t),received=backMap()[id]||0;
-  const external=Number(t.paidDirect)||0,expected=Number(t.expectedBack)||0;
-  openSheet('<h2>Share & contributions</h2>'+
-    '<p class="note">'+esc(t.merchant)+' · You paid '+rs(paid)+'. Record what others contributed without turning your own contribution into an equal split.</p>'+
-    '<div class="fromhome"><span>Received back (linked paybacks)</span><b>'+rs(received)+'</b></div>'+
-    '<div class="fromhome"><span>Your actual expense</span><b>'+rs(Math.max(0,paid-received))+'</b></div>'+
-    '<label class="field" style="margin-top:16px"><span>Other person paid directly (Rs)</span><input id="spDirect" class="inp num" inputmode="decimal" placeholder="e.g. 10000" value="'+(external?fmt(external,2):'')+'"></label>'+
-    '<p class="note">For example, you paid Rs 30,000 for spectacles and your father paid Rs 10,000 to the shop. This is not a refund and will not reduce your Rs 30,000 expense.</p>'+
-    '<div class="fromhome"><span>Total purchase (information only)</span><b id="spTotal">'+rs(paid+external)+'</b></div>'+
-    '<label class="field" style="margin-top:14px"><span>Expected reimbursement (Rs, optional)</span><input id="spExpected" class="inp num" inputmode="decimal" placeholder="e.g. 30000" value="'+(expected?fmt(expected,2):'')+'"></label>'+
-    '<p class="note">This is a reminder of what someone might pay back later. Spending changes only when you link the actual Paid back transaction.</p>'+
-    '<div class="field" style="margin-top:14px"><span>Equal split (optional)</span><div class="splitopts">'+opts.map(k=>'<button type="button" data-n="'+k+'" class="'+(k===n?'on':'')+'">'+(k?k:'Not split')+'</button>').join("")+'</div></div>'+
-    '<p class="note" id="spPlanned"></p>'+
-    '<button class="btn full" id="spSave">Save details</button>');
-  const amount=id=>{const v=parseFloat(String($(id).value||'').replace(/,/g,''));return Number.isFinite(v)?Math.max(0,v):0;};
-  const paint=()=>{
-    $('spTotal').textContent=rs(paid+amount('spDirect'));
-    $('spPlanned').textContent=n>1?'Equal-share target: '+rs(paid/n)+' per person. Actual expense remains '+rs(Math.max(0,paid-received))+' until a reimbursement is linked.':'Your expense is based on actual money paid and received.';
-  };
-  $('spDirect').oninput=paint;
-  document.querySelectorAll('.splitopts button').forEach(b=>b.onclick=()=>{
-    n=+b.dataset.n;document.querySelectorAll('.splitopts button').forEach(x=>x.classList.toggle('on',x===b));paint();
-  });
-  paint();
-  $('spSave').onclick=()=>{
-    const o=Object.assign({},t),direct=amount('spDirect'),expect=amount('spExpected');
-    if(direct>0)o.paidDirect=direct;else delete o.paidDirect;
-    if(expect>0)o.expectedBack=expect;else delete o.expectedBack;
-    if(n>1)o.split=n;else delete o.split;
-    put('tx',o);closeSheet();toast('Contribution details saved');render();
-  };
-}
-
 /* =============== Sappy Hub =============== */
 /* APP LIST — add a line here for each new app. view: the screen it opens. ready:false = "Coming soon". */
 const APPS = [
