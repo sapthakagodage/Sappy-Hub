@@ -676,8 +676,8 @@ details[open] summary::after{content:"－"}
 body.typing .tabs{display:none}
 
 /* Shared, low-key motion for every Pocket, Travel and Hub popup. */
-@keyframes sheetContentIn{from{opacity:.45;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
-#sheetBody.sheet-content-in{animation:sheetContentIn .22s cubic-bezier(.22,.8,.22,1) both}
+@keyframes sheetContentIn{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+#sheetBody.sheet-content-in{animation:sheetContentIn .3s cubic-bezier(.22,.8,.22,1) both}
 .sheet .btn,.sheet .chip,.sheet .seg button,.sheet .pick button,.sheet .lrow,.sheet .sx{
   transition:background-color .18s ease,color .18s ease,border-color .18s ease,opacity .18s ease,transform .18s ease;
 }
@@ -717,11 +717,11 @@ body.typing .tabs{display:none}
 .scrim.on{opacity:1;pointer-events:auto}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;background:var(--card);
   border-radius:32px 32px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom,0px));
-  transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);
+  transform:translate3d(0,105%,0);transition:transform .35s cubic-bezier(.22,.8,.22,1);
   max-height:calc(100vh - env(safe-area-inset-top,0px) - 24px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - 24px);
   overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.sheet.on{transform:none}
-.sheet:not(.on){visibility:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s .32s}
+.sheet.on{transform:translate3d(0,0,0)}
+.sheet:not(.on){visibility:hidden;transition:transform .35s cubic-bezier(.22,.8,.22,1),visibility 0s .35s}
 .sx{position:sticky;float:right;top:0;margin:4px -2px -38px 0;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:var(--soft);font-size:14px;font-weight:800;display:grid;place-items:center}
 .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
 .sheet h2{font-size:22px;margin:0 0 2px;letter-spacing:-.02em;font-weight:800}
@@ -1863,7 +1863,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.36";
+const APP_VERSION = "7.3.37";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2801,26 +2801,46 @@ document.addEventListener("input",e=>{
 function fmtAmountsIn(root){ (root||document).querySelectorAll('input[inputmode="decimal"]').forEach(el=>{ if(isAmountInput(el)&&el.value) el.value=fmtAmountStr(el.value); }); }
 
 /* =============== sheets =============== */
-let sheetOpen=false, lockY=0;
+let sheetOpen=false, lockY=0, sheetMotionId=0;
 function rescueSb(){ const f=$("sbForm"), h=$("sbHolder"); if(f&&h&&!h.contains(f)) h.appendChild(f); }
 function openSheet(html){
   rescueSb();
-  const body=$("sheetBody"),panel=$("sheet");
+  const body=$("sheetBody"),panel=$("sheet"),scrim=$("scrim");
+  const wasOpen=sheetOpen, motionId=++sheetMotionId;
+  const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Prepare the closed position and force it into layout before opening.
+  // iOS Safari otherwise coalesces the hidden -> visible state, skipping motion.
+  if(!wasOpen){ panel.classList.remove("on"); scrim.classList.remove("on"); void panel.offsetHeight; }
   body.classList.remove("sheet-content-in");
   body.innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html;
   $("sx").onclick=closeSheet;
   panel.scrollTop=0;
-  if(!sheetOpen){ lockY=window.scrollY; Object.assign(document.body.style,{position:"fixed",top:(-lockY)+"px",left:"0",right:"0"}); sheetOpen=true; }
-  $("scrim").classList.add("on"); panel.classList.add("on");
-  // Re-animate the content even when a new form replaces an already open sheet.
-  // This covers linked paybacks, Cash Wallet > Add expense and travel forms.
-  if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+  if(!wasOpen){
+    lockY=window.scrollY;
+    Object.assign(document.body.style,{position:"fixed",top:(-lockY)+"px",left:"0",right:"0"});
+    sheetOpen=true;
+    // A paint boundary is essential: opening from the same click/frame
+    // as the content insertion was showing the sheet instantly on iPhone.
+    requestAnimationFrame(()=>{
+      if(motionId!==sheetMotionId||!sheetOpen)return;
+      requestAnimationFrame(()=>{
+        if(motionId!==sheetMotionId||!sheetOpen)return;
+        scrim.classList.add("on"); panel.classList.add("on");
+      });
+    });
+  }else{
+    scrim.classList.add("on"); panel.classList.add("on");
+  }
+  // When a popup becomes another popup (e.g. Cash Wallet > Add Cash Expense)
+  // animate the new content without closing or jumping the shared drawer.
+  if(!reduced){
     void body.offsetWidth;
     body.classList.add("sheet-content-in");
   }
-  setTimeout(()=>fmtAmountsIn(body),0);
+  setTimeout(()=>{ if(motionId===sheetMotionId)fmtAmountsIn(body); },0);
 }
 function closeSheet(){
+  ++sheetMotionId; // Cancel any opening frames that have not painted yet.
   setTimeout(rescueSb,350);
   $("scrim").classList.remove("on"); $("sheet").classList.remove("on");
   if(sheetOpen){ Object.assign(document.body.style,{position:"",top:"",left:"",right:""}); window.scrollTo(0,lockY); sheetOpen=false; }
