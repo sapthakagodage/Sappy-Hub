@@ -1826,7 +1826,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.33";
+const APP_VERSION = "7.3.34";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2432,18 +2432,19 @@ function accKey(t){ return t.bank+"|"+(t.acct||""); }
 const isCashWithdrawal=t=>live(t)&&t.type==="out"&&t.cat==="Cash"&&t.bank!=="Cash";
 const isCashPayment=t=>live(t)&&t.bank==="Cash"&&t.type==="out"&&t.cat!=="Cash";
 function cashBalance(){
-  const snapshot=S.tracked&&S.tracked["Cash|"], hasBase=snapshot&&!snapshot.del;
-  const since=hasBase?snapshot.at:-Infinity;
+  // The Cash Wallet has no manual opening-balance control. Rebuild it only from
+  // live withdrawals and cash transactions. A legacy "Cash|" snapshot must not
+  // freeze the balance or keep deleted purchases deducted.
   let received=0,spent=0;
   Object.values(S.tx).forEach(t=>{
-    if(!live(t)||t.ts<=since)return;
+    if(!live(t))return;
     if(isCashWithdrawal(t))received+=lkrOf(t);
     else if(t.bank==="Cash"&&t.cat!=="Cash"){
       if(t.type==="in")received+=lkrOf(t);
       else if(t.type==="out")spent+=lkrOf(t);
     }
   });
-  return {balance:(hasBase?Number(snapshot.amount)||0:0)+received-spent,received,spent,base:!!hasBase};
+  return {balance:received-spent,received,spent};
 }
 function cashMovementHtml(t){
   const withdrawal=isCashWithdrawal(t),credit=withdrawal||t.type==="in";
@@ -2489,13 +2490,13 @@ function balances(){
   const map={}, fdA=fdAccounts();
   txList().forEach(t=>{ if(t.balance==null || (t.acct && fdA.has(t.acct))) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
   const out=Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")}));
-  Object.keys(S.tracked||{}).forEach(k=>{ const r=trackedBalance(k); if(!r) return; const [bank,acct]=k.split("|");
+  Object.keys(S.tracked||{}).forEach(k=>{ if(k==="Cash|")return; const r=trackedBalance(k); if(!r) return; const [bank,acct]=k.split("|");
     out.push({bank,acct,cur:"LKR",balance:r.bal,ts:r.last,lkr:r.bal,tracked:true,key:k}); });
   return out.sort((a,b)=>b.lkr-a.lkr);
 }
 function mainAccounts(){
   const b=balances().filter(x=>x.cur==="LKR").sort((a,c)=>(a.tracked?1:0)-(c.tracked?1:0)||c.lkr-a.lkr);
-  const u=untrackedAccounts().map(a=>({bank:a.bank,acct:a.acct,key:a.key,unset:true}));
+  const u=untrackedAccounts().filter(a=>a.bank!=="Cash").map(a=>({bank:a.bank,acct:a.acct,key:a.key,unset:true}));
   return b.concat(u);
 }
 function accTile(a){
@@ -2555,7 +2556,7 @@ function openNewFd(){
 /* is this HNB debit a top-up to a tracked side account? */
 function topupFor(t){
   if(t.type!=="out" || t.balance==null) return "";
-  const keys=Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del); if(!keys.length) return "";
+  const keys=Object.keys(S.tracked||{}).filter(k=>k!=="Cash|"&&!S.tracked[k].del); if(!keys.length) return "";
   const r=(S.topupRules||{})[t.merchant.toLowerCase()]; if(r && keys.includes(r)) return r;
   const raw=(t.raw||"")+" "+(t.where||"");
   for(const k of keys){ const b=k.split("|")[0];
