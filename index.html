@@ -685,32 +685,64 @@ body.typing .tabs{display:none}
 @media (prefers-reduced-motion:reduce){#sheetBody.sheet-content-in{animation:none!important}
   .sheet,.scrim,.sheet .btn,.sheet .chip,.sheet .seg button,.sheet .pick button,.sheet .lrow,.sheet .sx{transition:none!important}}
 
-/* Monthly insights shared bottom-sheet visual */
-.ins-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
-.ins-totals>div{background:var(--card2);border-radius:15px;padding:12px 10px;min-width:0}
-.ins-totals span,.ins-summary span{display:block;font-size:11px;color:var(--soft);font-weight:700}
-.ins-totals b{display:block;font-size:clamp(14px,4vw,20px);letter-spacing:-.04em;margin-top:6px;white-space:nowrap}
-.ins-chart{padding:15px 12px 12px;border-radius:18px;background:var(--card2)}
-.ins-chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.ins-chart-head>b{font-size:13px}
-.ins-chart-head>span{font-size:10px;color:var(--soft);display:flex;align-items:center;gap:4px;white-space:nowrap}
-.ins-dot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-left:3px}
-.ins-dot.income,.ins-bar.income{background:var(--lime)}
-.ins-dot.expense,.ins-bar.expense{background:var(--violet)}
-.ins-plot{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;height:158px;margin-top:18px;align-items:end}
-.ins-month{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;gap:6px}
-.ins-month>b{font-size:10px;color:var(--soft);font-weight:700}
-.ins-bars{height:127px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line)}
-.ins-bar{display:block;width:clamp(8px,3.8vw,15px);border-radius:5px 5px 0 0;min-height:0;transition:height .32s cubic-bezier(.22,.8,.22,1)}
-.ins-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
-.ins-summary>div{background:var(--card2);border-radius:15px;padding:12px;min-width:0}
-.ins-summary>div:last-child{grid-column:1/-1}
-.ins-summary b{display:block;font-size:clamp(14px,4vw,19px);letter-spacing:-.03em;margin-top:6px}
-.ins-account-head{font-size:13px;font-weight:800;margin:18px 2px 8px}
-.ins-account{display:flex;justify-content:space-between;align-items:center;padding:11px 3px;gap:10px;border-bottom:1px solid var(--line);font-size:12px}
-.ins-account span{color:var(--soft)}
-.ins-account b{white-space:nowrap}
-@media(prefers-reduced-motion:reduce){.ins-bar{transition:none}}
+/* Money Insights: one focused, responsive income-vs-expenses dashboard */
+.ins-dashboard{padding-bottom:8px}
+.ins-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:800;color:var(--soft);text-transform:uppercase;margin:5px 0}
+.ins-title{font-size:24px;letter-spacing:-.05em;margin:3px 0 5px;font-weight:800}
+.ins-intro{font-size:12px;color:var(--soft);margin:0 0 18px}
+.ins-range{display:flex;gap:3px;padding:4px;background:var(--card2);border-radius:999px;margin:0 0 15px}
+.ins-range button{flex:1;background:none;border:0;color:var(--soft);font-size:12px;font-weight:800;padding:9px;border-radius:999px;transition:background .2s,color .2s}
+.ins-range button.on{background:var(--lime);color:var(--on-lime)}
+.ins-feature{background:#172016;border:1px solid #33452B;border-radius:22px;padding:18px 16px;color:#F5F8F0}
+.ins-feature-label{font-size:11px;color:#B7C5AC;font-weight:700;letter-spacing:.04em}
+.ins-feature-amount{font-size:clamp(26px,8.5vw,38px);letter-spacing:-.05em;font-weight:800;color:#CDF46A;margin:6px 0}
+.ins-feature-amount.negative{color:#FFAD99}
+.ins-feature-note{font-size:11px;color:#B7C5AC}
+.ins-two{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.ins-kpi{background:var(--card2);border-radius:16px;padding:12px 11px;min-width:0}
+.ins-kpi-label{font-size:11px;color:var(--soft);font-weight:700}
+.ins-kpi-val{font-size:clamp(15px,4vw,19px);font-weight:800;letter-spacing:-.035em;margin-top:7px;white-space:nowrap}
+.ins-kpi-dot{display:inline-block;width:8px;height:8px;border-radius:3px;margin-right:5px}
+.ins-income{background:#CDF46A}.ins-expense{background:#BBA6FF}
+.ins-chart-shell{border:1px solid var(--line);border-radius:21px;margin:16px 0;padding:15px 12px 12px;background:var(--card)}
+.ins-chart-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.ins-chart-head b{font-size:13px;font-weight:800}
+.ins-chart-legend{display:flex;gap:10px;align-items:center;font-size:10px;color:var(--soft);font-weight:700}
+.ins-chart-legend span{white-space:nowrap}
+.ins-chart-area{display:flex;align-items:stretch;height:205px;gap:7px}
+.ins-axis{width:31px;display:flex;flex-direction:column;justify-content:space-between;text-align:right;color:var(--faint);font-size:9px;font-weight:700;padding-bottom:24px;flex:none}
+.ins-plot{flex:1;min-width:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;position:relative;border-radius:7px;align-items:end}
+.ins-plot:before{content:"";position:absolute;inset:0 0 24px;pointer-events:none;background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(25% - 1px),var(--line) calc(25% - 1px),var(--line) 25%);opacity:.85}
+.ins-month{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0;height:100%;position:relative;z-index:1;border:0;background:none;padding:0;cursor:pointer;color:var(--soft)}
+.ins-month:focus-visible{outline:2px solid var(--lime);outline-offset:2px;border-radius:6px}
+.ins-bars{width:100%;height:calc(100% - 24px);display:flex;gap:2px;justify-content:center;align-items:flex-end}
+.ins-bar{width:min(44%,15px);display:block;border-radius:5px 5px 0 0;transform-origin:bottom;animation:insGrow .45s cubic-bezier(.22,.8,.22,1) both}
+.ins-bar.income{background:#CDF46A}.ins-bar.expense{background:#BBA6FF}
+.ins-month.is-selected .ins-bar{filter:brightness(1.08);box-shadow:0 0 0 1px var(--ink)}
+.ins-month-label{height:24px;line-height:24px;font-size:9px;white-space:nowrap;font-weight:700}
+.ins-month.is-selected .ins-month-label{color:var(--ink);font-weight:800}
+@keyframes insGrow{from{transform:scaleY(.02)}to{transform:scaleY(1)}}
+.ins-detail{border-radius:17px;background:var(--card2);padding:12px 13px;margin:0 0 15px}
+.ins-detail-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}
+.ins-detail-head b{font-size:13px}.ins-detail-head span{font-size:10px;color:var(--soft)}
+.ins-detail-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;padding:4px 0;color:var(--soft)}
+.ins-detail-row b{color:var(--ink);font-weight:800}
+.ins-detail-row.net{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:800}
+.ins-detail-row.net b{color:var(--pos)}
+.ins-detail-row.net b.negative{color:var(--neg)}
+.ins-ledger-head{display:flex;justify-content:space-between;align-items:center;margin:15px 2px 8px}
+.ins-ledger-head b{font-size:14px;font-weight:800}.ins-ledger-head span{font-size:10px;color:var(--soft)}
+.ins-ledger{overflow:hidden;border-radius:16px;border:1px solid var(--line)}
+.ins-ledger-row{display:grid;grid-template-columns:minmax(52px,.75fr) minmax(0,1fr) minmax(0,1fr);gap:7px;padding:11px 10px;align-items:center;border:0;border-bottom:1px solid var(--line);width:100%;background:var(--card);text-align:right;color:var(--ink)}
+.ins-ledger-row:last-child{border-bottom:0}
+.ins-ledger-row.selected{background:var(--card2)}
+.ins-ledger-row span:first-child{text-align:left;font-size:11px;font-weight:800}
+.ins-ledger-row span:not(:first-child){font-size:11px;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.ins-ledger-headings{display:grid;grid-template-columns:minmax(52px,.75fr) minmax(0,1fr) minmax(0,1fr);gap:7px;padding:0 10px 8px;text-align:right;color:var(--faint);font-size:10px}
+.ins-ledger-headings span:first-child{text-align:left}
+.ins-method-note{font-size:11px;line-height:1.55;color:var(--soft);margin:14px 2px 3px}
+@media(max-width:360px){.ins-chart-area{height:185px}.ins-chart-shell{padding:13px 8px}.ins-plot{gap:1px}.ins-month-label{font-size:8px}.ins-axis{width:27px}.ins-ledger-row{gap:4px;padding:10px 7px}.ins-ledger-headings{gap:4px;padding-left:7px;padding-right:7px}}
+@media(prefers-reduced-motion:reduce){.ins-bar{animation:none}.ins-range button{transition:none}}
 
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
@@ -1863,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.37";
+const APP_VERSION = "7.3.38";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2373,39 +2405,61 @@ function pocketIncome(y,m){
   return Object.values(S.tx).reduce((sum,t)=>sum+(live(t)&&t.type==="in"&&t.cat==="Income"&&t.ts>=a&&t.ts<b?lkrOf(t):0),0);
 }
 function openPocketInsights(){
-  const now=pocketMonthNow(),months=[];
-  for(let i=5;i>=0;i--){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const income=pocketIncome(d.getFullYear(),d.getMonth());
-    const expenses=monthSpend(d.getFullYear(),d.getMonth()).total;
-    months.push({label:d.toLocaleDateString("en-GB",{month:"short"}),income,expenses});
-  }
-  const scale=Math.max(1,...months.flatMap(x=>[x.income,x.expenses]));
-  const bars=months.map(m=>'<div class="ins-month" role="group" aria-label="'+esc(m.label)+': income '+rs(m.income)+', expenses '+rs(m.expenses)+'">'+
-    '<div class="ins-bars"><span class="ins-bar income" style="height:'+Math.max(m.income?3:0,m.income/scale*100)+'%" title="Income: '+rs(m.income)+'"></span>'+
-    '<span class="ins-bar expense" style="height:'+Math.max(m.expenses?3:0,m.expenses/scale*100)+'%" title="Expenses: '+rs(m.expenses)+'"></span></div>'+
-    '<b>'+esc(m.label)+'</b></div>').join("");
-  const current=months[months.length-1];
-  const allBalances=balances().filter(b=>b.bank!=="Cash");
-  const bank=allBalances.reduce((total,b)=>total+b.lkr,0);
-  const fds=Object.values(S.fd).filter(live);
-  const deposited=fds.reduce((total,f)=>total+fdValue(f).p,0);
-  const cash=cashBalance().balance;
-  const moneyRows=allBalances.map(b=>'<div class="ins-account"><span>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+'</span>'+
-    '<b class="num">'+(b.cur==="LKR"?rs(b.balance):esc(b.cur)+" "+fmt(b.balance,2))+'</b></div>').join("");
-  openSheet('<h2>Money insights</h2><p class="note">Income vs expenses · Last 6 salary cycles (25th–24th)</p>'+
-    '<div class="ins-totals"><div><span>This cycle · Income</span><b class="num">'+rs(current.income)+'</b></div><div><span>This cycle · Spent</span><b class="num">'+rs(current.expenses)+'</b></div></div>'+
-    '<div class="ins-chart"><div class="ins-chart-head"><b>Income vs expenses</b><span><i class="ins-dot income"></i> Income <i class="ins-dot expense"></i> Expenses</span></div>'+
-    '<div class="ins-plot">'+bars+'</div></div>'+
-    '<div class="ins-summary"><div><span>Bank balances</span><b class="num">'+rs(bank)+'</b></div>'+
-    '<div><span>Fixed deposits · '+fds.length+'</span><b class="num">'+rs(deposited)+'</b></div>'+
-    '<div><span>Cash wallet</span><b class="num">'+rs(cash)+'</b></div></div>'+
-    '<div class="ins-account-head">Accounts</div>'+
-    (moneyRows||'<p class="note">No bank balances recorded yet.</p>')+
-    '<div class="btns" style="margin-top:16px"><button class="btn" id="insSavings" style="flex:1">View savings</button><button class="btn soft" id="insAddFd">+ Fixed deposit</button></div>'+
-    '<p class="note" style="font-size:12px">Expenses exclude cash withdrawals, transfers and fixed-deposit contributions. Paybacks reduce the original expense. Bank and FD totals are shown separately.</p>');
-  $("insSavings").onclick=()=>{closeSheet();go("savings");};
-  $("insAddFd").onclick=openNewFd;
+  const now=pocketMonthNow();
+  let range=6,selected=0;
+  const rootMonths=Array.from({length:12},(_,i)=>{
+    const d=new Date(now.getFullYear(),now.getMonth()-11+i,1);
+    return {y:d.getFullYear(),m:d.getMonth(),label:d.toLocaleDateString("en-GB",{month:"short"}),longLabel:d.toLocaleDateString("en-GB",{month:"long",year:"numeric"}),
+      income:pocketIncome(d.getFullYear(),d.getMonth()),expenses:monthSpend(d.getFullYear(),d.getMonth()).total};
+  });
+  const money=n=>rs(n);
+  const shortMoney=n=>n>=1000000?fmt(n/1000000,1)+"m":n>=1000?fmt(n/1000,0)+"k":fmt(n);
+  const months=()=>rootMonths.slice(-range);
+  selected=range-1;
+  const draw=()=>{
+    const data=months(),m=data[selected]||data[data.length-1],net=m.income-m.expenses;
+    const max=Math.max(1,...data.map(x=>Math.max(x.income,x.expenses)));
+    const rounded=Math.max(1,Math.ceil(max/100000)*100000);
+    const axis=[4,3,2,1,0].map(i=>'<span>'+shortMoney(rounded*i/4)+'</span>').join("");
+    const chart=data.map((x,i)=>{
+      const hi=x.income?Math.max(2,Math.min(100,x.income/rounded*100)):0;
+      const he=x.expenses?Math.max(2,Math.min(100,x.expenses/rounded*100)):0;
+      return '<button type="button" class="ins-month'+(i===selected?' is-selected':'')+'" data-month="'+i+'" aria-label="'+esc(x.longLabel)+': income '+money(x.income)+', expenses '+money(x.expenses)+'">'+
+        '<span class="ins-bars"><i class="ins-bar income" style="height:'+hi+'%"></i><i class="ins-bar expense" style="height:'+he+'%"></i></span>'+
+        '<span class="ins-month-label">'+esc(x.label)+'</span></button>';
+    }).join("");
+    const rows=data.slice().reverse().map((x,i)=>{
+      const ix=data.length-1-i;
+      return '<button type="button" class="ins-ledger-row'+(selected===ix?' selected':'')+'" data-month="'+ix+'"><span>'+esc(x.label)+' '+String(x.y).slice(2)+'</span>'+
+        '<span>'+money(x.income)+'</span><span>'+money(x.expenses)+'</span></button>';
+    }).join("");
+    openSheet('<div class="ins-dashboard"><div class="ins-eyebrow">Sappy Pocket · Insights</div><h2 class="ins-title">Income vs expenses</h2>'+
+      '<p class="ins-intro">Month-by-month money flow · Salary cycles 25th–24th</p>'+
+      '<div class="ins-range"><button type="button" data-range="6" class="'+(range===6?'on':'')+'">6 months</button><button type="button" data-range="12" class="'+(range===12?'on':'')+'">12 months</button></div>'+
+      '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · Difference</div>'+
+      '<div class="ins-feature-amount num'+(net<0?' negative':'')+'">'+(net>0?'+ ':'')+money(net)+'</div>'+
+      '<div class="ins-feature-note">'+(net<0?'Expenses exceeded income':net>0?'Income exceeded expenses':'Income and expenses are equal')+' for this cycle</div></div>'+
+      '<div class="ins-two"><div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-income"></i>Income</div><div class="ins-kpi-val num">'+money(m.income)+'</div></div>'+
+      '<div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-expense"></i>Expenses</div><div class="ins-kpi-val num">'+money(m.expenses)+'</div></div></div>'+
+      '<div class="ins-chart-shell"><div class="ins-chart-head"><b>Monthly comparison</b><div class="ins-chart-legend"><span><i class="ins-kpi-dot ins-income"></i>Income</span><span><i class="ins-kpi-dot ins-expense"></i>Expenses</span></div></div>'+
+      '<div class="ins-chart-area"><div class="ins-axis">'+axis+'</div><div class="ins-plot">'+chart+'</div></div></div>'+
+      '<div class="ins-detail"><div class="ins-detail-head"><b>'+esc(m.longLabel)+'</b><span>Tap another month to compare</span></div>'+
+      '<div class="ins-detail-row"><span>Income received</span><b class="num">'+money(m.income)+'</b></div>'+
+      '<div class="ins-detail-row"><span>Expenses recorded</span><b class="num">'+money(m.expenses)+'</b></div>'+
+      '<div class="ins-detail-row net"><span>Difference</span><b class="num'+(net<0?' negative':'')+'">'+(net>0?'+ ':'')+money(net)+'</b></div></div>'+
+      '<div class="ins-ledger-head"><b>Month by month</b><span>Tap a row for details</span></div>'+
+      '<div class="ins-ledger-headings"><span>Cycle</span><span>Income</span><span>Expenses</span></div>'+
+      '<div class="ins-ledger">'+rows+'</div>'+
+      '<p class="ins-method-note">Based on recorded income and categorized expenses. Cash withdrawals, transfers and fixed-deposit contributions are excluded from expenses. Linked paybacks reduce spending on the original expense. The current cycle may be incomplete.</p></div>');
+    document.querySelectorAll(".ins-range button").forEach(b=>b.onclick=()=>{
+      range=Number(b.dataset.range);
+      selected=range-1; draw();
+    });
+    document.querySelectorAll(".ins-month,.ins-ledger-row").forEach(b=>b.onclick=()=>{
+      selected=Number(b.dataset.month);draw();
+    });
+  };
+  draw();
 }
 
 /* ---------- home ---------- */
