@@ -700,6 +700,15 @@ body.typing .tabs{display:none}
 .ins-rate-actions{display:flex;gap:8px;margin-top:9px}
 .ins-rate-actions .btn{flex:1;padding:11px 8px;font-size:11px}
 
+.ins-simple .ins-chart-shell{margin:8px 0 13px}
+.ins-simple .ins-feature{margin-bottom:11px}
+.ins-simple .ins-progress>div{background:var(--lime)}
+.ins-simple .ins-two{margin:10px 0 14px}
+.ins-simple .ins-month{cursor:default}
+.ins-simple .ins-ledger-four-rows .ins-ledger-row{cursor:default}
+.ins-simple .ins-fx-compact{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:15px 2px 0;font-size:12px}
+.ins-simple .ins-fx-compact b{font-size:13px}
+
 /* Money Insights: one focused, responsive income-vs-expenses dashboard */
 .ins-dashboard{padding-bottom:8px}
 .ins-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:800;color:var(--soft);text-transform:uppercase;margin:5px 0}
@@ -1910,7 +1919,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.45";
+const APP_VERSION = "7.3.46";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2467,89 +2476,68 @@ function pocketIncome(y,m){
 }
 function pocketSaving(y,m){
   const inc=pocketIncome(y,m),spent=monthSpend(y,m).total;
-  const [a,b]=pocketBounds(y,m),fixed=txList().filter(t=>t.type==="out"&&t.cat==="Fixed deposit"&&t.ts>=a.getTime()&&t.ts<b.getTime()).reduce((n,t)=>n+valuationLkr(t),0);
-  return {income:inc,expenses:spent,saved:inc-spent,fd:fixed,available:inc-spent-fixed};
+
+  return {income:inc,expenses:spent,saved:inc-spent,available:inc-spent};
 }
 function openPocketInsights(){
   const now=pocketMonthNow();
-  let range=6,selected=5;
-  const rootMonths=Array.from({length:12},(_,i)=>{
-    const d=new Date(now.getFullYear(),now.getMonth()-11+i,1);
-    return {y:d.getFullYear(),m:d.getMonth(),label:d.toLocaleDateString("en-GB",{month:"short"}),longLabel:d.toLocaleDateString("en-GB",{month:"long",year:"numeric"})};
-  });
+  let range=6;
   const money=n=>(n<0?"−":"")+rs(Math.abs(n));
   const shortMoney=n=>n>=1000000?fmt(n/1000000,1)+"m":n>=1000?fmt(n/1000,0)+"k":fmt(n);
-  const months=()=>rootMonths.slice(-range).map(d=>Object.assign({},d,pocketSaving(d.y,d.m)));
-  selected=range-1;
   const draw=()=>{
-    const data=months(),m=data[selected]||data[data.length-1];
-    const max=Math.max(1,...data.map(x=>Math.max(x.income,x.expenses)));
-    const rounded=Math.max(1,Math.ceil(max/100000)*100000);
-    const axis=[4,3,2,1,0].map(i=>'<span>'+shortMoney(rounded*i/4)+'</span>').join("");
-    const chart=data.map((x,i)=>{
-      const hi=x.income?Math.max(2,Math.min(100,x.income/rounded*100)):0;
-      const he=x.expenses?Math.max(2,Math.min(100,x.expenses/rounded*100)):0;
-      return '<button type="button" class="ins-month'+(i===selected?' is-selected':'')+'" data-month="'+i+'" aria-label="'+esc(x.longLabel)+': income '+money(x.income)+', expenses '+money(x.expenses)+', saved '+money(x.saved)+'">'+
-        '<span class="ins-bars"><i class="ins-bar income" style="height:'+hi+'%"></i><i class="ins-bar expense" style="height:'+he+'%"></i></span>'+
-        '<span class="ins-month-label">'+esc(x.label)+'</span></button>';
+    const data=Array.from({length:range},(_,i)=>{
+      const d=new Date(now.getFullYear(),now.getMonth()-range+1+i,1);
+      return Object.assign({
+        label:d.toLocaleDateString("en-GB",{month:"short"}),
+        year:d.getFullYear(),
+        longLabel:d.toLocaleDateString("en-GB",{month:"long",year:"numeric"})
+      },pocketSaving(d.getFullYear(),d.getMonth()));
+    });
+    const m=data[data.length-1];
+    const highest=Math.max(1,...data.map(x=>Math.max(x.income,x.expenses)));
+    const top=Math.max(1,Math.ceil(highest/100000)*100000);
+    const axis=[4,3,2,1,0].map(i=>'<span>'+shortMoney(top*i/4)+'</span>').join("");
+    const chart=data.map(x=>{
+      const incomeH=x.income?Math.max(2,Math.min(100,x.income/top*100)):0;
+      const expenseH=x.expenses?Math.max(2,Math.min(100,x.expenses/top*100)):0;
+      return '<div class="ins-month"><span class="ins-bars"><i class="ins-bar income" style="height:'+incomeH+'%"></i>'+
+        '<i class="ins-bar expense" style="height:'+expenseH+'%"></i></span><span class="ins-month-label">'+esc(x.label)+'</span></div>';
     }).join("");
-    const rows=data.slice().reverse().map((x,i)=>{
-      const ix=data.length-1-i;
-      return '<button type="button" class="ins-ledger-row'+(selected===ix?' selected':'')+'" data-month="'+ix+'"><span>'+esc(x.label)+' '+String(x.y).slice(2)+'</span>'+
-        '<span>'+money(x.income)+'</span><span>'+money(x.expenses)+'</span><span class="'+(x.saved<0?'ins-negative':'ins-positive')+'">'+money(x.saved)+'</span></button>';
-    }).join("");
-    const pct=m.income>0?Math.max(0,Math.min(100,m.available/m.income*100)):0;
-    const bank=balances().filter(b=>b.bank!=="Cash").reduce((n,b)=>n+b.lkr,0);
-    const isCurrent=m.y===now.getFullYear()&&m.m===now.getMonth();
-    const fxNote= S.rate.source==="HNB" ? 'HNB indicative TT buying · '+esc(S.rate.date||"date unverified") : 'FX estimate not verified as HNB';
-    const fxRate=Number(S.rate.AUD)||0;
-    const [cycleStart,cycleEnd]=pocketBounds(m.y,m.m),dateFmt=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
-    const daysLeft=isCurrent?Math.max(0,Math.ceil((cycleEnd-Date.now())/86400000)):0;
-    openSheet('<div class="ins-dashboard"><div class="ins-eyebrow">Sappy Pocket · Salary savings</div><h2 class="ins-title">My money, month by month</h2>'+
-      '<p class="ins-intro">Spending: 22nd–21st · AUD income: 20th–25th · LKR salary: 22nd–25th</p>'+
-      '<div class="ins-range"><button type="button" data-range="6" class="'+(range===6?'on':'')+'">6 months</button><button type="button" data-range="12" class="'+(range===12?'on':'')+'">12 months</button></div>'+
-      '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · '+(isCurrent?'Salary left to spend':'Left at cycle end')+'</div>'+
-      '<div class="ins-feature-amount num'+(m.available<0?' negative':'')+'">'+money(m.available)+'</div>'+
-      '<div class="ins-feature-note">'+dateFmt(cycleStart)+'–'+dateFmt(new Date(cycleEnd.getTime()-86400000))+(isCurrent?' · '+daysLeft+' days until next cycle':'')+'</div>'+
-      '<div class="ins-progress"><div style="width:'+pct+'%;background:#CDF46A"></div></div>'+
-      '<div class="ins-feature-note">Income less spending and fixed-deposit contributions · '+Math.round(pct)+'% of income available</div></div>'+
-      '<div class="ins-two"><div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-income"></i>Income</div><div class="ins-kpi-val num">'+money(m.income)+'</div></div>'+
-      '<div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-expense"></i>Spent</div><div class="ins-kpi-val num">'+money(m.expenses)+'</div></div></div>'+
-      '<div class="ins-saved-card"><div><span>Saved / not spent</span><strong class="num'+(m.saved<0?' ins-negative':'')+'">'+money(m.saved)+'</strong><small>'+(m.income>0?Math.round(m.saved/m.income*100)+'% of recorded income':'No recorded income')+'</small></div><div><span>Moved to fixed deposits</span><strong class="num">'+money(m.fd)+'</strong><small>Included in savings, not spending</small></div></div>'+
-      '<div class="ins-chart-shell"><div class="ins-chart-head"><b>Income vs expenses</b><div class="ins-chart-legend"><span><i class="ins-kpi-dot ins-income"></i>Income</span><span><i class="ins-kpi-dot ins-expense"></i>Expenses</span></div></div>'+
+    const rows=data.slice().reverse().map(x=>'<div class="ins-ledger-row"><span>'+esc(x.label)+' '+String(x.year).slice(2)+'</span>'+
+      '<span>'+money(x.income)+'</span><span>'+money(x.expenses)+'</span>'+
+      '<span class="'+(x.saved<0?'ins-negative':'ins-positive')+'">'+money(x.saved)+'</span></div>').join("");
+    const pct=m.income>0?Math.max(0,Math.min(100,m.saved/m.income*100)):0;
+    const [from,to]=pocketBounds(now.getFullYear(),now.getMonth());
+    const date=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+    const fx=Number(S.rate.AUD)||0;
+    const fxNote=S.rate.source==="HNB"?"HNB buying rate":"Indicative estimate · not HNB verified";
+    openSheet('<div class="ins-dashboard ins-simple"><div class="ins-eyebrow">Sappy Pocket · Insights</div>'+
+      '<h2 class="ins-title">Income, expenses & savings</h2>'+
+      '<p class="ins-intro">Salary spending cycle 22nd–21st</p>'+
+      '<div class="ins-range"><button type="button" data-range="6" class="'+(range===6?'on':'')+'">6 months</button>'+
+      '<button type="button" data-range="12" class="'+(range===12?'on':'')+'">12 months</button></div>'+
+      '<div class="ins-chart-shell"><div class="ins-chart-head"><b>Monthly comparison</b>'+
+      '<div class="ins-chart-legend"><span><i class="ins-kpi-dot ins-income"></i>Income</span>'+
+      '<span><i class="ins-kpi-dot ins-expense"></i>Expenses</span></div></div>'+
       '<div class="ins-chart-area"><div class="ins-axis">'+axis+'</div><div class="ins-plot">'+chart+'</div></div></div>'+
-      '<div class="ins-detail"><div class="ins-detail-head"><b>'+esc(m.longLabel)+' breakdown</b><span>Tap any month above</span></div>'+
-      '<div class="ins-detail-row"><span>Income received</span><b class="num">'+money(m.income)+'</b></div>'+
-      '<div class="ins-detail-row"><span>Expenses recorded</span><b class="num">'+money(m.expenses)+'</b></div>'+
-      '<div class="ins-detail-row"><span>Saved / not spent</span><b class="num">'+money(m.saved)+'</b></div>'+
-      '<div class="ins-detail-row"><span>Fixed deposits</span><b class="num">'+money(m.fd)+'</b></div>'+
-      '<div class="ins-detail-row net"><span>Salary available</span><b class="num'+(m.available<0?' negative':'')+'">'+money(m.available)+'</b></div></div>'+
-      '<div class="ins-ledger-head"><b>Savings by salary month</b><span>Tap to compare</span></div>'+
+      '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · Salary remaining</div>'+
+      '<div class="ins-feature-amount num'+(m.saved<0?' negative':'')+'">'+money(m.saved)+'</div>'+
+      '<div class="ins-progress"><div style="width:'+pct+'%"></div></div>'+
+      '<div class="ins-feature-note">'+date(from)+' – '+date(new Date(to.getTime()-86400000))+
+      ' · '+Math.round(pct)+'% of recorded income remaining</div></div>'+
+      '<div class="ins-two"><div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-income"></i>Income</div>'+
+      '<div class="ins-kpi-val num">'+money(m.income)+'</div></div>'+
+      '<div class="ins-kpi"><div class="ins-kpi-label"><i class="ins-kpi-dot ins-expense"></i>Expenses</div>'+
+      '<div class="ins-kpi-val num">'+money(m.expenses)+'</div></div></div>'+
+      '<div class="ins-ledger-head"><b>Monthly savings</b><span>All values visible</span></div>'+
       '<div class="ins-ledger-headings ins-ledger-four"><span>Month</span><span>Income</span><span>Spent</span><span>Saved</span></div>'+
       '<div class="ins-ledger ins-ledger-four-rows">'+rows+'</div>'+
-      '<div class="ins-detail"><div class="ins-detail-head"><b>Bank balances (latest reported)</b></div>'+
-      '<div class="ins-detail-row"><span>Current tracked bank balance</span><b>'+money(bank)+'</b></div>'+
-      '<p class="ins-method-note">Bank balance is your latest recorded account snapshot, not the amount saved from this salary. It may include older savings and transfers.</p></div>'+
-      '<div class="ins-detail"><div class="ins-detail-head"><b>AUD to LKR estimate</b><span>'+fxNote+'</span></div>'+
-      '<div class="ins-detail-row"><span>1 AUD</span><b>'+money(fxRate)+'</b></div>'+
-      '<div class="ins-rate-actions"><button type="button" class="btn soft" id="insSetRate">Set HNB buying rate</button><button type="button" class="btn soft" id="insRateSite">HNB rates ↗</button></div>'+
-      '<p class="ins-method-note">The bank’s quoted buying rate is indicative. Actual bank-converted salary amounts remain fixed. If an official HNB rate cannot be verified automatically, use Set HNB buying rate; never assume a market FX rate is HNB.</p></div>'+
-      '<p class="ins-method-note">Savings = received income − spending after linked paybacks. Fixed deposits remain part of savings and are deducted only from spendable cash. Unrecorded transactions and pending salary payments affect totals; this is not a full reconciliation of bank savings.</p></div>');
-    document.querySelectorAll(".ins-range button").forEach(b=>b.onclick=()=>{range=Number(b.dataset.range);selected=range-1;draw();});
-    document.querySelectorAll(".ins-month,.ins-ledger-row").forEach(b=>b.onclick=()=>{selected=Number(b.dataset.month);draw();});
-    $("insRateSite").onclick=()=>window.open("https://www.hnb.lk/exchange-rates","_blank","noopener,noreferrer");
-    $("insSetRate").onclick=()=>{
-      const raw=prompt("HNB AUD/LKR Telegraphic Transfer BUYING rate (LKR per AUD)",String(S.rate.AUD||""));
-      if(raw===null)return;
-      const rate=Number(raw);
-      if(!Number.isFinite(rate)||rate<100||rate>500){toast("Enter a valid AUD buying rate");return;}
-      S.rate.AUD=rate;S.rate.source="HNB";S.rate.date=new Date().toLocaleDateString("en-CA");S.rate.at=Date.now();
-      persist();draw();render();
-    };
+      '<div class="ins-fx-compact"><span>AUD → LKR</span><b>1 AUD ≈ '+money(fx)+'</b></div>'+
+      '<p class="ins-method-note">'+fxNote+'. Saved = income − expenses. Fixed deposits and transfers are not included. AUD income received from the 20th and LKR salary from the 22nd count toward the next salary month. Older unrecorded savings do not affect these figures.</p></div>');
+    document.querySelectorAll(".ins-range button").forEach(b=>b.onclick=()=>{range=Number(b.dataset.range);draw();});
   };
   draw();
 }
-
 /* ---------- home ---------- */
 function monthSpend(y,m){
   let total=0; const by={};
@@ -2611,8 +2599,8 @@ function renderHome(){
   const back=mt.filter(isLooseBack).reduce((s,t)=>s+lkrOf(t),0);
   const spent=out.reduce((s,t)=>s+myShare(t),0);
   const net=spent;
-  const fdOut=mt.filter(t=>t.type==="out"&&t.cat==="Fixed deposit").reduce((s,t)=>s+lkrOf(t),0);
-  const left=inc-spent-fdOut;
+
+  const left=inc-spent;
   const by={}; out.forEach(t=>by[pocketCat(t)]=(by[pocketCat(t)]||0)+myShare(t));
   const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
   const mName=month.toLocaleDateString("en-GB",{month:"long"});
