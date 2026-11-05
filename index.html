@@ -1895,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.40";
+const APP_VERSION = "7.3.41";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2026,6 +2026,15 @@ function put(kind, obj){
 }
 function saveRules(){ put("cfg",{id:"rules",map:Object.assign({},S.rules),acct:Object.assign({},S.bankByAcct)}); }
 function remove(kind, id){ put(kind, {id, del:true}); }
+// A deleted SMS keeps its ID as a tombstone so future SMS syncs cannot recreate it.
+function deletePayment(id){
+  const t=S.tx[id];
+  if(!t || !live(t)) return;
+  remove("tx",id);
+  if(live(S.fd["f"+id])) remove("fd","f"+id);
+  closeSheet();
+  toast("Payment removed");
+}
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
@@ -2198,7 +2207,7 @@ function ingest(raw){
     if(approvedBankAlert(t) && /(lkr|rs\.?|aud|usd)\s*[\d,]/i.test(t) && !looksOtp(t)){ const id="k"+hashStr(t); if(!live(S.skip[id])) put("skip",{id,raw:t}); }
     return {r:"skip"};
   }
-  if(S.tx[p.id] && live(S.tx[p.id])) return {r:"dup",p};
+  if(S.tx[p.id]) return {r:"dup",p};
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
   const tk=topupFor(p); if(tk){ p.topup=tk; p.cat="Transfers"; const [tb,ta]=tk.split("|"); p.merchant="Top-up to "+tb+(ta?" ••"+ta:""); p.nameSet=true; }
   put("tx",p);
@@ -2507,7 +2516,8 @@ function openSort(id){
     '<div class="sortcard"><b>'+esc(t.merchant)+'</b><span class="num">−'+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2)+' · '+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+(t.bank&&t.bank!=="Bank"?' · '+esc(t.bank):'')+'</span></div>'+
     catPicker(PICK.concat(["Fixed deposit"]),null)+
     '<label class="chk"><input type="checkbox" id="srem" checked> Always use this for '+esc(t.merchant)+'</label>'+
-    '<div class="btns"><button class="btn" id="sSave" style="flex:1">Save</button><button class="btn soft" id="sLater">Later</button></div>');
+    '<div class="btns"><button class="btn" id="sSave" style="flex:1">Save</button><button class="btn soft" id="sLater">Later</button></div>'+
+    '<button type="button" class="btn warn" id="sDelete" style="width:100%;margin-top:10px;text-align:center">Delete payment</button>');
   wirePicker(c=>cat=c);
   $("sSave").onclick=()=>{ if(!cat) return toast("Pick a category");
     put("tx",Object.assign({},t,{cat,catSet:true}));
@@ -2515,6 +2525,10 @@ function openSort(id){
       unsorted().filter(o=>o.merchant.toLowerCase()===k).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
     dataVer++; closeSheet(); toast("Saved · "+cat); render(); setTimeout(()=>{ const u=unsorted(); if(u.length&&!sheetOpen) openSort(u[0].id); },450); };
   $("sLater").onclick=closeSheet;
+  $("sDelete").onclick=()=>{
+    if(!confirm("Delete this payment permanently? It will be removed from your expenses and sorting list.")) return;
+    deletePayment(t.id);
+  };
 }
 function renderSoon(){
   const loose=(typeof looseBacks==="function")?looseBacks().filter(p=>backSuggestions(p).length):[];
@@ -2996,7 +3010,10 @@ function openTx(id,edit){
     if(askBal){ toast("Saved. Now set the "+askBal.split("|")[0]+" balance"); setTimeout(()=>openSetBal(askBal),350); return; }
     closeSheet(); toast("Saved");
   };
-  $("tdel").onclick=()=>{ remove("tx",t.id); if(live(S.fd["f"+t.id])) remove("fd","f"+t.id); closeSheet(); toast("Deleted"); };
+  $("tdel").onclick=()=>{
+    if(!confirm("Delete this payment permanently?")) return;
+    deletePayment(t.id);
+  };
 }
 
 function openAdd(cashOnly=false){
