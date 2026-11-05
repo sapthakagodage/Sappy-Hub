@@ -684,6 +684,34 @@ body.typing .tabs{display:none}
 .sheet .btn:active,.sheet .lrow:active{transform:scale(.985)}
 @media (prefers-reduced-motion:reduce){#sheetBody.sheet-content-in{animation:none!important}
   .sheet,.scrim,.sheet .btn,.sheet .chip,.sheet .seg button,.sheet .pick button,.sheet .lrow,.sheet .sx{transition:none!important}}
+
+/* Monthly insights shared bottom-sheet visual */
+.ins-totals{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+.ins-totals>div{background:var(--card2);border-radius:15px;padding:12px 10px;min-width:0}
+.ins-totals span,.ins-summary span{display:block;font-size:11px;color:var(--soft);font-weight:700}
+.ins-totals b{display:block;font-size:clamp(14px,4vw,20px);letter-spacing:-.04em;margin-top:6px;white-space:nowrap}
+.ins-chart{padding:15px 12px 12px;border-radius:18px;background:var(--card2)}
+.ins-chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.ins-chart-head>b{font-size:13px}
+.ins-chart-head>span{font-size:10px;color:var(--soft);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.ins-dot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-left:3px}
+.ins-dot.income,.ins-bar.income{background:var(--lime)}
+.ins-dot.expense,.ins-bar.expense{background:var(--violet)}
+.ins-plot{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;height:158px;margin-top:18px;align-items:end}
+.ins-month{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;gap:6px}
+.ins-month>b{font-size:10px;color:var(--soft);font-weight:700}
+.ins-bars{height:127px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line)}
+.ins-bar{display:block;width:clamp(8px,3.8vw,15px);border-radius:5px 5px 0 0;min-height:0;transition:height .32s cubic-bezier(.22,.8,.22,1)}
+.ins-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.ins-summary>div{background:var(--card2);border-radius:15px;padding:12px;min-width:0}
+.ins-summary>div:last-child{grid-column:1/-1}
+.ins-summary b{display:block;font-size:clamp(14px,4vw,19px);letter-spacing:-.03em;margin-top:6px}
+.ins-account-head{font-size:13px;font-weight:800;margin:18px 2px 8px}
+.ins-account{display:flex;justify-content:space-between;align-items:center;padding:11px 3px;gap:10px;border-bottom:1px solid var(--line);font-size:12px}
+.ins-account span{color:var(--soft)}
+.ins-account b{white-space:nowrap}
+@media(prefers-reduced-motion:reduce){.ins-bar{transition:none}}
+
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -1813,7 +1841,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
     <button class="tab" data-v="home" aria-current="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/></svg><span>Overview</span></button>
     <button class="tab" data-v="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Activity</span></button>
 
-    <button class="fab nav-add" id="fab" aria-label="Add Pocket entry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="fab nav-add" id="fab" aria-label="Monthly insights" title="Monthly insights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M9.5 19V5M15 19v-8M20 19V8"/></svg></button>
     <button class="tab" data-v="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v9H4zM4 10l8-5 8 5M8 13v3M12 13v3M16 13v3"/></svg><span>Savings</span></button>
     <button class="tab" data-v="sms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4z"/><path d="M8 9h8M8 12.5h5"/></svg><span>Add SMS</span></button>
   </div>
@@ -1835,7 +1863,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.35";
+const APP_VERSION = "7.3.36";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2335,6 +2363,49 @@ function render(){
   if(view==="savings") renderSavings();
   if(view==="sms") renderSms();
   if(document.body.classList.contains("in-set")) renderSettings();
+}
+
+
+/* ---------- Quick insights (footer chart) ---------- */
+function pocketIncome(y,m){
+  const [start,end]=pocketBounds(y,m),a=start.getTime(),b=end.getTime();
+  // Only actual Income, not paybacks, transfers or cash withdrawals.
+  return Object.values(S.tx).reduce((sum,t)=>sum+(live(t)&&t.type==="in"&&t.cat==="Income"&&t.ts>=a&&t.ts<b?lkrOf(t):0),0);
+}
+function openPocketInsights(){
+  const now=pocketMonthNow(),months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const income=pocketIncome(d.getFullYear(),d.getMonth());
+    const expenses=monthSpend(d.getFullYear(),d.getMonth()).total;
+    months.push({label:d.toLocaleDateString("en-GB",{month:"short"}),income,expenses});
+  }
+  const scale=Math.max(1,...months.flatMap(x=>[x.income,x.expenses]));
+  const bars=months.map(m=>'<div class="ins-month" role="group" aria-label="'+esc(m.label)+': income '+rs(m.income)+', expenses '+rs(m.expenses)+'">'+
+    '<div class="ins-bars"><span class="ins-bar income" style="height:'+Math.max(m.income?3:0,m.income/scale*100)+'%" title="Income: '+rs(m.income)+'"></span>'+
+    '<span class="ins-bar expense" style="height:'+Math.max(m.expenses?3:0,m.expenses/scale*100)+'%" title="Expenses: '+rs(m.expenses)+'"></span></div>'+
+    '<b>'+esc(m.label)+'</b></div>').join("");
+  const current=months[months.length-1];
+  const allBalances=balances().filter(b=>b.bank!=="Cash");
+  const bank=allBalances.reduce((total,b)=>total+b.lkr,0);
+  const fds=Object.values(S.fd).filter(live);
+  const deposited=fds.reduce((total,f)=>total+fdValue(f).p,0);
+  const cash=cashBalance().balance;
+  const moneyRows=allBalances.map(b=>'<div class="ins-account"><span>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+'</span>'+
+    '<b class="num">'+(b.cur==="LKR"?rs(b.balance):esc(b.cur)+" "+fmt(b.balance,2))+'</b></div>').join("");
+  openSheet('<h2>Money insights</h2><p class="note">Income vs expenses · Last 6 salary cycles (25th–24th)</p>'+
+    '<div class="ins-totals"><div><span>This cycle · Income</span><b class="num">'+rs(current.income)+'</b></div><div><span>This cycle · Spent</span><b class="num">'+rs(current.expenses)+'</b></div></div>'+
+    '<div class="ins-chart"><div class="ins-chart-head"><b>Income vs expenses</b><span><i class="ins-dot income"></i> Income <i class="ins-dot expense"></i> Expenses</span></div>'+
+    '<div class="ins-plot">'+bars+'</div></div>'+
+    '<div class="ins-summary"><div><span>Bank balances</span><b class="num">'+rs(bank)+'</b></div>'+
+    '<div><span>Fixed deposits · '+fds.length+'</span><b class="num">'+rs(deposited)+'</b></div>'+
+    '<div><span>Cash wallet</span><b class="num">'+rs(cash)+'</b></div></div>'+
+    '<div class="ins-account-head">Accounts</div>'+
+    (moneyRows||'<p class="note">No bank balances recorded yet.</p>')+
+    '<div class="btns" style="margin-top:16px"><button class="btn" id="insSavings" style="flex:1">View savings</button><button class="btn soft" id="insAddFd">+ Fixed deposit</button></div>'+
+    '<p class="note" style="font-size:12px">Expenses exclude cash withdrawals, transfers and fixed-deposit contributions. Paybacks reduce the original expense. Bank and FD totals are shown separately.</p>');
+  $("insSavings").onclick=()=>{closeSheet();go("savings");};
+  $("insAddFd").onclick=openNewFd;
 }
 
 /* ---------- home ---------- */
@@ -2902,7 +2973,7 @@ function go(v){ rememberScreen(); if(sheetOpen) closeSheet();
   view=v; document.body.classList.toggle("on-savings",v==="savings"); document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v===v?"true":"false"));
   ["home","activity","savings","sms"].forEach(x=>$("v-"+x).hidden=x!==v); window.scrollTo(0,0); render(); enterScreen(); }
 document.querySelectorAll(".tab[data-v]").forEach(b=>b.onclick=()=>go(b.dataset.v));
-$("fab").onclick=openAdd;
+$("fab").onclick=openPocketInsights;
 $("prev").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()-1); focusCat=null; render(); };
 $("next").onclick=()=>{ selDay=null; selWeek=null; selMonth=null; setTimeout(enterScreen,0); month.setMonth(month.getMonth()+1); focusCat=null; render(); };
 $("q").oninput=renderActivity;
