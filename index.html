@@ -1826,7 +1826,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.32";
+const APP_VERSION = "7.3.33";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2472,7 +2472,7 @@ function openCashWallet(){
     '<div class="btns"><button class="btn full" id="cashAdd">+ Cash expense</button></div>'+
     '<div class="sechead" style="margin-top:22px"><span>Cash activity</span><span class="r">Latest first</span></div>'+
     '<div id="cashMoves">'+(timeline||'<div class="list"><div class="empty">No cash movements recorded yet.</div></div>')+'</div>');
-  $("cashAdd").onclick=()=>openAdd();
+  $("cashAdd").onclick=()=>openAdd(true);
   $("cashMoves").querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
 }
 
@@ -2811,7 +2811,7 @@ function openTx(id,edit){
   $("tdel").onclick=()=>{ remove("tx",t.id); if(live(S.fd["f"+t.id])) remove("fd","f"+t.id); closeSheet(); toast("Deleted"); };
 }
 
-function openAdd(){
+function openAdd(cashOnly=false){
   let type="out", cat=null, acc="Cash|";
   // where the money came from / went: Cash first, then your accounts
   const accOpts=()=>{ const o=[{k:"Cash|",n:"Cash"}], seen=new Set(["Cash|"]);
@@ -2822,23 +2822,27 @@ function openAdd(){
     if(cat && !cats.includes(cat)) cat=type==="in"?"Income":null;
     const accs=accOpts(); if(!accs.find(a=>a.k===acc)) acc="Cash|";
     const amtV=$("aamt")?$("aamt").value:"", nameV=$("aname")?$("aname").value:"";
-    openSheet('<h2>Add entry</h2><div class="note">Cash purchases count as expenses. A bank withdrawal is just money moved into Cash, so do not add the withdrawal again.</div>'+
+    const dateV=$("adate")?$("adate").value:ymd(Date.now()), currencyV=$("acur")?$("acur").value:"LKR";
+    openSheet('<h2>'+(cashOnly?'Add cash expense':'Add entry')+'</h2><div class="note">'+(cashOnly?'Choose the date you actually spent the cash, even if you are recording it a few days later.':'Cash purchases count as expenses. A bank withdrawal is just money moved into Cash, so do not add the withdrawal again.')+'</div>'+
       '<div style="height:12px"></div>'+
-      '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Money in</button></div>'+
+      (cashOnly?'':'<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Money in</button></div>')+
       '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num" value="'+esc(amtV)+'"></div></label>'+
-      '<div class="field"><span>'+(type==="in"?"Received in":"Paid from")+'</span><div class="chips" id="accPick" style="flex-wrap:wrap">'+accs.map(a=>'<button type="button" class="chip'+(a.k===acc?' on':'')+'" data-k="'+esc(a.k)+'">'+esc(a.n)+'</button>').join("")+'</div></div>'+
+      (cashOnly?'<div class="fromhome"><span>Paid from</span><b>Cash wallet</b></div>':'<div class="field"><span>'+(type==="in"?"Received in":"Paid from")+'</span><div class="chips" id="accPick" style="flex-wrap:wrap">'+accs.map(a=>'<button type="button" class="chip'+(a.k===acc?' on':'')+'" data-k="'+esc(a.k)+'">'+esc(a.n)+'</button>').join("")+'</div></div>')+
       '<label class="field"><span>'+(type==="in"?"From (who)":"Where")+'</span><input id="aname" value="'+esc(nameV)+'" placeholder="'+(type==="in"?"e.g. Kelum":"Shop or place")+'"></label>'+
       catPicker(cats,cat)+
-      '<label class="field"><span>Date</span><input id="adate" type="date" value="'+ymd(Date.now())+'"></label>'+
+      '<label class="field"><span>'+(cashOnly?'Date spent':'Date')+'</span><input id="adate" type="date" max="'+ymd(Date.now())+'" value="'+esc(dateV)+'"></label>'+
       '<button class="btn full" id="asave">Add</button>');
-    $("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ type=b.dataset.t; draw(); });
-    $("accPick").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ acc=b.dataset.k; $("accPick").querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b)); });
+    if($("tt"))$("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ type=b.dataset.t; draw(); });
+    if($("accPick"))$("accPick").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ acc=b.dataset.k; $("accPick").querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b)); });
     wirePicker(c=>cat=c);
-    $("acur").value="LKR";
+    $("acur").value=cashOnly?"LKR":currencyV;
+    if(cashOnly){$("acur").value="LKR";$("acur").disabled=true;acc="Cash|";}
     $("asave").onclick=()=>{
       const amount=parseFloat($("aamt").value.replace(/,/g,"")); if(!(amount>0)) return toast("Enter an amount");
       if(!cat) return toast("Pick a category");
-      const cur=$("acur").value, d=$("adate").value?fromYmd($("adate").value):Date.now();
+      if(!$("adate").value)return toast("Choose the date spent");
+      if($("adate").value>ymd(Date.now()))return toast("Choose today or an earlier date");
+      const cur=$("acur").value, d=fromYmd($("adate").value);
       const ts= sameDay(d,Date.now())?Date.now():d;
       const [bank,acct]=acc.split("|");
       put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, merchant:$("aname").value.trim()||(type==="in"?(cat==="Paid back"?"Paid back":"Cash received"):cat), ts, bank, acct:acct||"", lkr:amount*rateFor(cur), fx:rateFor(cur)});
