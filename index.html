@@ -1593,11 +1593,28 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 /* Differentiate ComBank subtly inside the shared HNB + ComBank activity timeline. */
 .tx.bank-combank .c{color:#86B9EB}
 .bank-indicator{display:inline-block;vertical-align:middle;width:6px;height:6px;border-radius:50%;background:#86B9EB;margin:0 5px 1px 0}
-.cash-wallet{width:100%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;text-align:left;gap:6px;margin:12px 0 8px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--ink);padding:16px;box-shadow:var(--shadow)}
-.cash-wallet-label{font-size:13px;font-weight:800}
-.cash-wallet-label small{font-size:11px;font-weight:500;color:var(--soft)}
-.cash-wallet b{font-size:19px}
-.cash-wallet-sub{width:100%;color:var(--soft);font-size:12px}
+.cash-wallet{width:100%;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--ink);padding:17px 16px;display:flex;align-items:center;gap:12px;text-align:left;margin:12px 0 14px;box-shadow:var(--shadow);min-width:0}
+.cash-wallet:active{transform:scale(.995);background:var(--press)}
+.cw-icon{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:var(--lime);color:#172212;font-size:23px;font-weight:800;flex:none}
+.cw-content{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.cash-wallet-label{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.cash-wallet-sub{font-size:11px;color:var(--soft);line-height:1.35}
+.cw-balance{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.cw-balance small{font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--soft)}
+.cw-balance b{font-size:clamp(16px,4.3vw,21px);letter-spacing:-.04em;white-space:nowrap}
+.cash-sheet-hero{background:var(--on-lime);color:#F5F8F0;border-radius:20px;padding:20px 18px;margin:12px 0 16px;overflow:hidden;position:relative}
+.csh-top{display:flex;gap:9px;align-items:center;font-size:11px;letter-spacing:.11em;color:#B9C5AF;font-weight:800}
+.csh-icon{width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:var(--lime);color:#182118;font-size:18px;letter-spacing:0}
+.csh-amount{font-weight:850;color:var(--lime);letter-spacing:-.045em;font-size:clamp(30px,9vw,43px);margin:16px 0 12px}
+.csh-meta{color:#B9C5AF;font-size:12px;line-height:1.55;max-width:290px}
+.hc-accts{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.fx-account{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #3C4438;background:var(--on-lime);border-radius:var(--r-md);padding:10px 12px;min-width:0}
+.fx-account-name{font-size:12px;font-weight:800;color:#D9DED2;min-width:0}
+.fx-account-name small{display:block;margin-top:3px;font-size:10px;font-weight:600;color:#96A28F}
+.fx-account-money{text-align:right;min-width:0}
+.fx-account-money b{font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--lime);white-space:nowrap}
+.fx-account-money small{display:block;margin-top:3px;font-size:10px;color:#96A28F}
+@media(max-width:350px){.cw-icon{width:35px;height:35px}.cash-wallet{gap:8px;padding:12px}.cw-balance b{font-size:15px}.hc-bal2{padding:10px 9px}}
 </style>
 </head>
 <body class="in-hub">
@@ -1718,7 +1735,11 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
       <div class="hc-bals" id="hcBals"></div>
       <div class="hc-accts" id="balAccts"></div>
     </div>
-    <button class="card cash-wallet" id="cashWallet" type="button"><span class="cash-wallet-label">Cash wallet <small>· Withdrawals aren’t expenses</small></span><b id="cashValue" class="num">Rs 0</b><span class="cash-wallet-sub">Track cash spending</span></button>
+    <button class="cash-wallet" id="cashWallet" type="button" aria-label="Open cash wallet">
+      <span class="cw-icon" aria-hidden="true">↗</span>
+      <span class="cw-content"><span class="cash-wallet-label">Cash wallet</span><span class="cash-wallet-sub">Cash on hand · Tap to see spending</span></span>
+      <span class="cw-balance"><small>AVAILABLE</small><b id="cashValue" class="num">Rs 0</b></span>
+    </button>
 
     <div class="sechead" id="whereHead"><span>Where it went</span><span class="r">Tap a bar</span></div>
     <div class="card" id="whereCard">
@@ -1803,7 +1824,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.29";
+const APP_VERSION = "7.3.30";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2376,14 +2397,14 @@ function renderHome(){
   $("cSub").textContent=out.length?out.length+" payments · "+rs(net/days)+" a day":"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
   $("insBadge").textContent=badge;
-  const fx=balances().filter(b=>b.cur!=="LKR"), accs=mainAccounts();
+  const fx=balances().filter(b=>b.cur!=="LKR"&&b.bank!=="Cash"), accs=mainAccounts().filter(a=>a.bank!=="Cash");
   $("inc").textContent=fmt(Math.round(inc)); $("inc").dataset.count=Math.round(inc);
   document.querySelector(".hc-flow").style.gridTemplateColumns="1fr";
   $("hcBals").innerHTML=accs.map(accTile).join("");
-  $("hcBals").style.gridTemplateColumns=accs.length>1?"1fr 1fr":"1fr";
+  $("hcBals").style.gridTemplateColumns=accs.length>1?"repeat(2,minmax(0,1fr))":"1fr";
   $("hcBals").hidden=!accs.length;
   $("hcBals").querySelectorAll("[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
-  $("balAccts").innerHTML=fx.map(b=>'<div>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' · '+esc(b.cur)+' '+fmt(b.balance,2)+'</div>').join("");
+  $("balAccts").innerHTML=fx.map(b=>'<div class="fx-account"><span class="fx-account-name">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' <small>'+esc(b.cur)+' account</small></span><span class="fx-account-money"><b class="num">'+esc(b.cur)+' '+fmt(b.balance,2)+'</b><small>≈ '+rs(b.lkr)+'</small></span></div>').join("");
   $("balAccts").hidden=!fx.length;
   const cash=cashBalance(); $("cashValue").textContent=rs(cash.balance);
   $("cashWallet").onclick=openCashWallet;
@@ -2437,14 +2458,33 @@ function openCashBalance(){
     closeSheet();toast("Cash balance updated");render();
   };
 }
+function cashMovementHtml(t){
+  const withdrawal=isCashWithdrawal(t),credit=withdrawal||t.type==="in";
+  const category=withdrawal?"Cash":pocketCat(t),c=CATS[category]||CATS.Other;
+  const amount=(credit?"+":"−")+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
+  return '<button class="tx" data-id="'+esc(t.id)+'">'+
+    '<span class="ic" style="background:'+c.c+'">'+icon(category,20)+'</span>'+
+    '<span class="mid"><div class="m">'+esc(withdrawal?"Cash withdrawal":t.merchant)+'</div>'+
+    '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(category)+" · Cash")+'</div></span>'+
+    '<span class="rt"><div class="a num'+(credit?' in':'')+'">'+amount+'</div></span></button>';
+}
 function openCashWallet(){
-  const c=cashBalance(), cash=txList().filter(t=>isCashWithdrawal(t)||(t.bank==="Cash"&&t.cat!=="Cash"));
+  const c=cashBalance();
+  const moves=txList().filter(t=>isCashWithdrawal(t)||(t.bank==="Cash"&&t.cat!=="Cash")).sort((a,b)=>b.ts-a.ts);
+  let timeline="",day="",opened=false;
+  moves.slice(0,60).forEach(t=>{
+    const d=dayLabel(t.ts);
+    if(d!==day){if(opened)timeline+='</div>';timeline+='<div class="day">'+esc(d)+'</div><div class="list">';day=d;opened=true;}
+    timeline+=cashMovementHtml(t);
+  });
+  if(opened)timeline+='</div>';
   openSheet('<h2>Cash wallet</h2>'+
-    '<p class="note">Withdrawals are transfers into cash, not expenses. Record cash payments using Add entry → Paid from: Cash and choose the real category.</p>'+
-    '<div class="fromhome"><span>Estimated cash available</span><b>'+rs(c.balance)+'</b></div>'+
+    '<div class="cash-sheet-hero"><div class="csh-top"><span class="csh-icon">↗</span><span>AVAILABLE CASH</span></div>'+
+    '<div class="csh-amount num">'+rs(c.balance)+'</div>'+
+    '<div class="csh-meta">Withdrawals fund your wallet. Only cash purchases count as spending.</div></div>'+
     '<div class="btns"><button class="btn" id="cashAdd" style="flex:1">+ Cash expense</button><button class="btn soft" id="cashAdjust">Set balance</button></div>'+
-    '<div class="sechead"><span>Cash movements</span></div>'+
-    '<div class="list" id="cashMoves">'+(cash.length?cash.slice(0,35).map(t=>'<button class="tx" data-id="'+esc(t.id)+'"><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Withdrawn · moved into cash":esc(catLabel(pocketCat(t))))+' · '+new Date(t.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'</div></span><span class="rt"><div class="a num">'+(isCashWithdrawal(t)||t.type==="in"?"+":"−")+rs(lkrOf(t))+'</div></span></button>').join(""):'<div class="empty">No cash movements recorded yet.</div>')+'</div>');
+    '<div class="sechead" style="margin-top:22px"><span>Cash activity</span><span class="r">Latest first</span></div>'+
+    '<div id="cashMoves">'+(timeline||'<div class="list"><div class="empty">No cash movements recorded yet.</div></div>')+'</div>');
   $("cashAdd").onclick=()=>openAdd();
   $("cashAdjust").onclick=openCashBalance;
   $("cashMoves").querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
