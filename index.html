@@ -709,6 +709,18 @@ body.typing .tabs{display:none}
 .ins-simple .ins-fx-compact{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:15px 2px 0;font-size:12px}
 .ins-simple .ins-fx-compact b{font-size:13px}
 
+
+/* Chart values remain directly visible, even for 12 months on mobile. */
+.ins-simple .ins-chart-area{height:246px}
+.ins-simple .ins-plot{overflow-x:auto;overflow-y:hidden;grid-auto-columns:minmax(65px,1fr);gap:6px;scrollbar-width:thin}
+.ins-simple .ins-month{height:100%;min-width:65px}
+.ins-simple .ins-bars{height:calc(100% - 58px)}
+.ins-simple .ins-bar-values{width:100%;height:34px;display:flex;flex-direction:column;justify-content:center;gap:2px;align-items:center;line-height:1.1;font-size:9px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ins-simple .ins-bar-val.income{color:var(--pos)}
+.ins-simple .ins-bar-val.expense{color:var(--violet)}
+.ins-simple .ins-plot:before{bottom:24px}
+@media(max-width:360px){.ins-simple .ins-chart-area{height:234px}}
+
 /* Money Insights: one focused, responsive income-vs-expenses dashboard */
 .ins-dashboard{padding-bottom:8px}
 .ins-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:800;color:var(--soft);text-transform:uppercase;margin:5px 0}
@@ -1919,7 +1931,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.46";
+const APP_VERSION = "7.3.47";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2221,7 +2233,11 @@ function guessCat(t){
   if(/\batm\b|withdraw/i.test(t.raw||"")) return "Cash";
   return "Other";
 }
-function lkrOf(t){ return t.lkr!=null ? t.lkr : t.amount*rateFor(t.cur||"LKR"); }
+function lkrOf(t){
+  if((t.cur||"LKR")==="LKR")return t.lkr!=null?t.lkr:t.amount;
+  // Bank-confirmed conversions are historical facts; estimates move with daily FX.
+  return t.fxReal&&t.lkr!=null?t.lkr:t.amount*rateFor(t.cur||"LKR");
+}
 
 /* returns "added" | "dup" | "skip" */
 function ingest(raw){
@@ -2500,7 +2516,10 @@ function openPocketInsights(){
     const chart=data.map(x=>{
       const incomeH=x.income?Math.max(2,Math.min(100,x.income/top*100)):0;
       const expenseH=x.expenses?Math.max(2,Math.min(100,x.expenses/top*100)):0;
-      return '<div class="ins-month"><span class="ins-bars"><i class="ins-bar income" style="height:'+incomeH+'%"></i>'+
+      return '<div class="ins-month"><span class="ins-bar-values" aria-label="Income '+money(x.income)+', expenses '+money(x.expenses)+'">'+
+        '<span class="ins-bar-val income">'+fmt(Math.round(x.income))+'</span>'+
+        '<span class="ins-bar-val expense">'+fmt(Math.round(x.expenses))+'</span></span>'+
+        '<span class="ins-bars"><i class="ins-bar income" style="height:'+incomeH+'%"></i>'+
         '<i class="ins-bar expense" style="height:'+expenseH+'%"></i></span><span class="ins-month-label">'+esc(x.label)+'</span></div>';
     }).join("");
     const rows=data.slice().reverse().map(x=>'<div class="ins-ledger-row"><span>'+esc(x.label)+' '+String(x.year).slice(2)+'</span>'+
@@ -2510,7 +2529,8 @@ function openPocketInsights(){
     const [from,to]=pocketBounds(now.getFullYear(),now.getMonth());
     const date=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
     const fx=Number(S.rate.AUD)||0;
-    const fxNote=S.rate.source==="HNB"?"HNB buying rate":"Indicative estimate · not HNB verified";
+    const fxNote=S.rate.source==="ExchangeRate-API"?"Daily market estimate · "+esc(S.rate.date||"rate date unavailable"):
+      S.rate.source==="HNB"?"HNB rate last set "+esc(S.rate.date||""):"Estimated rate · awaiting refresh";
     openSheet('<div class="ins-dashboard ins-simple"><div class="ins-eyebrow">Sappy Pocket · Insights</div>'+
       '<h2 class="ins-title">Income, expenses & savings</h2>'+
       '<p class="ins-intro">Salary spending cycle 22nd–21st</p>'+
@@ -4718,6 +4738,35 @@ applyTheme(); render(); if(S.pv<PARSER_VERSION) reparseAll(); checkHash(); reque
 // Never silently replace an HNB quote with a generic market quote.
 // Existing saved non-HNB estimates remain marked unverified until confirmed by the user.
 if(!S.rate.source){S.rate.source="unverified";persist();}
+// Refresh the public AUD/LKR market reference each day when the app is open.
+// This is not a bank-specific HNB quote; never label it as one.
+let fxRefreshing=false;
+async function refreshFx(){
+  if(fxRefreshing || (S.rate.source==="ExchangeRate-API" && Date.now()-(S.rate.at||0)<23*3600000)) return;
+  fxRefreshing=true;
+  try{
+    const r=await fetch("https://open.er-api.com/v6/latest/AUD",{cache:"no-store"});
+    if(!r.ok)throw Error("FX source unavailable");
+    const data=await r.json();
+    const rate=Number(data.rates&&data.rates.LKR);
+    const usdToAud=Number(data.rates&&data.rates.USD);
+    const date=data.time_last_update_utc?new Date(data.time_last_update_utc):new Date();
+    if(data.result!=="success"||!Number.isFinite(rate)||rate<=0||!Number.isFinite(usdToAud)||usdToAud<=0||Number.isNaN(date.getTime()))throw Error("Invalid FX response");
+    // API sends 1 AUD -> LKR and 1 AUD -> USD; calculate 1 USD -> LKR.
+    const old=S.rate.AUD;
+    S.rate.AUD=Number(rate.toFixed(4));
+    S.rate.USD=Number((rate/usdToAud).toFixed(4));
+    S.rate.source="ExchangeRate-API";
+    S.rate.date=date.toISOString().slice(0,10);
+    S.rate.at=Date.now();
+    persist();
+    if(old!==S.rate.AUD)render();
+  }catch(e){console.warn("FX update unavailable; showing last saved estimate",e);}
+  finally{fxRefreshing=false;}
+}
+refreshFx();
+setInterval(refreshFx,60*60*1000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshFx();});
 })();
 </script>
 </body>
