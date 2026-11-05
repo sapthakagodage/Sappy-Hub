@@ -1797,7 +1797,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.27";
+const APP_VERSION = "7.3.28";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4018,6 +4018,53 @@ function backSuggestions(p){
 function expenseContributors(expenseId){
   return txList().filter(t=>t.type==="in"&&t.cat==="Paid back"&&linksOf(t).includes(expenseId));
 }
+// Split preferences are planning information only. Actual spending is reduced
+// by real, linked Paid back transactions, never by an unreceived promise.
+function openSplitSetup(expenseId){
+  const bill=S.tx[expenseId];
+  if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
+  let mode=Number(bill.split)>1?"equal":"custom";
+  let count=Math.max(2,Math.min(100,Number(bill.split)||2));
+  const amount=lkrOf(bill);
+  const contributors=expenseContributors(expenseId);
+  const paid=backMap()[expenseId]||0;
+  openSheet('<h2>Split the expense</h2>'+
+    '<p class="note">'+esc(bill.merchant)+' · '+rs(amount)+'. Choose how this expense is shared. You can link as many people as needed.</p>'+
+    '<div class="seg" id="splitMode"><button data-m="equal" class="'+(mode==="equal"?'on':'')+'">Equal split</button><button data-m="custom" class="'+(mode==="custom"?'on':'')+'">Custom amounts</button></div>'+
+    '<div id="splitEqual" class="field" style="margin-top:14px"><label class="fl2"><span>Total people including you</span><input id="splitCount" class="inp num" type="number" inputmode="numeric" min="2" max="100" step="1" value="'+count+'"></label></div>'+
+    '<div id="splitPreview" style="margin-top:12px"></div>'+
+    '<div class="fromhome" style="margin-top:12px"><span>Already received from others</span><b>'+rs(paid)+'</b></div>'+
+    (contributors.length?contributors.map(p=>'<div class="fromhome"><span>'+esc(p.merchant)+'</span><b>'+rs(lkrOf(p))+'</b></div>').join(""):'')+
+    '<p class="note">The equal share is a target, not an automatic refund. Your spending changes only when paybacks are actually received and linked.</p>'+
+    '<button class="btn full" id="splitSave">Save split</button>'+
+    '<button class="link" id="splitCancel" style="display:block;margin:12px auto 0">Cancel</button>');
+  const paint=()=>{
+    $("splitEqual").hidden=mode!=="equal";
+    $("splitMode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
+    const raw=Number($("splitCount").value);
+    count=Number.isInteger(raw)&&raw>=2&&raw<=100?raw:count;
+    $("splitPreview").innerHTML=mode==="equal"?
+      '<div class="fromhome"><span>Each person’s share</span><b>'+rs(amount/count)+'</b></div>'+
+      '<div class="fromhome"><span>Expected from others</span><b>'+rs(amount-amount/count)+'</b></div>'+
+      '<div class="fromhome"><span>Your planned share</span><b>'+rs(amount/count)+'</b></div>':
+      '<div class="fromhome"><span>Your current expense</span><b>'+rs(myShare(bill))+'</b></div>'+
+      '<p class="note">Everyone can contribute a different amount. Add each payback when received.</p>';
+  };
+  $("splitMode").querySelectorAll("button").forEach(b=>b.onclick=()=>{mode=b.dataset.m;paint();});
+  $("splitCount").oninput=paint;
+  $("splitCancel").onclick=closeSheet;
+  $("splitSave").onclick=()=>{
+    const o=Object.assign({},bill);
+    if(mode==="equal"){
+      const n=Number($("splitCount").value);
+      if(!Number.isInteger(n)||n<2||n>100)return toast("Enter 2 to 100 people");
+      o.split=n;
+    }else delete o.split;
+    put("tx",o);
+    closeSheet();toast(mode==="equal"?"Equal split saved":"Custom contributions selected");render();
+  };
+  paint();
+}
 function openAddContributor(expenseId){
   const bill=S.tx[expenseId];if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
   // Recalculate from the actual linked receipts, not a planned split.
@@ -4056,13 +4103,14 @@ function openLink(id){
     (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
       :'<p class="note">No recent expenses found to link. This payment remains unlinked.</p>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
-    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button>':'')+
+    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button><button class="link" id="lkSplit" style="display:block;margin:12px auto 0">Equal split or custom amounts</button>':'')+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{
     document.querySelectorAll("#lkList .lrow").forEach(b=>{const on=sel.has(b.dataset.id);b.classList.toggle("sel",on);b.querySelector(".tick").textContent=on?"✓":"";});
     const ids=[...sel],one=ids.length===1?S.tx[ids[0]]:null;
     if($("lkSum"))$("lkSum").textContent=ids.length?ids.length+" expense"+(ids.length>1?"s":"")+" · "+rs(ids.reduce((a,k)=>a+lkrOf(S.tx[k]),0)):"Select an expense";
     if($("lkAddPerson"))$("lkAddPerson").hidden=!one;
+    if($("lkSplit"))$("lkSplit").hidden=!one;
     if($("lkContributors")){
       if(!one){$("lkContributors").innerHTML="";return;}
       const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
@@ -4071,7 +4119,8 @@ function openLink(id){
       $("lkContributors").innerHTML='<div class="fromhome" style="margin-top:12px"><span>Expense</span><b>'+rs(lkrOf(one))+'</b></div>'+
         others.map(t=>'<div class="fromhome"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
         (!linkedHere?'<div class="fromhome"><span>'+esc(p.merchant)+' (selected)</span><b>'+rs(P)+'</b></div>':'')+
-        '<div class="fromhome"><span>Your remaining share</span><b>'+rs(net)+'</b></div>';
+        (Number(one.split)>1?'<div class="fromhome"><span>Equal split · '+one.split+' people (including you)</span><b>'+rs(lkrOf(one)/one.split)+' each</b></div><div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,lkrOf(one)*(one.split-1)/one.split-paid))+'</b></div>':'')+
+        '<div class="fromhome"><span>Your current expense</span><b>'+rs(net)+'</b></div>';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
   };
@@ -4079,6 +4128,12 @@ function openLink(id){
   document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{const k=b.dataset.id;sel.has(k)?sel.delete(k):sel.add(k);paint();});
   paint();
   if($("lkSave"))$("lkSave").onclick=()=>{if(!linkSelected())return toast("Select an expense");closeSheet();toast("Payback linked");render();setTimeout(nextLink,450);};
+  if($("lkSplit"))$("lkSplit").onclick=()=>{
+    if(sel.size!==1)return toast("Select one expense");
+    const expenseId=[...sel][0];
+    if(!cur.includes(expenseId)||cur.length!==1)linkSelected();
+    openSplitSetup(expenseId);
+  };
   if($("lkAddPerson"))$("lkAddPerson").onclick=()=>{
     if(sel.size!==1)return toast("Select one expense");
     const expenseId=[...sel][0];
