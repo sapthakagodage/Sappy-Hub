@@ -1593,6 +1593,11 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 /* Differentiate ComBank subtly inside the shared HNB + ComBank activity timeline. */
 .tx.bank-combank .c{color:#86B9EB}
 .bank-indicator{display:inline-block;vertical-align:middle;width:6px;height:6px;border-radius:50%;background:#86B9EB;margin:0 5px 1px 0}
+.cash-wallet{width:100%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;text-align:left;gap:6px;margin:12px 0 8px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--ink);padding:16px;box-shadow:var(--shadow)}
+.cash-wallet-label{font-size:13px;font-weight:800}
+.cash-wallet-label small{font-size:11px;font-weight:500;color:var(--soft)}
+.cash-wallet b{font-size:19px}
+.cash-wallet-sub{width:100%;color:var(--soft);font-size:12px}
 </style>
 </head>
 <body class="in-hub">
@@ -1713,6 +1718,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
       <div class="hc-bals" id="hcBals"></div>
       <div class="hc-accts" id="balAccts"></div>
     </div>
+    <button class="card cash-wallet" id="cashWallet" type="button"><span class="cash-wallet-label">Cash wallet <small>· Withdrawals aren’t expenses</small></span><b id="cashValue" class="num">Rs 0</b><span class="cash-wallet-sub">Track cash spending</span></button>
 
     <div class="sechead" id="whereHead"><span>Where it went</span><span class="r">Tap a bar</span></div>
     <div class="card" id="whereCard">
@@ -1797,7 +1803,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.28";
+const APP_VERSION = "7.3.29";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1891,7 +1897,7 @@ const PICK = ["Eating out","Groceries","Fuel","Transport","Day out","Fitness","F
 const SPEND = PICK.concat(["Other"]);
 const catLabel=c=>c==="Other"?"Not sorted yet":c==="Health"?"My Health":c;
 const pocketCat=t=>t.cat==="Health"?"My Health":t.cat; // Legacy Health stays in storage.
-const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back"]);
+const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back","Cash"]);
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
 const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","My Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
@@ -1931,7 +1937,7 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 12;
+const PARSER_VERSION = 13;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -2061,6 +2067,8 @@ function parseSms(raw){
 }
 function guessCat(t){
   if(t.isFd) return "Fixed deposit";
+  // ATM withdrawals move money to the cash wallet; they are not purchases.
+  if(t.type==="out" && /\batm\b|cash withdrawal|cash withdrawn/i.test((t.merchant||"")+" "+(t.raw||""))) return "Cash";
   const key=t.merchant.toLowerCase();
   if(S.rules[key]) return S.rules[key]==="Health"?"My Health":S.rules[key];
   if(t.type==="in"){ if(/own ?a\/?c|own account|\bfcy\b|conversion/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
@@ -2377,6 +2385,8 @@ function renderHome(){
   $("hcBals").querySelectorAll("[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
   $("balAccts").innerHTML=fx.map(b=>'<div>'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' · '+esc(b.cur)+' '+fmt(b.balance,2)+'</div>').join("");
   $("balAccts").hidden=!fx.length;
+  const cash=cashBalance(); $("cashValue").textContent=rs(cash.balance);
+  $("cashWallet").onclick=openCashWallet;
 
   // donut + colourful bars
   $("whereCard").hidden=$("whereHead").hidden=!rows.length;
@@ -2394,6 +2404,52 @@ function renderHome(){
 
 }
 function accKey(t){ return t.bank+"|"+(t.acct||""); }
+/* Cash moves from a bank to your pocket on withdrawal; spending happens
+   later when a manual entry is paid from Cash. Never debit a bank twice. */
+const isCashWithdrawal=t=>live(t)&&t.type==="out"&&t.cat==="Cash"&&t.bank!=="Cash";
+const isCashPayment=t=>live(t)&&t.bank==="Cash"&&t.type==="out"&&t.cat!=="Cash";
+function cashBalance(){
+  const snapshot=S.tracked&&S.tracked["Cash|"], hasBase=snapshot&&!snapshot.del;
+  const since=hasBase?snapshot.at:-Infinity;
+  let received=0,spent=0;
+  Object.values(S.tx).forEach(t=>{
+    if(!live(t)||t.ts<=since)return;
+    if(isCashWithdrawal(t))received+=lkrOf(t);
+    else if(t.bank==="Cash"&&t.cat!=="Cash"){
+      if(t.type==="in")received+=lkrOf(t);
+      else if(t.type==="out")spent+=lkrOf(t);
+    }
+  });
+  return {balance:(hasBase?Number(snapshot.amount)||0:0)+received-spent,received,spent,base:!!hasBase};
+}
+function openCashBalance(){
+  const c=cashBalance();
+  openSheet('<h2>Cash wallet</h2>'+
+    '<p class="note">Cash withdrawals move money from your bank to your wallet. Only purchases paid with cash count as expenses. Enter the cash you actually have if your older transactions are incomplete.</p>'+
+    '<div class="fromhome"><span>Estimated cash</span><b>'+rs(c.balance)+'</b></div>'+
+    '<label class="field"><span>Cash currently on hand (Rs)</span><input id="cashCount" inputmode="decimal" class="num" value="'+(c.balance>=0?fmt(c.balance,2):"")+'" placeholder="Count your cash"></label>'+
+    '<button class="btn full" id="cashSave">Set cash on hand</button><button class="link" id="cashCancel" style="display:block;margin:12px auto 0">Cancel</button>');
+  $("cashCancel").onclick=closeSheet;
+  $("cashSave").onclick=()=>{
+    const amount=Number(String($("cashCount").value).replace(/,/g,""));
+    if(!Number.isFinite(amount)||amount<0||!$("cashCount").value.trim())return toast("Enter cash on hand");
+    S.tracked["Cash|"]={amount,at:Date.now()};saveAccounts();
+    closeSheet();toast("Cash balance updated");render();
+  };
+}
+function openCashWallet(){
+  const c=cashBalance(), cash=txList().filter(t=>isCashWithdrawal(t)||(t.bank==="Cash"&&t.cat!=="Cash"));
+  openSheet('<h2>Cash wallet</h2>'+
+    '<p class="note">Withdrawals are transfers into cash, not expenses. Record cash payments using Add entry → Paid from: Cash and choose the real category.</p>'+
+    '<div class="fromhome"><span>Estimated cash available</span><b>'+rs(c.balance)+'</b></div>'+
+    '<div class="btns"><button class="btn" id="cashAdd" style="flex:1">+ Cash expense</button><button class="btn soft" id="cashAdjust">Set balance</button></div>'+
+    '<div class="sechead"><span>Cash movements</span></div>'+
+    '<div class="list" id="cashMoves">'+(cash.length?cash.slice(0,35).map(t=>'<button class="tx" data-id="'+esc(t.id)+'"><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Withdrawn · moved into cash":esc(catLabel(pocketCat(t))))+' · '+new Date(t.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'</div></span><span class="rt"><div class="a num">'+(isCashWithdrawal(t)||t.type==="in"?"+":"−")+rs(lkrOf(t))+'</div></span></button>').join(""):'<div class="empty">No cash movements recorded yet.</div>')+'</div>');
+  $("cashAdd").onclick=()=>openAdd();
+  $("cashAdjust").onclick=openCashBalance;
+  $("cashMoves").querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
+}
+
 function trackedBalance(key){
   const tr=(S.tracked||{})[key]; if(!tr||tr.del) return null;
   let bal=tr.amount, last=tr.at;
@@ -2489,7 +2545,7 @@ function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+esc(catLabel(pocketCat(t)))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -2566,7 +2622,7 @@ function renderActivity(){
   $("achips").hidden=al.length<2;
   $("achips").innerHTML='<button class="chip'+(accFilter==="all"?' on':'')+'" data-a="all">All accounts</button>'+al.map(a=>'<button class="chip'+(accFilter===a.k?' on':'')+'" data-a="'+esc(a.k)+'">'+esc(a.name)+'</button>').join("");
   $("achips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ accFilter=b.dataset.a; renderActivity(); });
-  const opts=["All","Spending","Income","Paid back","Fixed deposit"];
+  const opts=["All","Spending","Cash movements","Income","Paid back","Fixed deposit"];
   $("fchips").innerHTML=opts.map(o=>'<button class="chip'+(o===filter?' on':'')+'" data-f="'+esc(o)+'">'+esc(o)+'</button>').join("");
   $("fchips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f; renderActivity();});
   const q=$("q").value.trim().toLowerCase();
@@ -2575,6 +2631,7 @@ function renderActivity(){
   if(chartMode==="weeks" && selWeek!=null) list=list.filter(t=>{const ix=pocketDayIndex(t);return ix>=selWeek*7&&ix<(selWeek+1)*7;});
   if(accFilter!=="all") list=list.filter(t=>accKey(t)===accFilter);
   if(filter==="Spending") list=list.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
+  else if(filter==="Cash movements") list=list.filter(t=>isCashWithdrawal(t)||t.bank==="Cash");
   else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
   else if(filter==="Paid back") list=list.filter(t=>t.cat==="Paid back");
   else if(filter==="Fixed deposit") list=list.filter(t=>t.cat==="Fixed deposit");
@@ -2739,7 +2796,7 @@ function openAdd(){
     if(cat && !cats.includes(cat)) cat=type==="in"?"Income":null;
     const accs=accOpts(); if(!accs.find(a=>a.k===acc)) acc="Cash|";
     const amtV=$("aamt")?$("aamt").value:"", nameV=$("aname")?$("aname").value:"";
-    openSheet('<h2>Add entry</h2><div class="note">For cash, or anything without an SMS.</div>'+
+    openSheet('<h2>Add entry</h2><div class="note">Cash purchases count as expenses. A bank withdrawal is just money moved into Cash, so do not add the withdrawal again.</div>'+
       '<div style="height:12px"></div>'+
       '<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Money in</button></div>'+
       '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num" value="'+esc(amtV)+'"></div></label>'+
