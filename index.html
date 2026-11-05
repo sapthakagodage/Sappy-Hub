@@ -1895,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.43";
+const APP_VERSION = "7.3.44";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2982,7 +2982,7 @@ function openTx(id,edit){
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
     (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
-    '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn soft" id="tdel">Delete</button></div>');
+    '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
   wirePicker(c=>cat=c);
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
