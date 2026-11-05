@@ -1895,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.38";
+const APP_VERSION = "7.3.39";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2365,9 +2365,9 @@ let focusCat=null, filter="All", accFilter="all";
 const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
 function renderSms(){ const sk=Object.values(S.skip).filter(live).length; $("skipRow").hidden=!sk; $("skipD").textContent=sk+" SMS couldn’t be read. Send one to Claude to improve reading."; }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
-// A single salary cycle, always 25th inclusive to the next 25th exclusive.
+// A salary-funded month starts on the 23rd of the preceding month (inclusive).
 // The displayed month names the month when the cycle ends.
-const SALARY_CYCLE_DAY=25;
+const SALARY_CYCLE_DAY=23;
 function pocketMonthNow(){
   const d=new Date();
   return new Date(d.getFullYear(),d.getMonth()+(d.getDate()>=SALARY_CYCLE_DAY?1:0),1);
@@ -2434,7 +2434,7 @@ function openPocketInsights(){
         '<span>'+money(x.income)+'</span><span>'+money(x.expenses)+'</span></button>';
     }).join("");
     openSheet('<div class="ins-dashboard"><div class="ins-eyebrow">Sappy Pocket · Insights</div><h2 class="ins-title">Income vs expenses</h2>'+
-      '<p class="ins-intro">Month-by-month money flow · Salary cycles 25th–24th</p>'+
+      '<p class="ins-intro">Month-by-month money flow · Salary cycle 23rd–22nd · Salary received on 23rd–25th funds the next month</p>'+
       '<div class="ins-range"><button type="button" data-range="6" class="'+(range===6?'on':'')+'">6 months</button><button type="button" data-range="12" class="'+(range===12?'on':'')+'">12 months</button></div>'+
       '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · Difference</div>'+
       '<div class="ins-feature-amount num'+(net<0?' negative':'')+'">'+(net>0?'+ ':'')+money(net)+'</div>'+
