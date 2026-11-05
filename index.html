@@ -1895,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.39";
+const APP_VERSION = "7.3.40";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2029,16 +2029,32 @@ function remove(kind, id){ put(kind, {id, del:true}); }
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 13;
-const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank","0112303050":"Sampath","0112204444":"BOC"};
+const PARSER_VERSION = 14;
+const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
 
 function cleanRaw(raw){ return String(raw||"").replace(/^\s*\[[^\]]{6,30}\]\s*[^:]{1,40}:\s*/,"").replace(/\s+/g," ").trim(); }
 const BILLERS=[[/\bceb\b|\bedl\b|electricity/i,"CEB Electricity"],[/leco/i,"LECO Electricity"],[/water|nwsdb/i,"Water Board"],[/mobitel/i,"Mobitel"],[/dialog/i,"Dialog"],[/\bslt\b|sltmobitel/i,"SLT"],[/hutch/i,"Hutch"],[/airtel/i,"Airtel"],[/peo ?tv/i,"PEO TV"]];
+
+// Only import genuine HNB and Commercial Bank transaction alerts.
+// A price or promotional message must never count as spending.
+function approvedBankAlert(s){
+  if(/\b(?:offer|offers|promotion|promotional|discount|special price|starting from|starting at|order now|limited time|dine-in|dine in|menu|save up to|flat off)\b/i.test(s)) return false;
+  const bankTag=/\b(?:hnb|combank|cbc)\b|hatton national bank|commercial bank/i.test(s);
+  const hotline=Object.keys(HOTLINES).some(n=>s.replace(/\D/g,"").includes(n));
+  const combankCard=/^dear cardholder,?\s*purchase at\s+.+?\s+for\s+(?:USD|US\$|LKR|RS\.?|AUD|A\$)\s*[\d,]+(?:\.\d{1,2})?\s+on\s+\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}/i.test(s)
+    && /has been authori[sz]ed on your (?:debit|credit) card/i.test(s);
+  if(!(bankTag||hotline||combankCard))return false;
+  const movement=/\b(?:debited|credited|deposited|withdrawn|withdrawal|spent|charged|transferred|purchase at|transaction at|txn at|payment made|paid to|salary credited|funds received|has been authori[sz]ed)\b/i.test(s);
+  const reason=/\breason\s*[:\-]\s*(?:mb|ib|ob|pos|ecom|ceft|slips|trf|fund|bill|atm|online|salary|sal|pmt|transfer|own|fd|deposit)/i.test(s);
+  const acct=/\b(?:a\/?c|acct|account|card|balance|bal|avl)\b/i.test(s);
+  return combankCard || ((bankTag||hotline)&&(movement||reason)&&acct);
+}
+
 function parseSms(raw){
   const s = cleanRaw(raw);
-  if(!s || looksOtp(s)) return null;
+  if(!s || looksOtp(s) || !approvedBankAlert(s)) return null;
 
   // amounts: first non-balance figure is the amount
   const re = /(LKR|Rs\.?|SLR|AUD|A\$|USD|US\$)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+\.\d{2})\s*(LKR|AUD|USD)/gi;
@@ -2179,7 +2195,7 @@ function ingest(raw){
   const p=parseSms(raw);
   if(!p){
     const t=cleanRaw(raw);
-    if(/(lkr|rs\.?|aud|usd)\s*[\d,]/i.test(t) && !looksOtp(t)){ const id="k"+hashStr(t); if(!live(S.skip[id])) put("skip",{id,raw:t}); }
+    if(approvedBankAlert(t) && /(lkr|rs\.?|aud|usd)\s*[\d,]/i.test(t) && !looksOtp(t)){ const id="k"+hashStr(t); if(!live(S.skip[id])) put("skip",{id,raw:t}); }
     return {r:"skip"};
   }
   if(S.tx[p.id] && live(S.tx[p.id])) return {r:"dup",p};
@@ -2291,7 +2307,14 @@ function reparseAll(force){
   let fixed=0, rescued=0;
   Object.values(S.tx).forEach(t=>{
     if(!live(t) || t.src!=="sms" || !t.raw) return;
-    const p=parseSms(t.raw); if(!p) return;
+    const p=parseSms(t.raw);
+    if(!p){
+      // Purge obvious promotional SMS mistakenly imported by older versions.
+      if(/\b(?:offer|offers|promotion|promotional|discount|special price|starting from|order now|limited time|menu)\b|thalappakatti/i.test(t.raw)){
+        S.tx[t.id]={id:t.id,del:true,u:Date.now()}; S.dirty["tx:"+t.id]=1; fixed++;
+      }
+      return;
+    }
     const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer,isPerson:p.isPerson,where:p.where});
     if(!t.nameSet) n.merchant=p.merchant;
     if(!t.bankSet) n.bank=p.bank;
@@ -2302,7 +2325,8 @@ function reparseAll(force){
   });
   Object.values(S.skip).forEach(k=>{
     if(!live(k)) return;
-    const p=parseSms(k.raw); if(!p) return;
+    const p=parseSms(k.raw);
+    if(!p){ S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1; return; }
     if(!live(S.tx[p.id])){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
     S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1;
   });
