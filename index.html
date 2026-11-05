@@ -1593,6 +1593,16 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 /* Differentiate ComBank subtly inside the shared HNB + ComBank activity timeline. */
 .tx.bank-combank .c{color:#86B9EB}
 .bank-indicator{display:inline-block;vertical-align:middle;width:6px;height:6px;border-radius:50%;background:#86B9EB;margin:0 5px 1px 0}
+.cash-wallet{width:100%;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--ink);padding:17px 16px;display:flex;align-items:center;gap:12px;text-align:left;margin:12px 0 14px;box-shadow:var(--shadow);min-width:0}
+.cash-wallet:active{transform:scale(.995);background:var(--press)}
+.cw-icon{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;background:var(--lime);color:#172212;font-size:23px;font-weight:800;flex:none}
+.cw-content{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.cash-wallet-label{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.cash-wallet-sub{font-size:11px;color:var(--soft);line-height:1.35}
+.cw-balance{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.cw-balance small{font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--soft)}
+.cw-balance b{font-size:clamp(16px,4.3vw,21px);letter-spacing:-.04em;white-space:nowrap}
+@media(max-width:350px){.cw-icon{width:35px;height:35px}.cash-wallet{gap:8px;padding:12px}.cw-balance b{font-size:15px}}
 .cash-sheet-hero{background:var(--on-lime);color:#F5F8F0;border-radius:20px;padding:20px 18px;margin:12px 0 16px;overflow:hidden;position:relative}
 .csh-top{display:flex;gap:9px;align-items:center;font-size:11px;letter-spacing:.11em;color:#B9C5AF;font-weight:800}
 .csh-icon{width:28px;height:28px;border-radius:10px;display:grid;place-items:center;background:var(--lime);color:#182118;font-size:18px;letter-spacing:0}
@@ -1726,6 +1736,11 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
       <div class="hc-bals" id="hcBals"></div>
       <div class="hc-accts" id="balAccts"></div>
     </div>
+    <button class="cash-wallet" id="cashWallet" type="button" aria-label="Open cash wallet">
+      <span class="cw-icon" aria-hidden="true">↗</span>
+      <span class="cw-content"><span class="cash-wallet-label">Cash wallet</span><span class="cash-wallet-sub">Cash on hand · Tap to see spending</span></span>
+      <span class="cw-balance"><small>AVAILABLE</small><b id="cashValue" class="num">Rs 0</b></span>
+    </button>
 
 
     <div class="sechead" id="whereHead"><span>Where it went</span><span class="r">Tap a bar</span></div>
@@ -1811,7 +1826,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.31";
+const APP_VERSION = "7.3.32";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2393,6 +2408,8 @@ function renderHome(){
   $("hcBals").querySelectorAll("[data-key]").forEach(b=>b.onclick=()=>openSetBal(b.dataset.key));
   $("balAccts").innerHTML=fx.map(b=>'<div class="fx-account"><span class="fx-account-name">'+esc(b.bank)+(b.acct?' ••'+esc(b.acct):'')+' <small>'+esc(b.cur)+' account</small></span><span class="fx-account-money"><b class="num">'+esc(b.cur)+' '+fmt(b.balance,2)+'</b><small>≈ '+rs(b.lkr)+'</small></span></div>').join("");
   $("balAccts").hidden=!fx.length;
+  $("cashValue").textContent=rs(cashBalance().balance);
+  $("cashWallet").onclick=openCashWallet;
 
   // donut + colourful bars
   $("whereCard").hidden=$("whereHead").hidden=!rows.length;
@@ -4235,7 +4252,7 @@ function renderHub(){
   const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
   const feats=APPS.filter(a=>a.id==="pocket"), feat=feats[0], rest=APPS.filter(a=>a.id!=="pocket");
   const featCard=a=>{ let stats="";
-    if(a.id==="pocket"){ const ac=mainAccounts(); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(x=>'<div><span>'+esc(x.bank)+(x.acct?' ••'+esc(x.acct):'')+'</span><b class="num">'+(x.unset?'—':rs(x.balance))+'</b></div>'));
+    if(a.id==="pocket"){ const ac=mainAccounts().filter(x=>x.bank!=="Cash"); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(x=>'<div><span>'+esc(x.bank)+(x.acct?' ••'+esc(x.acct):'')+'</span><b class="num">'+(x.unset?'—':rs(x.balance))+'</b></div>'));
       stats='<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; }
     if(a.id==="travel"){ const tr=trips(), nx=plans().find(p=>p.date&&daysTo(p.date)>=0), yr=new Date().getFullYear();
       stats='<div class="h-stats" style="grid-template-columns:1fr 1fr"><div><span>Places visited</span><b class="num">'+tr.length+'</b></div><div><span>This year</span><b class="num">'+tr.filter(t=>tYear(t)===yr).length+'</b></div>'+
