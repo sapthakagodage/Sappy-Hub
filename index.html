@@ -1797,7 +1797,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.26";
+const APP_VERSION = "7.3.27";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2689,7 +2689,7 @@ function openTx(id,edit){
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
     
-    (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Change":"Link")+'</button></div>':'')+
+    (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -4015,26 +4015,77 @@ function backSuggestions(p){
     .map(t=>{ const days=(p.ts-t.ts)/864e5, linked=(backMap()[t.id]||0)>0, big=lkrOf(t)>=pv*0.95; return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)}; })
     .sort((a,b)=>a.score-b.score).slice(0,8).map(x=>x.t);
 }
+function expenseContributors(expenseId){
+  return txList().filter(t=>t.type==="in"&&t.cat==="Paid back"&&linksOf(t).includes(expenseId));
+}
+function openAddContributor(expenseId){
+  const bill=S.tx[expenseId];if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
+  // Recalculate from the actual linked receipts, not a planned split.
+  const remaining=myShare(bill);
+  openSheet('<h2>Add received payback</h2>'+
+    '<p class="note">'+esc(bill.merchant)+' · You paid '+rs(lkrOf(bill))+'. Add money only after someone has actually paid you. If their bank SMS is already in Activity, link that instead to avoid duplicates.</p>'+
+    '<div class="fromhome"><span>Not yet reimbursed</span><b>'+rs(remaining)+'</b></div>'+
+    '<label class="field"><span>Who paid you?</span><input id="cpName" placeholder="e.g. Brother" autocomplete="off"></label>'+
+    '<label class="field"><span>Amount received (Rs)</span><input id="cpAmount" inputmode="decimal" class="num" placeholder="e.g. 10000"></label>'+
+    '<label class="field"><span>Received on</span><input id="cpDate" type="date" value="'+ymd(Date.now())+'"></label>'+
+    '<button class="btn full" id="cpSave">Add payback</button>'+
+    '<button class="link" id="cpCancel" style="display:block;margin:12px auto 0">Cancel</button>');
+  $("cpCancel").onclick=()=>closeSheet();
+  $("cpSave").onclick=()=>{
+    const name=$("cpName").value.trim(),amount=parseFloat(String($("cpAmount").value||"").replace(/,/g,""));
+    if(!name)return toast("Enter the person's name");
+    if(!Number.isFinite(amount)||amount<=0)return toast("Enter the amount received");
+    const left=myShare(bill);
+    if(amount>left+0.005)return toast("Amount exceeds the unreimbursed balance");
+    const d=$("cpDate").value?fromYmd($("cpDate").value):Date.now();
+    const ts=sameDay(d,Date.now())?Date.now():d;
+    const entry={id:"m"+uid(),src:"manual",amount,cur:"LKR",type:"in",cat:"Paid back",
+      merchant:name,ts,bank:"Cash",acct:"",lkr:amount,fx:1,links:[expenseId],catSet:true,nameSet:true,
+      note:"Received payback for "+bill.merchant};
+    put("tx",entry);closeSheet();toast(name+" paid back "+rs(amount));render();
+  };
+}
 function openLink(id){
-  const p=S.tx[id]; if(!p) return;
-  const cur=linksOf(p), sug=backSuggestions(p);
-  cur.forEach(cid=>{ if(!sug.some(t=>t.id===cid)) sug.unshift(S.tx[cid]); });
-  const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));   // most likely payment ticked
+  const p=S.tx[id];if(!p)return;
+  const cur=linksOf(p),sug=backSuggestions(p);
+  cur.forEach(cid=>{if(S.tx[cid]&&!sug.some(t=>t.id===cid))sug.unshift(S.tx[cid]);});
+  const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));
   const P=lkrOf(p);
-  const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(t.cat in CATS?t.cat:"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(t.cat)+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
-  openSheet('<h2>What was this payback for?</h2><div class="note">'+esc(p.merchant)+' paid you back <b>'+rs(P)+'</b> on '+new Date(p.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+'. Choose the payment this refund belongs to. Only the amount received is deducted.</div>'+
-    (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Covers</span><b id="lkSum"></b></div>'
-      :'<div class="note" style="margin-top:12px">No payments in the month before this. It isn’t taken off your spending.</div>')+
-    '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Later</button></div>'+
+  const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
+  openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. More than one person can reimburse the same expense, with different amounts.</p>'+
+    (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
+      :'<p class="note">No recent expenses found to link. This payment remains unlinked.</p>')+
+    '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
+    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button>':'')+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
-  const paint=()=>{ document.querySelectorAll("#lkList .lrow").forEach(b=>{ const on=sel.has(b.dataset.id); b.classList.toggle("sel",on); b.querySelector(".tick").textContent=on?"✓":""; });
-    if($("lkSum")){ const tot=[...sel].reduce((a,k)=>a+lkrOf(S.tx[k]),0); $("lkSum").textContent=sel.size?sel.size+" payment"+(sel.size>1?"s":"")+" · "+rs(tot)+" · Refund "+rs(Math.min(P,tot)):"Select a payment"; }
-    if($("lkSave")) $("lkSave").textContent=sel.size>1?"Link to "+sel.size+" payments":"Link"; };
-  document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{ const k=b.dataset.id; sel.has(k)?sel.delete(k):sel.add(k); paint(); });
+  const paint=()=>{
+    document.querySelectorAll("#lkList .lrow").forEach(b=>{const on=sel.has(b.dataset.id);b.classList.toggle("sel",on);b.querySelector(".tick").textContent=on?"✓":"";});
+    const ids=[...sel],one=ids.length===1?S.tx[ids[0]]:null;
+    if($("lkSum"))$("lkSum").textContent=ids.length?ids.length+" expense"+(ids.length>1?"s":"")+" · "+rs(ids.reduce((a,k)=>a+lkrOf(S.tx[k]),0)):"Select an expense";
+    if($("lkAddPerson"))$("lkAddPerson").hidden=!one;
+    if($("lkContributors")){
+      if(!one){$("lkContributors").innerHTML="";return;}
+      const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
+      const paid=others.reduce((a,t)=>a+lkrOf(t),0)+(linkedHere?0:P);
+      const net=Math.max(0,lkrOf(one)-paid);
+      $("lkContributors").innerHTML='<div class="fromhome" style="margin-top:12px"><span>Expense</span><b>'+rs(lkrOf(one))+'</b></div>'+
+        others.map(t=>'<div class="fromhome"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
+        (!linkedHere?'<div class="fromhome"><span>'+esc(p.merchant)+' (selected)</span><b>'+rs(P)+'</b></div>':'')+
+        '<div class="fromhome"><span>Your remaining share</span><b>'+rs(net)+'</b></div>';
+    }
+    if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
+  };
+  const linkSelected=()=>{if(!sel.size)return false;const n=Object.assign({},p,{links:[...sel]});delete n.linkTo;put("tx",n);return true;};
+  document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{const k=b.dataset.id;sel.has(k)?sel.delete(k):sel.add(k);paint();});
   paint();
-  if($("lkSave")) $("lkSave").onclick=()=>{ if(!sel.size) return toast("Tick at least one payment");
-    const n=Object.assign({},p,{links:[...sel]}); delete n.linkTo; put("tx",n); dataVer++; closeSheet(); toast("Linked · your share updated"); render(); setTimeout(nextLink,450); };
-  if($("lkNone")) $("lkNone").onclick=()=>{ const n=Object.assign({},p); delete n.linkTo; delete n.links; put("tx",n); dataVer++; closeSheet(); render(); };
+  if($("lkSave"))$("lkSave").onclick=()=>{if(!linkSelected())return toast("Select an expense");closeSheet();toast("Payback linked");render();setTimeout(nextLink,450);};
+  if($("lkAddPerson"))$("lkAddPerson").onclick=()=>{
+    if(sel.size!==1)return toast("Select one expense");
+    const expenseId=[...sel][0];
+    if(!cur.includes(expenseId)||cur.length!==1){linkSelected();}
+    openAddContributor(expenseId);
+  };
+  if($("lkNone"))$("lkNone").onclick=()=>{const n=Object.assign({},p);delete n.linkTo;delete n.links;put("tx",n);closeSheet();render();};
   $("lkLater").onclick=closeSheet;
   $("lkCat").onclick=()=>openTx(p.id,true);
 }
