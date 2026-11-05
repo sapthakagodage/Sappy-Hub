@@ -675,6 +675,15 @@ details[open] summary::after{content:"－"}
 .fab svg{width:24px;height:24px}
 body.typing .tabs{display:none}
 
+/* Shared, low-key motion for every Pocket, Travel and Hub popup. */
+@keyframes sheetContentIn{from{opacity:.45;transform:translate3d(0,8px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+#sheetBody.sheet-content-in{animation:sheetContentIn .22s cubic-bezier(.22,.8,.22,1) both}
+.sheet .btn,.sheet .chip,.sheet .seg button,.sheet .pick button,.sheet .lrow,.sheet .sx{
+  transition:background-color .18s ease,color .18s ease,border-color .18s ease,opacity .18s ease,transform .18s ease;
+}
+.sheet .btn:active,.sheet .lrow:active{transform:scale(.985)}
+@media (prefers-reduced-motion:reduce){#sheetBody.sheet-content-in{animation:none!important}
+  .sheet,.scrim,.sheet .btn,.sheet .chip,.sheet .seg button,.sheet .pick button,.sheet .lrow,.sheet .sx{transition:none!important}}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
 .scrim.on{opacity:1;pointer-events:auto}
@@ -1826,7 +1835,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.34";
+const APP_VERSION = "7.3.35";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2725,11 +2734,20 @@ let sheetOpen=false, lockY=0;
 function rescueSb(){ const f=$("sbForm"), h=$("sbHolder"); if(f&&h&&!h.contains(f)) h.appendChild(f); }
 function openSheet(html){
   rescueSb();
-  setTimeout(()=>fmtAmountsIn($("sheetBody")),0);
-  $("sheetBody").innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html; $("sx").onclick=closeSheet;
-  $("sheet").scrollTop=0;
+  const body=$("sheetBody"),panel=$("sheet");
+  body.classList.remove("sheet-content-in");
+  body.innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html;
+  $("sx").onclick=closeSheet;
+  panel.scrollTop=0;
   if(!sheetOpen){ lockY=window.scrollY; Object.assign(document.body.style,{position:"fixed",top:(-lockY)+"px",left:"0",right:"0"}); sheetOpen=true; }
-  $("scrim").classList.add("on"); $("sheet").classList.add("on");
+  $("scrim").classList.add("on"); panel.classList.add("on");
+  // Re-animate the content even when a new form replaces an already open sheet.
+  // This covers linked paybacks, Cash Wallet > Add expense and travel forms.
+  if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    void body.offsetWidth;
+    body.classList.add("sheet-content-in");
+  }
+  setTimeout(()=>fmtAmountsIn(body),0);
 }
 function closeSheet(){
   setTimeout(rescueSb,350);
