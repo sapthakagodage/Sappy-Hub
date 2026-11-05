@@ -1895,7 +1895,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.41";
+const APP_VERSION = "7.3.42";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2755,7 +2755,34 @@ function listInto(el, list, emptyMsg, flat){
     if(open) html+='</div>'; el.innerHTML=html;
   }
   el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
+  // A direct delete option on Activity history, including all previous months.
+  if(el.id==="allList"){
+    el.querySelectorAll(".tx").forEach(transaction=>{
+      const wrapper=document.createElement("div");
+      wrapper.className="tx-history-row";
+      transaction.parentNode.insertBefore(wrapper,transaction);
+      wrapper.appendChild(transaction);
+      const del=document.createElement("button");
+      del.type="button";
+      del.className="tx-history-delete";
+      del.textContent="Delete";
+      del.setAttribute("aria-label","Delete "+(S.tx[transaction.dataset.id]?.merchant||"transaction"));
+      del.onclick=()=>{
+        const id=transaction.dataset.id, t=S.tx[id];
+        if(!t||!live(t))return;
+        if(!confirm("Delete "+t.merchant+" ("+rs(lkrOf(t))+")? This will remove it from your records and dashboard."))return;
+        deletePayment(id);
+        renderActivity();
+      };
+      wrapper.appendChild(del);
+    });
+  }
 }
+
+/* Activity history: visible Delete for old and new entries */
+const activityDeleteStyle=document.createElement("style");
+activityDeleteStyle.textContent='.tx-history-row{display:flex;align-items:center;min-width:0;border-bottom:1px solid var(--line)}.tx-history-row:last-child{border-bottom:0}.tx-history-row>.tx{flex:1;min-width:0;width:auto}.tx-history-row .tx-history-delete{flex:none;margin-right:11px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--neg);font-size:12px;font-weight:800}.tx-history-row .tx-history-delete:active{background:var(--press)}';
+document.head.appendChild(activityDeleteStyle);
 
 /* ---------- activity ---------- */
 let chartMode="months", selDay=null, selWeek=null, selMonth=null;
