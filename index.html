@@ -1783,8 +1783,8 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .hero-card .hc-amt small{color:#33652B;opacity:1}
 .hero-card .hc-sub{color:#32562B;opacity:1}
 .cash-wallet{
-  width:100%;display:grid;grid-template-columns:46px minmax(0,1fr);column-gap:13px;row-gap:13px;
-  align-items:center;text-align:left;margin:12px 0 14px;padding:16px 17px 15px;
+  width:100%;display:grid;grid-template-columns:44px minmax(0,1fr) auto;column-gap:11px;row-gap:0;
+  align-items:center;text-align:left;margin:12px 0 14px;padding:14px 15px;
   background:#192B1A;color:#F2F8EB;border:1px solid #36542C;border-radius:24px;
   box-shadow:0 8px 25px -18px rgba(0,0,0,.5)
 }
@@ -1794,13 +1794,13 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .cash-wallet .cash-wallet-label{color:#F3F8ED;font-size:15px;font-weight:800}
 .cash-wallet .cash-wallet-sub{color:#B6C6AA;font-size:11px}
 .cash-wallet .cw-balance{
-  grid-column:1/-1;display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;
-  gap:10px;min-width:0;border-top:1px solid #3A5033;padding-top:13px
+  grid-column:3;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;
+  gap:4px;min-width:0;border:0;padding:0
 }
 .cash-wallet .cw-balance small{color:#B8CAAB;font-size:10px;font-weight:800;letter-spacing:.09em;flex:none}
 .cash-wallet .cw-balance b{
-  color:#CDF46A;font-size:clamp(25px,7.2vw,34px);font-weight:850;line-height:1.15;
-  white-space:normal;overflow-wrap:anywhere;text-align:right;letter-spacing:-.045em;font-variant-numeric:tabular-nums
+  color:#CDF46A;font-size:clamp(19px,5.5vw,26px);font-weight:850;line-height:1.15;
+  white-space:nowrap;text-align:right;letter-spacing:-.045em;font-variant-numeric:tabular-nums
 }
 :root[data-theme="light"] .cash-wallet,
 :root[data-theme="auto"] .cash-wallet{background:#192B1A;border-color:#36542C;color:#F2F8EB}
@@ -1813,10 +1813,12 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 :root[data-theme="light"] .cash-wallet .cw-balance b,
 :root[data-theme="auto"] .cash-wallet .cw-balance b{color:#CDF46A}
 @media(max-width:350px){
- .cash-wallet{padding:14px 13px;grid-template-columns:40px minmax(0,1fr);gap:10px}
- .cash-wallet .cw-icon{width:40px;height:40px}
- .cash-wallet .cw-balance{flex-wrap:wrap;gap:5px}
- .cash-wallet .cw-balance b{font-size:28px}
+ .cash-wallet{padding:12px 11px;grid-template-columns:36px minmax(0,1fr) auto;column-gap:8px}
+ .cash-wallet .cw-icon{width:36px;height:36px}
+ .cash-wallet .cash-wallet-label{font-size:13px}
+ .cash-wallet .cash-wallet-sub{font-size:10px}
+ .cash-wallet .cw-balance b{font-size:19px}
+ .cash-wallet .cw-balance small{font-size:9px}
 }
 </style>
 </head>
@@ -2029,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.60";
+const APP_VERSION = "7.3.61";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
