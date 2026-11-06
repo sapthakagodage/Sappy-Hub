@@ -727,6 +727,8 @@ body.typing .tabs{display:none}
 @media(max-width:360px){.ins-simple .ins-chart-area{height:234px}}
 
 
+.cash-edit-prefix{display:flex;align-items:center;padding:0 10px;background:var(--card2);color:var(--soft);font-size:12px;font-weight:800}
+#tamount{flex:1;min-width:0;font-size:20px;font-weight:800}
 /* Gym-only prepaid coverage: no impact on cash spending or savings. */
 .gym-option[hidden],.gym-fields[hidden],.gym-home[hidden]{display:none!important}
 .gym-option{margin:12px 0 14px;padding:12px;background:var(--card2);border-radius:18px;border:1px solid var(--line)}
@@ -1949,7 +1951,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.53";
+const APP_VERSION = "7.3.54";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3128,7 +3130,11 @@ function openTx(id,edit){
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
-  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div><div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'+
+  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div>'+
+    (t.bank==="Cash"
+      ?'<label class="field"><span>Amount (Rs) · edit</span><div class="amt"><span class="cash-edit-prefix">LKR</span><input id="tamount" type="text" inputmode="decimal" autocomplete="off" class="num" value="'+esc(fmt(t.amount,Number(t.amount)%1?2:0))+'" aria-label="Cash transaction amount"></div></label>'+
+       '<div class="note">'+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'
+      :'<div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>')+
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
@@ -3138,7 +3144,6 @@ function openTx(id,edit){
     '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
     (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
-    (t.bank==="Cash"?'<label class="field"><span>Cash amount (Rs)</span><input id="tamount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(t.amount)+'" aria-label="Edit cash transaction amount"></label>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
   const updateGym=wireGymPicker(t,()=>cat);
@@ -3151,7 +3156,7 @@ function openTx(id,edit){
     const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
     const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
     if(t.bank==="Cash"){
-      const raw=String($("tamount").value).trim();
+      const raw=String($("tamount").value).replace(/,/g,"").trim();
       const amount=Number(raw);
       if(!raw||!Number.isFinite(amount)||amount<=0||amount>1000000000)return toast("Enter a valid cash amount");
       n.amount=Math.round(amount*100)/100;
