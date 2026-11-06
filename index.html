@@ -723,6 +723,7 @@ body.typing .tabs{display:none}
 
 
 /* Gym-only prepaid coverage: no impact on cash spending or savings. */
+.gym-option[hidden],.gym-fields[hidden],.gym-home[hidden]{display:none!important}
 .gym-option{margin:12px 0 14px;padding:12px;background:var(--card2);border-radius:18px;border:1px solid var(--line)}
 .gym-option .chk{margin:0}.gym-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
 .gym-fields .note{grid-column:1/-1;font-size:11px;margin:0}
@@ -1943,7 +1944,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.51";
+const APP_VERSION = "7.3.52";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2610,7 +2611,7 @@ function monthSpend(y,m){
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
-const isUnsorted=t=>live(t)&&t.type==="out"&&t.cat==="Other";
+const isUnsorted=t=>live(t)&&t.type==="out"&&t.cat==="Other"&&!t.catSet;
 function unsorted(){ return txList().filter(isUnsorted); }
 function openSort(id){
   const t=S.tx[id]; if(!t) return; let cat=null;
