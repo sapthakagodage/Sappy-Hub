@@ -1931,7 +1931,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.48";
+const APP_VERSION = "7.3.49";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -1960,10 +1960,33 @@ function showUpdBanner_unused(v){
 
 
 /* =============== launch screen + small loader =============== */
-function hideSplash(){ const sp=document.getElementById("splash"); if(!sp||sp.classList.contains("out")) return;
-  const wait=Math.max(0,1600-(Date.now()-(window.__t0||Date.now())));   // show long enough to feel calm, never long
-  setTimeout(()=>{ sp.classList.add("out"); setTimeout(()=>{ if(sp.classList.contains("out")) sp.style.display="none"; },500); },wait); }
-function showSplash(text){ const sp=document.getElementById("splash"); if(!sp) return; if(text) document.getElementById("spTag").textContent=text; sp.style.display="flex"; void sp.offsetWidth; sp.classList.remove("out"); }
+let splashRun=0;
+function hideSplash(){
+  const sp=document.getElementById("splash");
+  if(!sp||sp.classList.contains("out"))return;
+  const run=++splashRun;
+  const wait=Math.max(0,1600-(Date.now()-(window.__t0||Date.now())));
+  setTimeout(()=>{
+    if(run!==splashRun||document.hidden)return;
+    sp.classList.add("out");
+    setTimeout(()=>{if(run===splashRun&&sp.classList.contains("out"))sp.style.display="none";},500);
+  },wait);
+}
+function showSplash(text){
+  const sp=document.getElementById("splash");
+  if(!sp)return;
+  ++splashRun; // Cancel any pending hide from an earlier launch.
+  window.__t0=Date.now();
+  document.getElementById("spTag").textContent=text||"All my records, in one place.";
+  sp.style.display="flex";
+  sp.classList.add("out");
+  // Replay logo, text and progress bar on a return from background.
+  const animated=sp.querySelectorAll(".sp-logo,.sp-name,.sp-tag,.sp-bar i");
+  animated.forEach(el=>el.style.animation="none");
+  void sp.offsetWidth;
+  animated.forEach(el=>el.style.removeProperty("animation"));
+  sp.classList.remove("out");
+}
 let busyN=0, busyTimer=null;
 function busyStart(msg){ busyN++; document.getElementById("busyText").textContent=msg||"Loading…";
   clearTimeout(busyTimer); busyTimer=setTimeout(()=>{ if(busyN>0) document.getElementById("busy").classList.add("on"); },250); }
@@ -4718,12 +4741,25 @@ function freshStart(){
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-current",b.dataset.v==="home"?"true":"false"));
   showHub();
 }
+let resumeLaunchInProgress=false;
+function resumeToHub(){
+  if(resumeLaunchInProgress)return;
+  resumeLaunchInProgress=true;
+  showSplash(); // Show the full branded startup before navigating.
+  freshStart(); // Prepare the landing page while the splash covers it.
+  hideSplash(); // Follow the same gentle 1.6-second launch animation.
+  setTimeout(()=>{resumeLaunchInProgress=false;},1900);
+}
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){ hiddenAt=Date.now(); return; }
-  if(hiddenAt && Date.now()-hiddenAt>15000) freshStart();   // away more than 15 s = start fresh on the Hub
+  if(hiddenAt && Date.now()-hiddenAt>15000) resumeToHub();
+  hiddenAt=0;
   sync(); checkHash();
 });
-window.addEventListener("pageshow",e=>{ if(e.persisted) freshStart(); });
+window.addEventListener("pageshow",e=>{
+  // Safari may restore a suspended page from its back-forward cache.
+  if(e.persisted && (!hiddenAt||Date.now()-hiddenAt>15000))resumeToHub();
+});
 if(!S.look3){ S.theme="dark"; S.look3=1; persist(); }
 if(S.name===undefined){ S.name="Sapthaka"; persist(); }
 S.trip=S.trip||{}; S.plan=S.plan||{};
