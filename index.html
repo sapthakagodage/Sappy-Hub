@@ -731,6 +731,10 @@ body.typing .tabs{display:none}
 .field .cash-edit-row .cash-edit-prefix{display:flex;align-items:center;justify-content:center;align-self:stretch;flex:none;margin:0;padding:0 15px;border:0;border-right:1px solid var(--line);background:transparent;color:var(--soft);font-size:13px;line-height:1;font-weight:800}
 .field .cash-edit-row #tamount{flex:1;min-width:0;width:100%;height:54px;padding:10px 14px;margin:0;border:0;border-radius:0;background:transparent;color:var(--ink);font-size:20px;line-height:1.4;font-weight:800;outline:none}
 .field .cash-edit-row:focus-within{border-color:var(--lime)}
+.tx-name-first{margin:0 0 13px}
+.tx-name-first>span{font-size:12px;letter-spacing:.02em}
+.tx-name-first #tname{font-weight:750;font-size:17px;padding:14px 13px}
+.tx-name-first #tname:focus{border-color:var(--lime);outline:none}
 /* Gym-only prepaid coverage: no impact on cash spending or savings. */
 .gym-option[hidden],.gym-fields[hidden],.gym-home[hidden]{display:none!important}
 .gym-option{margin:12px 0 14px;padding:12px;background:var(--card2);border-radius:18px;border:1px solid var(--line)}
@@ -1953,7 +1957,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.55";
+const APP_VERSION = "7.3.56";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3132,7 +3136,8 @@ function openTx(id,edit){
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
-  openSheet('<h2>'+esc(t.merchant)+'</h2><div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div>'+
+  openSheet('<label class="field tx-name-first"><span>Transaction name</span><input id="tname" type="text" value="'+esc(t.merchant)+'" autocomplete="off" aria-label="Edit transaction name"></label>'+
+    '<div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div>'+
     (t.bank==="Cash"
       ?'<label class="field"><span>Amount (Rs) · edit</span><div class="cash-edit-row"><span class="cash-edit-prefix">LKR</span><input id="tamount" type="text" inputmode="decimal" autocomplete="off" class="num" value="'+esc(fmt(t.amount,Number(t.amount)%1?2:0))+'" aria-label="Cash transaction amount"></div></label>'+
        '<div class="note">'+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'
@@ -3143,8 +3148,7 @@ function openTx(id,edit){
     catPicker(cats,cat)+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
-    '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
-    '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
+    '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label>'+
     (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
