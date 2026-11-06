@@ -1775,6 +1775,49 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .hc-accts .fx-account-money b{display:block;font-size:15px;font-weight:800;letter-spacing:-.02em;color:#CDF46A;white-space:nowrap}
 .hc-accts .fx-account-money small{display:block;margin-top:3px;font-size:10px;color:#B0C3A5}
 @media(max-width:350px){.hc-bal2{padding:10px 9px}.hc-accts .fx-account{padding:10px;gap:5px}.hc-accts .fx-account-money b{font-size:13px}}
+
+/* Pocket hero and cash wallet final theme-safe treatments.
+   Keep these AFTER legacy component styles so light mode cannot override them. */
+.hero-card{background:#CDF46A;color:#172712}
+.hero-card .hc-amt{color:#23491B;font-weight:850}
+.hero-card .hc-amt small{color:#33652B;opacity:1}
+.hero-card .hc-sub{color:#32562B;opacity:1}
+.cash-wallet{
+  width:100%;display:grid;grid-template-columns:46px minmax(0,1fr);column-gap:13px;row-gap:13px;
+  align-items:center;text-align:left;margin:12px 0 14px;padding:16px 17px 15px;
+  background:#192B1A;color:#F2F8EB;border:1px solid #36542C;border-radius:24px;
+  box-shadow:0 8px 25px -18px rgba(0,0,0,.5)
+}
+.cash-wallet:active{background:#233A21}
+.cash-wallet .cw-icon{width:44px;height:44px;background:#CDF46A;color:#172212}
+.cash-wallet .cw-content{min-width:0;display:flex;flex-direction:column;gap:3px}
+.cash-wallet .cash-wallet-label{color:#F3F8ED;font-size:15px;font-weight:800}
+.cash-wallet .cash-wallet-sub{color:#B6C6AA;font-size:11px}
+.cash-wallet .cw-balance{
+  grid-column:1/-1;display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;
+  gap:10px;min-width:0;border-top:1px solid #3A5033;padding-top:13px
+}
+.cash-wallet .cw-balance small{color:#B8CAAB;font-size:10px;font-weight:800;letter-spacing:.09em;flex:none}
+.cash-wallet .cw-balance b{
+  color:#CDF46A;font-size:clamp(25px,7.2vw,34px);font-weight:850;line-height:1.15;
+  white-space:normal;overflow-wrap:anywhere;text-align:right;letter-spacing:-.045em;font-variant-numeric:tabular-nums
+}
+:root[data-theme="light"] .cash-wallet,
+:root[data-theme="auto"] .cash-wallet{background:#192B1A;border-color:#36542C;color:#F2F8EB}
+:root[data-theme="light"] .cash-wallet .cash-wallet-label,
+:root[data-theme="auto"] .cash-wallet .cash-wallet-label{color:#F3F8ED}
+:root[data-theme="light"] .cash-wallet .cash-wallet-sub,
+:root[data-theme="auto"] .cash-wallet .cash-wallet-sub{color:#B6C6AA}
+:root[data-theme="light"] .cash-wallet .cw-balance small,
+:root[data-theme="auto"] .cash-wallet .cw-balance small{color:#B8CAAB}
+:root[data-theme="light"] .cash-wallet .cw-balance b,
+:root[data-theme="auto"] .cash-wallet .cw-balance b{color:#CDF46A}
+@media(max-width:350px){
+ .cash-wallet{padding:14px 13px;grid-template-columns:40px minmax(0,1fr);gap:10px}
+ .cash-wallet .cw-icon{width:40px;height:40px}
+ .cash-wallet .cw-balance{flex-wrap:wrap;gap:5px}
+ .cash-wallet .cw-balance b{font-size:28px}
+}
 </style>
 </head>
 <body class="in-hub">
@@ -1986,7 +2029,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.59";
+const APP_VERSION = "7.3.60";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
