@@ -721,6 +721,17 @@ body.typing .tabs{display:none}
 .ins-simple .ins-plot:before{bottom:24px}
 @media(max-width:360px){.ins-simple .ins-chart-area{height:234px}}
 
+
+/* Gym-only prepaid coverage: no impact on cash spending or savings. */
+.gym-option{margin:12px 0 14px;padding:12px;background:var(--card2);border-radius:18px;border:1px solid var(--line)}
+.gym-option .chk{margin:0}.gym-fields{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.gym-fields .note{grid-column:1/-1;font-size:11px;margin:0}
+.gym-fields .field{min-width:0}.gym-fields input,.gym-fields select{width:100%;min-width:0}
+.gym-home{display:flex;align-items:center;gap:12px;margin:12px 0;padding:14px;border:1px solid var(--line);border-radius:19px;background:var(--card);cursor:pointer}
+.gym-home-icon{display:grid;place-items:center;background:#FF9BBE;color:#12140D;width:39px;height:39px;flex:none;border-radius:13px}
+.gym-home>div{flex:1;min-width:0}.gym-home b,.gym-home small{display:block}.gym-home b{font-size:13px}.gym-home small{font-size:11px;line-height:1.5;color:var(--soft);margin-top:3px}
+.gym-home-arrow{color:var(--faint);font-size:23px}
+
 /* Money Insights: one focused, responsive income-vs-expenses dashboard */
 .ins-dashboard{padding-bottom:8px}
 .ins-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:800;color:var(--soft);text-transform:uppercase;margin:5px 0}
@@ -1841,6 +1852,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
       <div class="hc-bals" id="hcBals"></div>
       <div class="hc-accts" id="balAccts"></div>
     </div>
+    <div class="gym-home" id="gymHome" hidden></div>
     <button class="cash-wallet" id="cashWallet" type="button" aria-label="Open cash wallet">
       <span class="cw-icon" aria-hidden="true">↗</span>
       <span class="cw-content"><span class="cash-wallet-label">Cash wallet</span><span class="cash-wallet-sub">Cash on hand · Tap to see spending</span></span>
@@ -1931,7 +1943,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.50";
+const APP_VERSION = "7.3.51";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2605,13 +2617,17 @@ function openSort(id){
   const left=unsorted().length;
   openSheet('<h2>Which category?</h2><div class="note">'+(left>1?left+' payments to sort · ':'')+'Pick one. It’s remembered for this shop.</div>'+
     '<div class="sortcard"><b>'+esc(t.merchant)+'</b><span class="num">−'+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2)+' · '+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+(t.bank&&t.bank!=="Bank"?' · '+esc(t.bank):'')+'</span></div>'+
-    catPicker(PICK.concat(["Fixed deposit"]),null)+
+    catPicker(PICK.concat(["Fixed deposit","Other"]),null)+
+    gymPicker(t,null)+
     '<label class="chk"><input type="checkbox" id="srem" checked> Always use this for '+esc(t.merchant)+'</label>'+
     '<div class="btns"><button class="btn" id="sSave" style="flex:1">Save</button><button class="btn soft" id="sLater">Later</button></div>'+
     '<button type="button" class="btn warn" id="sDelete" style="width:100%;margin-top:10px;text-align:center">Delete payment</button>');
-  wirePicker(c=>cat=c);
+  const updateGym=wireGymPicker(t,()=>cat);
+  wirePicker(c=>{cat=c;updateGym();});
   $("sSave").onclick=()=>{ if(!cat) return toast("Pick a category");
-    put("tx",Object.assign({},t,{cat,catSet:true}));
+    const saved=Object.assign({},t,{cat,catSet:true});
+    applyGymFields(saved,cat);
+    put("tx",saved);
     if($("srem").checked){ const k=t.merchant.toLowerCase(); S.rules[k]=cat; saveRules();
       unsorted().filter(o=>o.merchant.toLowerCase()===k).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
     dataVer++; closeSheet(); toast("Saved · "+cat); render(); setTimeout(()=>{ const u=unsorted(); if(u.length&&!sheetOpen) openSort(u[0].id); },450); };
@@ -2621,6 +2637,54 @@ function openSort(id){
     deletePayment(t.id);
   };
 }
+
+// Only gym membership transactions may have prepaid months. This never splits
+// the bank transaction or changes income, expense or savings calculations.
+function gymCoverage(t){
+  const months=Number(t&&t.gymMonths)||0;
+  if(!t||!live(t)||t.type!=="out"||pocketCat(t)!=="Fitness"||months<1||months>24)return null;
+  const raw=t.gymStart||ymd(t.ts), start=new Date(raw+"T12:00:00");
+  if(Number.isNaN(start.getTime()))return null;
+  const end=new Date(start.getFullYear(),start.getMonth()+months,start.getDate(),12);
+  const stamp=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+  return {start,end,months,renewal:stamp(end),monthly:lkrOf(t)/months};
+}
+function gymPicker(t,cat){
+  return '<div class="gym-option" id="gymOption"'+(cat==="Fitness"&&t.type==="out"?'':' hidden')+'>'+
+    '<label class="chk"><input type="checkbox" id="gymPrepaid"'+(t.gymMonths?' checked':'')+'> Gym membership paid in advance</label>'+
+    '<div class="gym-fields" id="gymFields"'+(t.gymMonths?'':' hidden')+'>'+
+    '<label class="field"><span>Months covered</span><select id="gymMonths">'+[1,2,3,6,12].map(n=>'<option value="'+n+'"'+(Number(t.gymMonths||3)===n?' selected':'')+'>'+n+' month'+(n>1?'s':'')+'</option>').join("")+'</select></label>'+
+    '<label class="field"><span>Membership starts</span><input type="date" id="gymStart" value="'+esc(t.gymStart||ymd(t.ts))+'"></label>'+
+    '<div class="note" id="gymPreview"></div></div></div>';
+}
+function wireGymPicker(t,getCat){
+  const area=$("gymOption"),check=$("gymPrepaid"),fields=$("gymFields");
+  if(!area)return;
+  const update=()=>{
+    const enabled=getCat()==="Fitness"&&t.type==="out";
+    area.hidden=!enabled;
+    fields.hidden=!enabled||!check.checked;
+    const label=$("gymPreview");
+    if(!enabled||!check.checked){label.textContent="";return;}
+    const months=Number($("gymMonths").value)||3;
+    const start=$("gymStart").value;
+    const detail=gymCoverage(Object.assign({},t,{cat:"Fitness",gymMonths:months,gymStart:start}));
+    label.textContent=detail?rs(detail.monthly)+" per covered month · Renews "+detail.renewal+" · full payment counts once": "Choose a valid membership start date";
+  };
+  check.onchange=update;$("gymMonths").onchange=update;$("gymStart").onchange=update;update();
+  return update;
+}
+function applyGymFields(t,cat){
+  if(cat!=="Fitness"||!$("gymPrepaid")||!$("gymPrepaid").checked){delete t.gymMonths;delete t.gymStart;return;}
+  t.gymMonths=Number($("gymMonths").value)||3;
+  t.gymStart=$("gymStart").value||ymd(t.ts);
+}
+function activeGymPayment(){
+  const now=Date.now();
+  return txList().filter(t=>{const c=gymCoverage(t);return c&&c.end.getTime()>now;})
+    .sort((a,b)=>gymCoverage(a).end-gymCoverage(b).end)[0]||null;
+}
+
 function renderSoon(){
   const loose=(typeof looseBacks==="function")?looseBacks().filter(p=>backSuggestions(p).length):[];
   const it=notiItems().filter(i=>i.d<=7);
@@ -2641,6 +2705,13 @@ function renderSoon(){
 }
 function renderHome(){
   renderSoon();
+  const gym=activeGymPayment(),gymHome=$("gymHome");
+  gymHome.hidden=!gym;
+  if(gym){
+    const cov=gymCoverage(gym);
+    gymHome.innerHTML='<span class="gym-home-icon">'+icon("Fitness",20)+'</span><div><b>Gym membership covered</b><small>Paid '+cov.months+' months · '+rs(cov.monthly)+'/month · Renews '+esc(cov.renewal)+'</small></div><span class="gym-home-arrow">›</span>';
+    gymHome.onclick=()=>openTx(gym.id,true);
+  }
   const all=txList(), mt=all.filter(inMonth);
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=pocketIncome(month.getFullYear(),month.getMonth());
@@ -2835,7 +2906,7 @@ function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div></span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -3047,7 +3118,7 @@ function openTx(id,edit){
   const t=S.tx[id]; if(!t) return; let cat=pocketCat(t);
   const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
   let topSel=t.topup||"";
-  const cats = t.type==="in"?["Income","Paid back","Transfers"]:[...PICK,"Fixed deposit"];
+  const cats = t.type==="in"?["Income","Paid back","Transfers"]:[...PICK,"Fixed deposit","Other"];
   const banks=["ComBank","Sampath","HNB","BOC","CommBank AU","Bank","Manual"];
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
@@ -3056,20 +3127,23 @@ function openTx(id,edit){
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
+    gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
     '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
     (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
-  wirePicker(c=>cat=c);
+  const updateGym=wireGymPicker(t,()=>cat);
+  wirePicker(c=>{cat=c;updateGym();});
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
-    if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); } });
+    if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
   $("tsave").onclick=()=>{
     const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
     const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
+    applyGymFields(n,cat);
     if(name!==t.merchant) n.nameSet=true;
     let askBal="";
     if(topOpts.length){
