@@ -1931,7 +1931,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.49";
+const APP_VERSION = "7.3.50";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4742,23 +4742,65 @@ function freshStart(){
   showHub();
 }
 let resumeLaunchInProgress=false;
+let splashArmedForReturn=false;
+// Cover the *old* app before iOS freezes its snapshot. Reopening should never
+// paint the previous landing page before the loader.
+function prepareReturnSplash(){
+  if(splashArmedForReturn)return;
+  const sp=document.getElementById("splash");
+  if(!sp)return;
+  ++splashRun; // Invalidate a pending hide from the previous launch.
+  splashArmedForReturn=true;
+  sp.style.transition="none";
+  sp.style.display="flex";
+  sp.classList.remove("out");
+  sp.offsetHeight; // Commit the covering frame before the page is frozen.
+}
+function restoreShortReturn(){
+  if(!splashArmedForReturn)return;
+  const sp=document.getElementById("splash");
+  if(!sp)return;
+  ++splashRun;
+  sp.style.transition="none";
+  sp.classList.add("out");
+  sp.style.display="none"; // Instant return to the exact screen, e.g. after OTP.
+  splashArmedForReturn=false;
+  requestAnimationFrame(()=>sp.style.removeProperty("transition"));
+}
 function resumeToHub(){
   if(resumeLaunchInProgress)return;
   resumeLaunchInProgress=true;
-  showSplash(); // Show the full branded startup before navigating.
-  freshStart(); // Prepare the landing page while the splash covers it.
-  hideSplash(); // Follow the same gentle 1.6-second launch animation.
+  showSplash(); // First visible frame is already the Sappy Hub loader.
+  splashArmedForReturn=false;
+  const sp=document.getElementById("splash");
+  if(sp)sp.style.removeProperty("transition");
+  freshStart(); // Update the landing page behind the loader.
+  hideSplash(); // Reveal it only after the branded loading animation.
   setTimeout(()=>{resumeLaunchInProgress=false;},1900);
 }
-document.addEventListener("visibilitychange",()=>{
-  if(document.hidden){ hiddenAt=Date.now(); return; }
-  if(hiddenAt && Date.now()-hiddenAt>15000) resumeToHub();
+function handleAppReturn(){
+  if(!hiddenAt)return;
+  const away=Date.now()-hiddenAt;
   hiddenAt=0;
+  if(away>15000)resumeToHub();
+  else restoreShortReturn();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){
+    if(!hiddenAt)hiddenAt=Date.now();
+    prepareReturnSplash();
+    return;
+  }
+  handleAppReturn();
   sync(); checkHash();
 });
+window.addEventListener("pagehide",()=>{
+  if(!hiddenAt)hiddenAt=Date.now();
+  prepareReturnSplash();
+});
 window.addEventListener("pageshow",e=>{
-  // Safari may restore a suspended page from its back-forward cache.
-  if(e.persisted && (!hiddenAt||Date.now()-hiddenAt>15000))resumeToHub();
+  // Safari can restore a suspended home-screen app without visibilitychange.
+  if(e.persisted)handleAppReturn();
 });
 if(!S.look3){ S.theme="dark"; S.look3=1; persist(); }
 if(S.name===undefined){ S.name="Sapthaka"; persist(); }
