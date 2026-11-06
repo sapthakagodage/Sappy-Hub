@@ -1958,7 +1958,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.57";
+const APP_VERSION = "7.3.58";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2076,6 +2076,9 @@ const SPEND = PICK.concat(["Other"]);
 const catLabel=c=>c==="Other"?"Not sorted yet":c==="Health"?"My Health":c;
 const pocketCat=t=>t.cat==="Health"?"My Health":t.cat; // Legacy Health stays in storage.
 const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back","Cash"]);
+// Sharing is optional for normal purchases (food, fuel, trips, shopping, etc.).
+// Bills remain straightforward personal expenses with no split controls.
+const canSplitExpense = t => !!t && live(t) && t.type==="out" && !NOT_SPENDING.has(t.cat) && t.cat!=="Bills";
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
 const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","My Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
@@ -3146,7 +3149,7 @@ function openTx(id,edit){
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
-    (t.type==="out"&&!NOT_SPENDING.has(cat)?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split or share this expense</button>':'')+
+    (canSplitExpense(t)?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split with friends (optional)</button>':'')+
     catPicker(cats,cat)+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -4497,7 +4500,7 @@ function expenseContributors(expenseId){
 // by real, linked Paid back transactions, never by an unreceived promise.
 function openSplitSetup(expenseId){
   const bill=S.tx[expenseId];
-  if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
+  if(!canSplitExpense(bill))return;
   let mode=Number(bill.split)>1?"equal":"custom";
   let count=Math.max(2,Math.min(100,Number(bill.split)||2));
   const amount=lkrOf(bill);
@@ -4599,7 +4602,7 @@ function openLink(id){
     const ids=[...sel],one=ids.length===1?S.tx[ids[0]]:null;
     if($("lkSum"))$("lkSum").textContent=ids.length?ids.length+" expense"+(ids.length>1?"s":"")+" · "+rs(ids.reduce((a,k)=>a+lkrOf(S.tx[k]),0)):"Select an expense";
     if($("lkAddPerson"))$("lkAddPerson").hidden=!one;
-    if($("lkSplit"))$("lkSplit").hidden=!one;
+    if($("lkSplit"))$("lkSplit").hidden=!one||!canSplitExpense(one);
     if($("lkContributors")){
       if(!one){$("lkContributors").innerHTML="";return;}
       const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
@@ -4622,6 +4625,7 @@ function openLink(id){
   if($("lkSplit"))$("lkSplit").onclick=()=>{
     if(sel.size!==1)return toast("Select one expense");
     const expenseId=[...sel][0];
+    if(!canSplitExpense(S.tx[expenseId]))return toast("Splitting is not available for bills");
     if(!cur.includes(expenseId)||cur.length!==1)linkSelected();
     openSplitSetup(expenseId);
   };
