@@ -736,6 +736,34 @@ body.typing .tabs{display:none}
 .tx-name-first>span{font-size:12px;letter-spacing:.02em}
 .tx-name-first #tname{font-weight:750;font-size:17px;padding:14px 13px}
 .tx-name-first #tname:focus{border-color:var(--lime);outline:none}
+
+/* Pocket figures, using the existing Sappy lime and forest palette. */
+.hero-card .hc-amt{color:#23491B;font-weight:850;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.hero-card .hc-amt small{color:#33652B;opacity:1;font-weight:800}
+.hero-card .hc-sub{color:#32562B;opacity:1}
+.cash-wallet{display:grid;grid-template-columns:46px minmax(0,1fr);column-gap:13px;row-gap:13px;
+  background:linear-gradient(135deg,#1D301C 0%,#152417 100%);color:#F2F8EB;border:1px solid #35502C;
+  border-radius:24px;padding:16px 17px 15px;box-shadow:0 8px 25px -18px rgba(0,0,0,.5)}
+.cash-wallet:active{background:#243725}
+.cash-wallet .cw-icon{width:44px;height:44px;background:var(--lime);color:#172212}
+.cash-wallet .cw-content{min-width:0}
+.cash-wallet .cash-wallet-label{font-size:15px;color:#F3F8ED}
+.cash-wallet .cash-wallet-sub{font-size:11px;color:#B6C6AA}
+.cash-wallet .cw-balance{grid-column:1/-1;display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;
+  gap:10px;min-width:0;border-top:1px solid #3A5033;padding-top:13px}
+.cash-wallet .cw-balance small{color:#B8CAAB;font-size:10px;letter-spacing:.09em;flex:none}
+.cash-wallet .cw-balance b{color:var(--lime);font-size:clamp(25px,7.2vw,34px);font-weight:850;letter-spacing:-.045em;
+  line-height:1.15;white-space:normal;overflow-wrap:anywhere;text-align:right;font-variant-numeric:tabular-nums}
+#sheetBody:has(.cash-add-name)>.sx{position:sticky;top:0;float:none;margin:0 0 12px auto;display:grid;z-index:3}
+.cash-add-name{clear:both;margin:12px 0 12px}
+.cash-add-name #aname{font-size:17px;font-weight:750;padding:14px 13px}
+.cash-add-name #aname:focus{border-color:var(--lime);outline:none}
+@media(max-width:350px){
+  .cash-wallet{padding:14px 13px;grid-template-columns:40px minmax(0,1fr)}
+  .cash-wallet .cw-icon{width:40px;height:40px}
+  .cash-wallet .cw-balance{flex-wrap:wrap;gap:5px}
+  .cash-wallet .cw-balance b{font-size:28px}
+}
 /* Gym-only prepaid coverage: no impact on cash spending or savings. */
 .gym-option[hidden],.gym-fields[hidden],.gym-home[hidden]{display:none!important}
 .gym-option{margin:12px 0 14px;padding:12px;background:var(--card2);border-radius:18px;border:1px solid var(--line)}
@@ -1958,7 +1986,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.58";
+const APP_VERSION = "7.3.59";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3214,12 +3242,14 @@ function openAdd(cashOnly=false){
     const accs=accOpts(); if(!accs.find(a=>a.k===acc)) acc="Cash|";
     const amtV=$("aamt")?$("aamt").value:"", nameV=$("aname")?$("aname").value:"";
     const dateV=$("adate")?$("adate").value:ymd(Date.now()), currencyV=$("acur")?$("acur").value:"LKR";
-    openSheet('<h2>'+(cashOnly?'Add cash expense':'Add entry')+'</h2><div class="note">'+(cashOnly?'Choose the date you actually spent the cash, even if you are recording it a few days later.':'Cash purchases count as expenses. A bank withdrawal is just money moved into Cash, so do not add the withdrawal again.')+'</div>'+
+    openSheet('<h2>'+(cashOnly?'Add cash expense':'Add entry')+'</h2>'+
+      (cashOnly?'<label class="field tx-name-first cash-add-name"><span>Cash expense name</span><input id="aname" type="text" value="'+esc(nameV)+'" placeholder="e.g. Lunch, parking or snacks" autocomplete="off"></label>':'')+
+      '<div class="note">'+(cashOnly?'Choose the date you actually spent the cash, even if you are recording it a few days later.':'Cash purchases count as expenses. A bank withdrawal is just money moved into Cash, so do not add the withdrawal again.')+'</div>'+
       '<div style="height:12px"></div>'+
       (cashOnly?'':'<div class="seg" id="tt"><button data-t="out" class="'+(type==="out"?'on':'')+'">Expense</button><button data-t="in" class="'+(type==="in"?'on':'')+'">Money in</button></div>')+
       '<label class="field"><span>Amount</span><div class="amt"><select id="acur"><option>LKR</option><option>AUD</option><option>USD</option></select><input id="aamt" inputmode="decimal" placeholder="0.00" class="num" value="'+esc(amtV)+'"></div></label>'+
       (cashOnly?'<div class="fromhome"><span>Paid from</span><b>Cash wallet</b></div>':'<div class="field"><span>'+(type==="in"?"Received in":"Paid from")+'</span><div class="chips" id="accPick" style="flex-wrap:wrap">'+accs.map(a=>'<button type="button" class="chip'+(a.k===acc?' on':'')+'" data-k="'+esc(a.k)+'">'+esc(a.n)+'</button>').join("")+'</div></div>')+
-      '<label class="field"><span>'+(type==="in"?"From (who)":"Where")+'</span><input id="aname" value="'+esc(nameV)+'" placeholder="'+(type==="in"?"e.g. Kelum":"Shop or place")+'"></label>'+
+      (cashOnly?'':'<label class="field"><span>'+(type==="in"?"From (who)":"Where")+'</span><input id="aname" value="'+esc(nameV)+'" placeholder="'+(type==="in"?"e.g. Kelum":"Shop or place")+'"></label>')+
       catPicker(cats,cat)+
       '<label class="field"><span>'+(cashOnly?'Date spent':'Date')+'</span><input id="adate" type="date" max="'+ymd(Date.now())+'" value="'+esc(dateV)+'"></label>'+
       '<button class="btn full" id="asave">Add</button>');
