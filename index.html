@@ -731,7 +731,8 @@ body.typing .tabs{display:none}
 .field .cash-edit-row .cash-edit-prefix{display:flex;align-items:center;justify-content:center;align-self:stretch;flex:none;margin:0;padding:0 15px;border:0;border-right:1px solid var(--line);background:transparent;color:var(--soft);font-size:13px;line-height:1;font-weight:800}
 .field .cash-edit-row #tamount{flex:1;min-width:0;width:100%;height:54px;padding:10px 14px;margin:0;border:0;border-radius:0;background:transparent;color:var(--ink);font-size:20px;line-height:1.4;font-weight:800;outline:none}
 .field .cash-edit-row:focus-within{border-color:var(--lime)}
-.tx-name-first{margin:0 0 13px}
+.tx-name-first{margin:0 0 13px;clear:both}
+#sheetBody:has(.tx-name-first)>.sx{position:sticky;top:0;float:none;margin:0 0 12px auto;display:grid;z-index:3}
 .tx-name-first>span{font-size:12px;letter-spacing:.02em}
 .tx-name-first #tname{font-weight:750;font-size:17px;padding:14px 13px}
 .tx-name-first #tname:focus{border-color:var(--lime);outline:none}
@@ -1957,7 +1958,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.56";
+const APP_VERSION = "7.3.57";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3145,6 +3146,7 @@ function openTx(id,edit){
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
+    (t.type==="out"&&!NOT_SPENDING.has(cat)?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split or share this expense</button>':'')+
     catPicker(cats,cat)+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -3155,6 +3157,7 @@ function openTx(id,edit){
   const updateGym=wireGymPicker(t,()=>cat);
   wirePicker(c=>{cat=c;updateGym();});
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
+  if($("txSplit")) $("txSplit").onclick=()=>openSplitSetup(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
@@ -4498,12 +4501,17 @@ function openSplitSetup(expenseId){
   let mode=Number(bill.split)>1?"equal":"custom";
   let count=Math.max(2,Math.min(100,Number(bill.split)||2));
   const amount=lkrOf(bill);
+  const originalShared=Number(bill.splitBase);
+  const sharedAmount=Number.isFinite(originalShared)&&originalShared>0&&originalShared<=amount?originalShared:amount;
   const contributors=expenseContributors(expenseId);
   const paid=backMap()[expenseId]||0;
   openSheet('<h2>Split the expense</h2>'+
     '<p class="note">'+esc(bill.merchant)+' · '+rs(amount)+'. Choose how this expense is shared. You can link as many people as needed.</p>'+
     '<div class="seg" id="splitMode"><button data-m="equal" class="'+(mode==="equal"?'on':'')+'">Equal split</button><button data-m="custom" class="'+(mode==="custom"?'on':'')+'">Custom amounts</button></div>'+
-    '<div id="splitEqual" class="field" style="margin-top:14px"><label class="fl2"><span>Total people including you</span><input id="splitCount" class="inp num" type="number" inputmode="numeric" min="2" max="100" step="1" value="'+count+'"></label></div>'+
+    '<div id="splitEqual" class="field" style="margin-top:14px">'+
+      '<label class="fl2"><span>Amount to share (Rs)</span><input id="splitBase" class="inp num" type="text" inputmode="decimal" value="'+fmt(sharedAmount,Number(sharedAmount)%1?2:0)+'"></label>'+
+      '<p class="note" style="margin:4px 0 10px">The rest stays entirely yours. The original payment is not changed.</p>'+
+      '<label class="fl2"><span>People sharing this amount (including you)</span><input id="splitCount" class="inp num" type="number" inputmode="numeric" min="2" max="100" step="1" value="'+count+'"></label></div>'+
     '<div id="splitPreview" style="margin-top:12px"></div>'+
     '<div class="fromhome" style="margin-top:12px"><span>Already received from others</span><b>'+rs(paid)+'</b></div>'+
     (contributors.length?contributors.map(p=>'<div class="fromhome"><span>'+esc(p.merchant)+'</span><b>'+rs(lkrOf(p))+'</b></div>').join(""):'')+
@@ -4515,23 +4523,32 @@ function openSplitSetup(expenseId){
     $("splitMode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
     const raw=Number($("splitCount").value);
     count=Number.isInteger(raw)&&raw>=2&&raw<=100?raw:count;
+    const base=Number(String($("splitBase").value).replace(/,/g,""));
+    const valid=base>0&&base<=amount&&Number.isFinite(base);
     $("splitPreview").innerHTML=mode==="equal"?
-      '<div class="fromhome"><span>Each person’s share</span><b>'+rs(amount/count)+'</b></div>'+
-      '<div class="fromhome"><span>Expected from others</span><b>'+rs(amount-amount/count)+'</b></div>'+
-      '<div class="fromhome"><span>Your planned share</span><b>'+rs(amount/count)+'</b></div>':
+      (valid?'<div class="fromhome"><span>Shared portion</span><b>'+rs(base)+'</b></div>'+
+      '<div class="fromhome"><span>Each person’s share</span><b>'+rs(base/count)+'</b></div>'+
+      '<div class="fromhome"><span>Expected from your friends</span><b>'+rs(base*(count-1)/count)+'</b></div>'+
+      '<div class="fromhome"><span>Your final share (including unshared fuel)</span><b>'+rs(amount-base+base/count)+'</b></div>'+
+      '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,base*(count-1)/count-paid))+'</b></div>':
+      '<p class="note">Enter an amount greater than zero and no more than '+rs(amount)+'.</p>'):
       '<div class="fromhome"><span>Your current expense</span><b>'+rs(myShare(bill))+'</b></div>'+
       '<p class="note">Everyone can contribute a different amount. Add each payback when received.</p>';
   };
   $("splitMode").querySelectorAll("button").forEach(b=>b.onclick=()=>{mode=b.dataset.m;paint();});
   $("splitCount").oninput=paint;
+  $("splitBase").oninput=paint;
   $("splitCancel").onclick=closeSheet;
   $("splitSave").onclick=()=>{
     const o=Object.assign({},bill);
     if(mode==="equal"){
       const n=Number($("splitCount").value);
       if(!Number.isInteger(n)||n<2||n>100)return toast("Enter 2 to 100 people");
+      const base=Number(String($("splitBase").value).replace(/,/g,""));
+      if(!Number.isFinite(base)||base<=0||base>amount)return toast("Enter a valid amount to share");
       o.split=n;
-    }else delete o.split;
+      o.splitBase=Math.round(base*100)/100;
+    }else{delete o.split;delete o.splitBase;}
     put("tx",o);
     closeSheet();toast(mode==="equal"?"Equal split saved":"Custom contributions selected");render();
   };
@@ -4591,7 +4608,9 @@ function openLink(id){
       $("lkContributors").innerHTML='<div class="fromhome" style="margin-top:12px"><span>Expense</span><b>'+rs(lkrOf(one))+'</b></div>'+
         others.map(t=>'<div class="fromhome"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
         (!linkedHere?'<div class="fromhome"><span>'+esc(p.merchant)+' (selected)</span><b>'+rs(P)+'</b></div>':'')+
-        (Number(one.split)>1?'<div class="fromhome"><span>Equal split · '+one.split+' people (including you)</span><b>'+rs(lkrOf(one)/one.split)+' each</b></div><div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,lkrOf(one)*(one.split-1)/one.split-paid))+'</b></div>':'')+
+        (Number(one.split)>1?'<div class="fromhome"><span>Shared portion · '+one.split+' people (including you)</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one)))+'</b></div>'+
+        '<div class="fromhome"><span>Each person’s shared portion</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))/one.split)+'</b></div>'+
+        '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))*(one.split-1)/one.split-paid))+'</b></div>':'')+
         '<div class="fromhome"><span>Your current expense</span><b>'+rs(net)+'</b></div>';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
