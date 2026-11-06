@@ -430,6 +430,11 @@ body.in-travel .sheet:not(.on){transform:translateY(130%)}
 .mtag.ct{background:var(--lime)} .mtag.cp{background:#BBA6FF}
 /* compact calendar days (dots only) */
 .cgrid .cday{min-height:44px!important;height:auto!important;padding:6px 0 5px!important;align-content:start;gap:4px}
+
+/* iOS can paint a cached frame before resume callbacks run.
+   Keep the suspension splash composited before that frame is restored. */
+html.sappy-suspended #splash{display:flex!important;opacity:1!important;visibility:visible!important;transition:none!important;pointer-events:auto}
+
 /* ===== launch screen ===== */
 #splash{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;
   transition:opacity .45s var(--ease),visibility 0s .45s}
@@ -1944,7 +1949,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.52";
+const APP_VERSION = "7.3.53";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3115,7 +3120,7 @@ function openCat(c){
 
 function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
 function openTx(id,edit){
-  if(!edit && isUnsorted(S.tx[id])){ openSort(id); return; }
+  if(!edit && isUnsorted(S.tx[id]) && S.tx[id].bank!=="Cash"){ openSort(id); return; }
   const t=S.tx[id]; if(!t) return; let cat=pocketCat(t);
   const topOpts=(t.type==="out"&&t.balance!=null)?sideAccounts().filter(k=>k.split("|")[0]!==t.bank||k.split("|")[1]!==t.acct):[];
   let topSel=t.topup||"";
@@ -3133,6 +3138,7 @@ function openTx(id,edit){
     '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px"><label class="field"><span>Name</span><input id="tname" value="'+esc(t.merchant)+'"></label>'+
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label></div>'+
     (topOpts.length?'<div class="topbox"><div class="tq">Moved to another account?</div>'+topOpts.map(k=>'<button type="button" class="topb'+(t.topup===k?' on':'')+'" data-k="'+esc(k)+'">'+(t.topup===k?'✓ ':'')+'Top-up to '+esc(k.replace("|"," ••"))+'</button>').join("")+'</div>':'')+
+    (t.bank==="Cash"?'<label class="field"><span>Cash amount (Rs)</span><input id="tamount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(t.amount)+'" aria-label="Edit cash transaction amount"></label>':'')+
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
   const updateGym=wireGymPicker(t,()=>cat);
@@ -3144,6 +3150,15 @@ function openTx(id,edit){
   $("tsave").onclick=()=>{
     const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
     const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
+    if(t.bank==="Cash"){
+      const raw=String($("tamount").value).trim();
+      const amount=Number(raw);
+      if(!raw||!Number.isFinite(amount)||amount<=0||amount>1000000000)return toast("Enter a valid cash amount");
+      n.amount=Math.round(amount*100)/100;
+      n.cur="LKR";
+      n.lkr=n.amount;
+      n.fx=1;
+    }
     applyGymFields(n,cat);
     if(name!==t.merchant) n.nameSet=true;
     let askBal="";
@@ -4826,6 +4841,7 @@ function prepareReturnSplash(){
   if(!sp)return;
   ++splashRun; // Invalidate a pending hide from the previous launch.
   splashArmedForReturn=true;
+  document.documentElement.classList.add("sappy-suspended");
   sp.style.transition="none";
   sp.style.display="flex";
   sp.classList.remove("out");
@@ -4839,18 +4855,24 @@ function restoreShortReturn(){
   sp.style.transition="none";
   sp.classList.add("out");
   sp.style.display="none"; // Instant return to the exact screen, e.g. after OTP.
+  document.documentElement.classList.remove("sappy-suspended");
   splashArmedForReturn=false;
   requestAnimationFrame(()=>sp.style.removeProperty("transition"));
 }
 function resumeToHub(){
   if(resumeLaunchInProgress)return;
   resumeLaunchInProgress=true;
-  showSplash(); // First visible frame is already the Sappy Hub loader.
+  // Keep the cover visible throughout the first resumed frame, even on iOS.
+  document.documentElement.classList.add("sappy-suspended");
+  showSplash();
   splashArmedForReturn=false;
-  const sp=document.getElementById("splash");
-  if(sp)sp.style.removeProperty("transition");
-  freshStart(); // Update the landing page behind the loader.
-  hideSplash(); // Reveal it only after the branded loading animation.
+  freshStart(); // Prepare the landing page without exposing the previous screen.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const sp=document.getElementById("splash");
+    if(sp)sp.style.removeProperty("transition");
+    document.documentElement.classList.remove("sappy-suspended");
+    hideSplash();
+  }));
   setTimeout(()=>{resumeLaunchInProgress=false;},1900);
 }
 function handleAppReturn(){
@@ -4875,7 +4897,7 @@ window.addEventListener("pagehide",()=>{
 });
 window.addEventListener("pageshow",e=>{
   // Safari can restore a suspended home-screen app without visibilitychange.
-  if(e.persisted)handleAppReturn();
+  if(e.persisted && hiddenAt)handleAppReturn();
 });
 if(!S.look3){ S.theme="dark"; S.look3=1; persist(); }
 if(S.name===undefined){ S.name="Sapthaka"; persist(); }
