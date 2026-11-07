@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.67";
+const APP_VERSION = "7.3.68";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2509,7 +2509,7 @@ async function sync(manual){
     S.sb.at=Date.now(); S.sb.err=""; persist(); setPill("ok");
     if(added||reviewed) toast((added?"Added "+added+" from iPhone":"")+" "+(reviewed?"· "+reviewed+" need review":""));
     else if(manual) toast("Synced ✓");
-    try{ if(changed){ if(S.pv<PARSER_VERSION||Object.values(S.skip).some(live)) reparseAll(); else render(); } }catch(e){ console.warn(e); }
+    try{ if(changed||S.pv<PARSER_VERSION||Object.values(S.skip).some(live)){ reparseAll(); }else render(); }catch(e){ console.warn(e); }
   }catch(e){ console.warn(e); const m="Failed while "+step+": "+String(e.message||e); S.sb.err=m; persist(); setPill("err", m); if(manual) toast("Sync failed. Details in Settings."); }
   finally{ syncing=false; if(manual) busyEnd(); }
 }
@@ -2552,7 +2552,8 @@ function reparseAll(force){
     if(!live(k)) return;
     const p=parseSms(k.raw);
     if(!p){ return; } // Never erase unreadable bank messages; user can review them.
-    if(!live(S.tx[p.id])){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
+    if(!S.tx[p.id]){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
+    // A prior deliberate delete stays deleted; never restore an expense silently.
     S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1;
   });
   S.pv=PARSER_VERSION; persist(); linkOwnTransfers(); render(); queueSync();
@@ -3511,9 +3512,10 @@ function openPaste(){
     closeSheet();
     if(existing&&parts.length===1&&d){
       const when=new Date(existing.ts);
+      go("activity"); // Actually show Activity, not just change a hidden view variable.
       month=new Date(when.getFullYear(),when.getMonth()+(when.getDate()>=SALARY_CYCLE_DAY?1:0),1);
-      filter="All";accFilter="all";view="activity";
-      document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
+      filter="All";accFilter="all";$("q").value="";
+      chartMode="months";selDay=null;selWeek=null;
       render();
       setTimeout(()=>openTx(existing.id,true),250);
       toast("This SMS is saved. Opening its transaction.");
