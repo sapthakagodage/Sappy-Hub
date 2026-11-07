@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.62";
+const APP_VERSION = "7.3.63";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2179,12 +2179,26 @@ function load(){
   return blank();
 }
 function blank(){ return {tracked:{}, topupRules:{}, notiRead:{}, name:"Sapthaka", tx:{}, fd:{}, sub:{}, skip:{}, cfg:{}, bankByAcct:{}, pv:0, rules:{}, rate:{AUD:200, USD:300, at:0}, sb:{url:"",key:""}, lastPull:"", dirty:{}, theme:"dark"}; }
-function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast("Storage is full. Download a backup."); } }
+function persist(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));return true;}
+  catch(e){console.warn("Could not save Pocket records",e);toast("Could not save. Storage may be full — back up your data.");return false;}
+}
 const live = o => o && !o.del;
 
-function put(kind, obj){
-  obj.u = Date.now(); S[kind][obj.id] = obj; if(typeof dataVer!=="undefined") dataVer++;
-  S.dirty[kind+":"+obj.id] = 1; persist(); render(); queueSync();
+function put(kind,obj){
+  const key=kind+":"+obj.id,had=Object.prototype.hasOwnProperty.call(S[kind],obj.id);
+  const old=S[kind][obj.id],wasDirty=Object.prototype.hasOwnProperty.call(S.dirty,key);
+  obj.u=Date.now();
+  S[kind][obj.id]=obj;S.dirty[key]=1;
+  if(!persist()){
+    if(had)S[kind][obj.id]=old;else delete S[kind][obj.id];
+    if(!wasDirty)delete S.dirty[key];
+    return false; // No false "Added" when the phone could not retain the record.
+  }
+  if(typeof dataVer!=="undefined")dataVer++;
+  queueSync(); // Save/sync first: a rendering error must not discard an SMS.
+  try{render();}catch(e){console.warn("Pocket redraw failed after saving",e);toast("Saved, but display needs a refresh");}
+  return true;
 }
 function saveRules(){ put("cfg",{id:"rules",map:Object.assign({},S.rules),acct:Object.assign({},S.bankByAcct)}); }
 function remove(kind, id){ put(kind, {id, del:true}); }
@@ -2374,13 +2388,13 @@ function ingest(raw){
     const t=cleanRaw(raw);
     if(!t || looksOtp(t))return {r:"skip"};
     const id="k"+hashStr(t);
-    if(!live(S.skip[id]))put("skip",{id,raw:t});
+    if(!live(S.skip[id]) && !put("skip",{id,raw:t}))return {r:"error"};
     return {r:"review"};
   }
   if(S.tx[p.id]) return {r:"dup",p};
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
   const tk=topupFor(p); if(tk){ p.topup=tk; p.cat="Transfers"; const [tb,ta]=tk.split("|"); p.merchant="Top-up to "+tb+(ta?" ••"+ta:""); p.nameSet=true; }
-  put("tx",p);
+  if(!put("tx",p))return {r:"error"};
   if(p.isFd && p.type==="out"){
     put("fd",{id:"f"+p.id, bank:p.bank, amount:p.amount, cur:p.cur, rate:0, start:ymd(p.ts), months:12, note:"From SMS"});
   }
@@ -2431,6 +2445,7 @@ async function sync(manual){
       for(const r of inbox){
         if(!r || typeof r.raw!=="string")throw new Error("Invalid SMS inbox item; left in inbox for retry");
         const result=ingest(r.raw);
+        if(result.r==="error")throw new Error("Unable to save SMS on this device; inbox retained");
         if(result.r==="added")added++;
         if(result.r==="review")reviewed++;
       }
@@ -2498,13 +2513,9 @@ function reparseAll(force){
   Object.values(S.tx).forEach(t=>{
     if(!live(t) || t.src!=="sms" || !t.raw) return;
     const p=parseSms(t.raw);
-    if(!p){
-      // Purge obvious promotional SMS mistakenly imported by older versions.
-      if(/\b(?:offer|offers|promotion|promotional|discount|special price|starting from|order now|limited time|menu)\b|thalappakatti/i.test(t.raw)){
-        S.tx[t.id]={id:t.id,del:true,u:Date.now()}; S.dirty["tx:"+t.id]=1; fixed++;
-      }
-      return;
-    }
+    // An improved parser must NEVER erase an existing financial transaction.
+    // Older records remain untouched until the user explicitly deletes them.
+    if(!p)return;
     const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer,isPerson:p.isPerson,where:p.where});
     if(!t.nameSet) n.merchant=p.merchant;
     if(!t.bankSet) n.bank=p.bank;
@@ -3332,8 +3343,8 @@ function openAdd(cashOnly=false){
       const cur=$("acur").value, d=fromYmd($("adate").value);
       const ts= sameDay(d,Date.now())?Date.now():d;
       const [bank,acct]=acc.split("|");
-      put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, merchant:$("aname").value.trim()||(type==="in"?(cat==="Paid back"?"Paid back":"Cash received"):cat), ts, bank, acct:acct||"", lkr:amount*rateFor(cur), fx:rateFor(cur)});
-      closeSheet(); toast("Added"); render();
+      if(!put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, merchant:$("aname").value.trim()||(type==="in"?(cat==="Paid back"?"Paid back":"Cash received"):cat), ts, bank, acct:acct||"", lkr:amount*rateFor(cur), fx:rateFor(cur)}))return;
+      closeSheet(); toast("Added");
     };
   };
   draw();
@@ -3433,9 +3444,9 @@ function openSmsReview(id){
     const idTx="s"+hashStr(text);
     if(live(S.tx[idTx]))return toast("This SMS is already saved");
     const type=$("revType").value;
-    put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur:"LKR",type,cat:category,merchant:name,
+    if(!put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur:"LKR",type,cat:category,merchant:name,
       ts:sameDay(fromYmd(when),Date.now())?Date.now():fromYmd(when),
-      bank:$("revBank").value,acct:"",lkr:amount,fx:1,catSet:true,nameSet:true});
+      bank:$("revBank").value,acct:"",lkr:amount,fx:1,catSet:true,nameSet:true}))return;
     remove("skip",entry.id);
     closeSheet();toast("Transaction added");render();
   };
@@ -3454,7 +3465,7 @@ function openPaste(){
     // Only blank lines separate independently pasted SMS messages.
     const parts=v.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
     let a=0,d=0,review=0,skipped=0;
-    parts.forEach(p=>{const r=ingest(p).r;if(r==="added")a++;else if(r==="dup")d++;else if(r==="review")review++;else skipped++;});
+    parts.forEach(p=>{const r=ingest(p).r;if(r==="added")a++;else if(r==="dup")d++;else if(r==="review")review++;else if(r==="error")skipped++;else skipped++;});
     if(a)linkOwnTransfers();
     closeSheet();
     toast("Added "+a+(d?" · "+d+" already saved":"")+(review?" · "+review+" need review":"")+(skipped?" · "+skipped+" ignored":""));
