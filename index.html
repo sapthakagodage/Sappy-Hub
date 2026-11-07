@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.68";
+const APP_VERSION = "7.3.69";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2387,7 +2387,7 @@ function lkrOf(t){
 }
 
 /* returns "added" | "dup" | "skip" */
-function ingest(raw){
+function ingest(raw,allowRestore=false){
   const p=parseSms(raw);
   if(!p){
     // Preserve unmatched bank alerts for review rather than silently dropping
@@ -2400,7 +2400,14 @@ function ingest(raw){
   }
   if(S.tx[p.id]){
     const old=S.tx[p.id];
-    if(!live(old))return {r:"deleted",p}; // Deleted is NOT already added.
+    if(!live(old)&&!allowRestore)return {r:"deleted",p};
+    if(!live(old)&&allowRestore){
+      p.cat=guessCat(p);p.lkr=p.amount*rateFor(p.cur);p.fx=rateFor(p.cur);
+      const tk=topupFor(p);
+      if(tk){p.topup=tk;p.cat="Transfers";const [tb,ta]=tk.split("|");p.merchant="Top-up to "+tb+(ta?" ••"+ta:"");p.nameSet=true;}
+      if(!put("tx",p))return {r:"error"};
+      return {r:"restored",p,existing:p};
+    }
     if(old.src==="sms-review"&&old.balance==null&&p.balance!=null){
       if(!put("tx",Object.assign({},old,{balance:p.balance,bank:p.bank,acct:p.acct||old.acct})))return {r:"error"};
       return {r:"updated",p,existing:S.tx[p.id]};
@@ -3487,7 +3494,7 @@ function openSmsReview(id){
 }
 
 function openPaste(){
-  openSheet('<h2>Add an SMS</h2><div class="note">Copy it from Messages and paste below. Already-added ones are ignored.</div>'+
+  openSheet('<h2>Add an SMS</h2><div class="note">Paste an HNB or ComBank SMS. Existing transactions do not duplicate. Pasting a previously deleted SMS restores it.</div>'+
     '<textarea id="paste" class="smsbox" rows="7" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea>'+
     '<button class="btn full" id="pasteAdd">Add messages</button>');
   $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
@@ -3499,10 +3506,10 @@ function openPaste(){
       // only when each line independently matches a bank transaction.
       return lines.length>1&&lines.every(x=>approvedBankAlert(cleanRaw(x)))?lines:[block.trim()];
     }).filter(Boolean);
-    let a=0,d=0,review=0,deleted=0,skipped=0,existing=null;
+    let a=0,d=0,review=0,deleted=0,restored=0,skipped=0,existing=null;
     parts.forEach(p=>{
-      const result=ingest(p),r=result.r;
-      if(r==="added"||r==="updated"){a++;existing=result.p||existing;}
+      const result=ingest(p,true),r=result.r;
+      if(r==="added"||r==="updated"||r==="restored"){a++;if(r==="restored")restored++;existing=result.p||existing;}
       else if(r==="dup"){d++;existing=result.existing||existing;}
       else if(r==="review")review++;
       else if(r==="deleted")deleted++;
@@ -3518,9 +3525,9 @@ function openPaste(){
       chartMode="months";selDay=null;selWeek=null;
       render();
       setTimeout(()=>openTx(existing.id,true),250);
-      toast("This SMS is saved. Opening its transaction.");
+      toast("This transaction already exists in the system. Opening it.");
     }else{
-      toast("Added "+a+(d?" · "+d+" already in Activity":"")+(review?" · "+review+" need review":"")+(deleted?" · "+deleted+" previously deleted":"")+(skipped?" · "+skipped+" not saved":""));
+      toast((restored?"Restored "+restored+(a>restored?" · Added "+(a-restored):""):"Added "+a)+(d?" · "+d+" already in the system":"")+(review?" · "+review+" need review":"")+(deleted?" · "+deleted+" previously deleted":"")+(skipped?" · "+skipped+" not saved":""));
       if(review&&!a)setTimeout(openSmsReviewList,300);
     }
   };
