@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.66";
+const APP_VERSION = "7.3.67";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2400,11 +2400,12 @@ function ingest(raw){
   }
   if(S.tx[p.id]){
     const old=S.tx[p.id];
-    if(live(old)&&old.src==="sms-review"&&old.balance==null&&p.balance!=null){
+    if(!live(old))return {r:"deleted",p}; // Deleted is NOT already added.
+    if(old.src==="sms-review"&&old.balance==null&&p.balance!=null){
       if(!put("tx",Object.assign({},old,{balance:p.balance,bank:p.bank,acct:p.acct||old.acct})))return {r:"error"};
-      return {r:"updated",p};
+      return {r:"updated",p,existing:S.tx[p.id]};
     }
-    return {r:"dup",p};
+    return {r:"dup",p,existing:old};
   }
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
   const tk=topupFor(p); if(tk){ p.topup=tk; p.cat="Transfers"; const [tb,ta]=tk.split("|"); p.merchant="Top-up to "+tb+(ta?" ••"+ta:""); p.nameSet=true; }
@@ -3450,7 +3451,7 @@ function openSmsReview(id){
     '<label class="field"><span>Amount</span><div class="amt"><select id="revCur">'+["LKR","AUD","USD"].map(c=>'<option'+(c===suggestedCur?' selected':'')+'>'+c+'</option>').join("")+'</select><input id="revAmount" inputmode="decimal" class="num" value="'+esc(suggested?suggested[2]:"")+'" placeholder="0.00"></div></label>'+
     '<label class="field"><span>Available bank balance after payment</span><input id="revBalance" inputmode="decimal" class="num" value="'+esc(reportedBal==null?"":reportedBal)+'" placeholder="Balance shown in SMS"></label>'+
     '<label class="field"><span>Type</span><select id="revType"><option value="out">Expense</option><option value="in">Money in</option></select></label>'+
-    '<label class="field"><span>Bank</span><select id="revBank">'+["HNB","ComBank","Sampath","BOC","CommBank AU","Bank"].map(bank=>'<option'+(new RegExp("\\b"+bank.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\function openPaste(){")+"\\b","i").test(text)?' selected':'')+'>'+bank+'</option>').join("")+'</select></label>'+
+    '<label class="field"><span>Bank</span><select id="revBank">'+["HNB","ComBank","Sampath","BOC","CommBank AU","Bank"].map(bank=>'<option'+((bank==="HNB"?/(?:\bHNB\b|hatton|avl\s+bal)/i.test(text):new RegExp("\\b"+bank+"\\b","i").test(text))?' selected':'')+'>'+bank+'</option>').join("")+'</select></label>'+
     '<label class="field"><span>Transaction date</span><input id="revDate" type="date" max="'+ymd(Date.now())+'" value="'+ymd(Date.now())+'"></label>'+
     '<div id="revCat">'+catPicker([...PICK,"Other"],category)+'</div>'+
     '<div class="btns"><button class="btn" id="revSave" style="flex:1">Add verified transaction</button><button class="btn soft" id="revDismiss">Discard</button></div>');
@@ -3497,12 +3498,29 @@ function openPaste(){
       // only when each line independently matches a bank transaction.
       return lines.length>1&&lines.every(x=>approvedBankAlert(cleanRaw(x)))?lines:[block.trim()];
     }).filter(Boolean);
-    let a=0,d=0,review=0,skipped=0;
-    parts.forEach(p=>{const r=ingest(p).r;if(r==="added")a++;else if(r==="dup")d++;else if(r==="review")review++;else if(r==="error")skipped++;else skipped++;});
+    let a=0,d=0,review=0,deleted=0,skipped=0,existing=null;
+    parts.forEach(p=>{
+      const result=ingest(p),r=result.r;
+      if(r==="added"||r==="updated"){a++;existing=result.p||existing;}
+      else if(r==="dup"){d++;existing=result.existing||existing;}
+      else if(r==="review")review++;
+      else if(r==="deleted")deleted++;
+      else skipped++;
+    });
     if(a)linkOwnTransfers();
     closeSheet();
-    toast("Added "+a+(d?" · "+d+" already saved":"")+(review?" · "+review+" need review":"")+(skipped?" · "+skipped+" ignored":""));
-    if(review && !a)setTimeout(openSmsReviewList,300);
+    if(existing&&parts.length===1&&d){
+      const when=new Date(existing.ts);
+      month=new Date(when.getFullYear(),when.getMonth()+(when.getDate()>=SALARY_CYCLE_DAY?1:0),1);
+      filter="All";accFilter="all";view="activity";
+      document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.v===view));
+      render();
+      setTimeout(()=>openTx(existing.id,true),250);
+      toast("This SMS is saved. Opening its transaction.");
+    }else{
+      toast("Added "+a+(d?" · "+d+" already in Activity":"")+(review?" · "+review+" need review":"")+(deleted?" · "+deleted+" previously deleted":"")+(skipped?" · "+skipped+" not saved":""));
+      if(review&&!a)setTimeout(openSmsReviewList,300);
+    }
   };
 }
 
