@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.65";
+const APP_VERSION = "7.3.66";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2214,7 +2214,7 @@ function deletePayment(id){
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 14;
+const PARSER_VERSION = 15;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -2224,17 +2224,24 @@ const BILLERS=[[/\bceb\b|\bedl\b|electricity/i,"CEB Electricity"],[/leco/i,"LECO
 
 // Only import genuine HNB and Commercial Bank transaction alerts.
 // A price or promotional message must never count as spending.
+function smsReportedBalance(s){
+  const m=/(?:\b(?:avl|avail(?:able)?|closing|remaining)\s*(?:a\/?c\s*)?bal(?:ance)?\.?|\bbal(?:ance)?\s*[:=])\s*[:=\-]?\s*(?:LKR|RS\.?|SLR|AUD|USD)?\s*([\d,]+(?:\.\d{1,2})?)/i.exec(s);
+  return m?Number(m[1].replace(/,/g,"")):null;
+}
 function approvedBankAlert(s){
   if(/\b(?:offer|offers|promotion|promotional|discount|special price|starting from|starting at|order now|limited time|dine-in|dine in|menu|save up to|flat off)\b/i.test(s)) return false;
   const bankTag=/\b(?:hnb|combank|cbc)\b|hatton national bank|commercial bank/i.test(s);
   const hotline=Object.keys(HOTLINES).some(n=>s.replace(/\D/g,"").includes(n));
   const combankCard=/^dear cardholder,?\s*purchase at\s+.+?\s+for\s+(?:USD|US\$|LKR|RS\.?|AUD|A\$)\s*[\d,]+(?:\.\d{1,2})?\s+on\s+\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}/i.test(s)
     && /has been authori[sz]ed on your (?:debit|credit) card/i.test(s);
-  if(!(bankTag||hotline||combankCard))return false;
+  // Do not require bank name inside SMS body; iPhone automation may omit sender.
   const movement=/\b(?:debited|credited|deposited|withdrawn|withdrawal|spent|charged|transferred|purchase at|transaction at|txn at|payment made|paid to|salary credited|funds received|has been authori[sz]ed)\b/i.test(s);
   const reason=/\breason\s*[:\-]\s*(?:mb|ib|ob|pos|ecom|ceft|slips|trf|fund|bill|atm|online|salary|sal|pmt|transfer|own|fd|deposit)/i.test(s);
   const acct=/\b(?:a\/?c|acct|account|card|balance|bal|avl)\b/i.test(s);
-  return combankCard || ((bankTag||hotline)&&(movement||reason)&&acct);
+  const structured=/\b(?:a\/?c|acct|account|card)\b/i.test(s)&&
+    /\b(?:debited|credited|debit|credit|spent|withdrawn|withdrawal|paid|transaction|txn)\b/i.test(s)&&
+    /(?:LKR|Rs\.?|SLR|AUD|USD)\s*[\d,]+/i.test(s)&&smsReportedBalance(s)!==null;
+  return combankCard || ((bankTag||hotline)&&(movement||reason)&&acct) || structured;
 }
 
 function parseSms(raw){
@@ -2243,13 +2250,13 @@ function parseSms(raw){
 
   // amounts: first non-balance figure is the amount
   const re = /(LKR|Rs\.?|SLR|AUD|A\$|USD|US\$)\s*([\d,]+(?:\.\d{1,2})?)|([\d,]+\.\d{2})\s*(LKR|AUD|USD)/gi;
-  let m, amount=null, cur="LKR", balance=null;
+  let m, amount=null, cur="LKR", balance=smsReportedBalance(s);
   while((m=re.exec(s))){
     let c=(m[1]||m[4]||"LKR").toUpperCase().replace(/\.|\$/g,"");
     c = c==="RS"||c==="SLR"?"LKR": c==="A"?"AUD": c==="US"?"USD": c;
     const val=parseFloat(String(m[2]||m[3]).replace(/,/g,""));
-    const before=s.slice(Math.max(0,m.index-24),m.index).toLowerCase();
-    if(/bal|avl|available|limit/.test(before)){ if(balance===null) balance=val; continue; }
+    const before=s.slice(Math.max(0,m.index-32),m.index).toLowerCase();
+    if(/(?:avl|available|balance|bal)\s*[:=\-.]?\s*$/.test(before)){if(balance===null)balance=val;continue;}
     if(amount===null){ amount=val; cur=c; }
   }
   if(amount===null || !(amount>0)) return null;
@@ -2349,7 +2356,7 @@ function parseSms(raw){
     else if(combankCard&&/has been authori[sz]ed on your (?:debit|credit) card/i.test(s)) bank="ComBank";
   }
   if(!bank && acct && S.bankByAcct && S.bankByAcct[acct]) bank=S.bankByAcct[acct];
-  if(!bank) bank="Bank";
+  if(!bank) bank=/\b(?:avl|available)\s*bal/i.test(s)?"HNB":"Bank";
   else if(acct && S.bankByAcct) S.bankByAcct[acct]=S.bankByAcct[acct]||bank;
 
   const COMPANY=/\b(pty|ltd|lt|pvt|plc|limited|inc|llc|technolog|solutions|services|holdings|company|corp|bank|group|enterprises|trading|international|lanka|institute|university|insurance|assurance|finance|leasing|gov|ministry|dept|salary|sal|refund|reversal|interest|dividend|cashback)\b/i;
@@ -2391,7 +2398,14 @@ function ingest(raw){
     if(!live(S.skip[id]) && !put("skip",{id,raw:t}))return {r:"error"};
     return {r:"review"};
   }
-  if(S.tx[p.id]) return {r:"dup",p};
+  if(S.tx[p.id]){
+    const old=S.tx[p.id];
+    if(live(old)&&old.src==="sms-review"&&old.balance==null&&p.balance!=null){
+      if(!put("tx",Object.assign({},old,{balance:p.balance,bank:p.bank,acct:p.acct||old.acct})))return {r:"error"};
+      return {r:"updated",p};
+    }
+    return {r:"dup",p};
+  }
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
   const tk=topupFor(p); if(tk){ p.topup=tk; p.cat="Transfers"; const [tb,ta]=tk.split("|"); p.merchant="Top-up to "+tb+(ta?" ••"+ta:""); p.nameSet=true; }
   if(!put("tx",p))return {r:"error"};
@@ -2511,7 +2525,16 @@ function setPill(st,msg){
 function reparseAll(force){
   let fixed=0, rescued=0;
   Object.values(S.tx).forEach(t=>{
-    if(!live(t) || t.src!=="sms" || !t.raw) return;
+    if(!live(t)||!t.raw)return;
+    if(t.src==="sms-review"){
+      const parsed=parseSms(t.raw);
+      if(parsed&&parsed.balance!=null&&t.balance==null){
+        S.tx[t.id]=Object.assign({},t,{balance:parsed.balance,bank:parsed.bank,acct:parsed.acct||t.acct,u:Date.now()});
+        S.dirty["tx:"+t.id]=1;fixed++;
+      }
+      return;
+    }
+    if(t.src!=="sms")return;
     const p=parseSms(t.raw);
     // An improved parser must NEVER erase an existing financial transaction.
     // Older records remain untouched until the user explicitly deletes them.
@@ -3419,11 +3442,13 @@ function openSmsReview(id){
   const text=entry.raw||"";
   const suggested=/(LKR|Rs\.?|SLR|AUD|USD)\s*([\d,]+(?:\.\d{1,2})?)/i.exec(text);
   const suggestedCur=suggested&&/^(AUD|USD)$/i.test(suggested[1])?suggested[1].toUpperCase():"LKR";
+  const reportedBal=smsReportedBalance(text);
   let category="Other";
   openSheet('<h2>Review transaction</h2><p class="note">Please confirm the amount and details. This is not counted until you save.</p>'+
     '<div class="raw">'+esc(text)+'</div>'+
     '<label class="field"><span>Transaction name</span><input id="revName" placeholder="Shop or merchant" value=""></label>'+
     '<label class="field"><span>Amount</span><div class="amt"><select id="revCur">'+["LKR","AUD","USD"].map(c=>'<option'+(c===suggestedCur?' selected':'')+'>'+c+'</option>').join("")+'</select><input id="revAmount" inputmode="decimal" class="num" value="'+esc(suggested?suggested[2]:"")+'" placeholder="0.00"></div></label>'+
+    '<label class="field"><span>Available bank balance after payment</span><input id="revBalance" inputmode="decimal" class="num" value="'+esc(reportedBal==null?"":reportedBal)+'" placeholder="Balance shown in SMS"></label>'+
     '<label class="field"><span>Type</span><select id="revType"><option value="out">Expense</option><option value="in">Money in</option></select></label>'+
     '<label class="field"><span>Bank</span><select id="revBank">'+["HNB","ComBank","Sampath","BOC","CommBank AU","Bank"].map(bank=>'<option'+(new RegExp("\\b"+bank.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\function openPaste(){")+"\\b","i").test(text)?' selected':'')+'>'+bank+'</option>').join("")+'</select></label>'+
     '<label class="field"><span>Transaction date</span><input id="revDate" type="date" max="'+ymd(Date.now())+'" value="'+ymd(Date.now())+'"></label>'+
@@ -3445,9 +3470,11 @@ function openSmsReview(id){
     const idTx="s"+hashStr(text);
     if(live(S.tx[idTx]))return toast("This SMS is already saved");
     const type=$("revType").value,cur=$("revCur").value;
+    const balText=$("revBalance").value.replace(/,/g,"").trim(),balance=balText===""?null:Number(balText);
+    if(balance!==null&&(!Number.isFinite(balance)||balance<0))return toast("Check available balance");
     if(!put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur,type,cat:category,merchant:name,
       ts:sameDay(fromYmd(when),Date.now())?Date.now():fromYmd(when),
-      bank:$("revBank").value,acct:"",lkr:amount*rateFor(cur),fx:rateFor(cur),catSet:true,nameSet:true}))return;
+      bank:$("revBank").value,acct:"",balance,lkr:amount*rateFor(cur),fx:rateFor(cur),catSet:true,nameSet:true}))return;
     remove("skip",entry.id);
     closeSheet();toast("Transaction added");render();
   };
