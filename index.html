@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.64";
+const APP_VERSION = "7.3.65";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3479,11 +3479,11 @@ function openPaste(){
   };
 }
 
-$("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
+$("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,skip:S.skip,rules:S.rules,rate:S.rate},null,1);
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"application/json"})); a.download="sappy-pocket-"+ymd(Date.now())+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
 $("impBtn").onclick=()=>$("imp").click();
 $("imp").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ const d=JSON.parse(await f.text()); let n=0;
-  ["tx","fd"].forEach(k=>Object.values(d[k]||{}).forEach(o=>{ const l=S[k][o.id]; if(!l||(o.u||0)>(l.u||0)){ S[k][o.id]=o; S.dirty[k+":"+o.id]=1; n++; } }));
+  ["tx","fd","skip"].forEach(k=>Object.values(d[k]||{}).forEach(o=>{ const l=S[k][o.id]; if(!l||(o.u||0)>(l.u||0)){ S[k][o.id]=o; S.dirty[k+":"+o.id]=1; n++; } }));
   Object.assign(S.rules,d.rules||{}); persist(); render(); queueSync(); toast("Restored "+n+" records"); }catch(err){ toast("That file isn’t a Pocket Ledger backup"); } e.target.value=""; };
 
 document.querySelectorAll("#theme button").forEach(b=>b.onclick=()=>{ S.theme=b.dataset.t; persist(); applyTheme(); renderSettings(); });
