@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.61";
+const APP_VERSION = "7.3.62";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2369,9 +2369,13 @@ function lkrOf(t){
 function ingest(raw){
   const p=parseSms(raw);
   if(!p){
+    // Preserve unmatched bank alerts for review rather than silently dropping
+    // them from the iPhone Shortcut inbox. Never count them as spending.
     const t=cleanRaw(raw);
-    if(approvedBankAlert(t) && /(lkr|rs\.?|aud|usd)\s*[\d,]/i.test(t) && !looksOtp(t)){ const id="k"+hashStr(t); if(!live(S.skip[id])) put("skip",{id,raw:t}); }
-    return {r:"skip"};
+    if(!t || looksOtp(t))return {r:"skip"};
+    const id="k"+hashStr(t);
+    if(!live(S.skip[id]))put("skip",{id,raw:t});
+    return {r:"review"};
   }
   if(S.tx[p.id]) return {r:"dup",p};
   p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur);
@@ -2419,14 +2423,21 @@ function queueSync(){ if(!sbOn()) return; clearTimeout(syncTimer); syncTimer=set
 async function sync(manual){
   if(!sbOn()||syncing) return; syncing=true; setPill("busy");
   if(manual) busyStart("Syncing your records…");
-  let added=0, step="reading the SMS inbox";
+  let added=0, reviewed=0, inboxAck=null, step="reading the SMS inbox";
   try{
     // 1. pull SMS inbox from the iPhone shortcut
     const inbox=await sbf("inbox?select=id,raw&order=id.asc&limit=500");
     if(inbox&&inbox.length){
-      for(const r of inbox){ try{ if(r && typeof r.raw==="string" && ingest(r.raw).r==="added") added++; }catch(e){ console.warn("bad inbox row",r,e); } }
-      if(added) linkOwnTransfers();
-      await sbf("inbox?id=lte."+inbox[inbox.length-1].id,{method:"DELETE"});
+      for(const r of inbox){
+        if(!r || typeof r.raw!=="string")throw new Error("Invalid SMS inbox item; left in inbox for retry");
+        const result=ingest(r.raw);
+        if(result.r==="added")added++;
+        if(result.r==="review")reviewed++;
+      }
+      if(added)linkOwnTransfers();
+      // Do not remove inbox rows until the corresponding transactions AND
+      // pending-review messages have been uploaded successfully below.
+      inboxAck=inbox[inbox.length-1].id;
     }
     // 2. pull changes from other devices
     step="downloading your records";
@@ -2461,8 +2472,12 @@ async function sync(manual){
       await send();
       keys.forEach(k=>delete S.dirty[k]);
     }
+    if(inboxAck!=null){
+      step="acknowledging saved SMS";
+      await sbf("inbox?id=lte."+encodeURIComponent(inboxAck),{method:"DELETE"});
+    }
     S.sb.at=Date.now(); S.sb.err=""; persist(); setPill("ok");
-    if(added) toast("Added "+added+" new from your iPhone");
+    if(added||reviewed) toast((added?"Added "+added+" from iPhone":"")+" "+(reviewed?"· "+reviewed+" need review":""));
     else if(manual) toast("Synced ✓");
     try{ if(changed){ if(S.pv<PARSER_VERSION||Object.values(S.skip).some(live)) reparseAll(); else render(); } }catch(e){ console.warn(e); }
   }catch(e){ console.warn(e); const m="Failed while "+step+": "+String(e.message||e); S.sb.err=m; persist(); setPill("err", m); if(manual) toast("Sync failed. Details in Settings."); }
@@ -2501,7 +2516,7 @@ function reparseAll(force){
   Object.values(S.skip).forEach(k=>{
     if(!live(k)) return;
     const p=parseSms(k.raw);
-    if(!p){ S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1; return; }
+    if(!p){ return; } // Never erase unreadable bank messages; user can review them.
     if(!live(S.tx[p.id])){ p.cat=guessCat(p); p.lkr=p.amount*rateFor(p.cur); p.fx=rateFor(p.cur); p.u=Date.now(); S.tx[p.id]=p; S.dirty["tx:"+p.id]=1; rescued++; }
     S.skip[k.id]={id:k.id,del:true,u:Date.now()}; S.dirty["skip:"+k.id]=1;
   });
@@ -2554,15 +2569,21 @@ function checkHash(){
   }catch(e){ toast("That SMS link couldn’t be read"); return; }
   const r=ingest(text);
   if(r.r==="added") toast((r.p.type==="in"?"＋ ":"− ")+r.p.cur+" "+fmt(r.p.amount,2)+" · "+r.p.merchant);
-  else toast(r.r==="dup"?"Already added":"Not a bank transaction");
+  else toast(r.r==="dup"?"Already added":r.r==="review"?"SMS saved for review":"Not a transaction");
   history.replaceState(null,"",location.pathname+location.search);
+  lastHash=""; // A corrected resend must be processed, not silently ignored.
 }
 
 /* =============== view state =============== */
 let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
 let focusCat=null, filter="All", accFilter="all";
 const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
-function renderSms(){ const sk=Object.values(S.skip).filter(live).length; $("skipRow").hidden=!sk; $("skipD").textContent=sk+" SMS couldn’t be read. Send one to Claude to improve reading."; }
+function renderSms(){
+  const sk=Object.values(S.skip).filter(live).length;
+  $("skipRow").hidden=!sk;
+  $("skipD").textContent=sk+" SMS need review. Nothing is discarded or counted until confirmed.";
+  $("skipRetry").textContent="Review";
+}
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
 // Spending cycles run 22nd–21st; AUD income on the 20th–21st funds the next cycle.
 // The displayed month names the month when the cycle ends.
@@ -3367,17 +3388,78 @@ $("sbOpen").onclick=()=>{ openSheet('<h2>Cloud sync</h2><p class="note">From Sup
 $("sbSync").onclick=()=>sync(true);
 async function showLatest(){ try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); const v=(await r.json()).app; $("verLatest").textContent=v&&v!==APP_VERSION?" · latest on GitHub: v"+v:" · up to date"; }catch(e){ $("verLatest").textContent=""; } }
 $("updBtn").onclick=async()=>{ toast("Checking…"); const r=await checkUpdate("app",APP_VERSION,"version.json",true); if(r===false) toast("You have the latest version"); else if(r===null) toast("Couldn’t check. Are you online?"); };
-$("skipRetry").onclick=()=>{ reparseAll(true); render(); };
+$("skipRetry").onclick=openSmsReviewList;
 $("sbOff").onclick=()=>{ S.sb={url:"",key:""}; persist(); renderSettings(); toast("Disconnected. Data stays on this phone."); };
+
+
+/* Review inbox holds SMS that did not match the strict bank parser. Nothing
+   here becomes a financial transaction without explicit user confirmation. */
+function openSmsReviewList(){
+  const items=Object.values(S.skip).filter(live).sort((a,b)=>(b.u||0)-(a.u||0));
+  if(!items.length){toast("No messages need review");return;}
+  openSheet('<h2>SMS to review</h2><p class="note">These messages were saved safely, but not added as transactions. Review each one to avoid missing spending.</p>'+
+    '<div class="list">'+items.map(k=>'<button class="tx" data-review="'+esc(k.id)+'"><span class="mid"><div class="m">'+esc(k.raw.slice(0,65))+'</div><div class="c">Tap to review · not counted yet</div></span><span class="rt">›</span></button>').join("")+'</div>'+
+    '<button class="btn soft full" id="reviewRetry" style="margin-top:12px">Try reading again</button>');
+  document.querySelectorAll("[data-review]").forEach(b=>b.onclick=()=>openSmsReview(b.dataset.review));
+  $("reviewRetry").onclick=()=>{reparseAll(true);openSmsReviewList();};
+}
+function openSmsReview(id){
+  const entry=S.skip[id];if(!live(entry))return openSmsReviewList();
+  const text=entry.raw||"";
+  const suggested=/(?:LKR|Rs\.?|SLR|AUD|USD)\s*([\d,]+(?:\.\d{1,2})?)/i.exec(text);
+  let category="Other";
+  openSheet('<h2>Review transaction</h2><p class="note">Please confirm the amount and details. This is not counted until you save.</p>'+
+    '<div class="raw">'+esc(text)+'</div>'+
+    '<label class="field"><span>Transaction name</span><input id="revName" placeholder="Shop or merchant" value=""></label>'+
+    '<label class="field"><span>Amount</span><input id="revAmount" inputmode="decimal" class="num" value="'+esc(suggested?suggested[1]:"")+'" placeholder="0.00"></label>'+
+    '<label class="field"><span>Type</span><select id="revType"><option value="out">Expense</option><option value="in">Money in</option></select></label>'+
+    '<label class="field"><span>Bank</span><select id="revBank">'+["HNB","ComBank","Sampath","BOC","CommBank AU","Bank"].map(bank=>'<option'+(new RegExp("\\b"+bank.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\function openPaste(){")+"\\b","i").test(text)?' selected':'')+'>'+bank+'</option>').join("")+'</select></label>'+
+    '<label class="field"><span>Transaction date</span><input id="revDate" type="date" max="'+ymd(Date.now())+'" value="'+ymd(Date.now())+'"></label>'+
+    '<div id="revCat">'+catPicker([...PICK,"Other"],category)+'</div>'+
+    '<div class="btns"><button class="btn" id="revSave" style="flex:1">Add verified transaction</button><button class="btn soft" id="revDismiss">Discard</button></div>');
+  const drawCats=()=>{
+    const incoming=$("revType").value==="in";
+    category=incoming?"Income":"Other";
+    $("revCat").innerHTML=catPicker(incoming?["Income","Paid back","Transfers"]:[...PICK,"Other"],category);
+    wirePicker(c=>category=c);
+  };
+  wirePicker(c=>category=c);
+  $("revType").onchange=drawCats;
+  $("revSave").onclick=()=>{
+    const name=$("revName").value.trim(),raw=String($("revAmount").value).replace(/,/g,"").trim(),amount=Number(raw);
+    if(!name)return toast("Enter the transaction name");
+    if(!raw||!Number.isFinite(amount)||amount<=0)return toast("Enter a valid amount");
+    const when=$("revDate").value;if(!when||when>ymd(Date.now()))return toast("Check transaction date");
+    const idTx="s"+hashStr(text);
+    if(live(S.tx[idTx]))return toast("This SMS is already saved");
+    const type=$("revType").value;
+    put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur:"LKR",type,cat:category,merchant:name,
+      ts:sameDay(fromYmd(when),Date.now())?Date.now():fromYmd(when),
+      bank:$("revBank").value,acct:"",lkr:amount,fx:1,catSet:true,nameSet:true});
+    remove("skip",entry.id);
+    closeSheet();toast("Transaction added");render();
+  };
+  $("revDismiss").onclick=()=>{
+    if(!confirm("Discard this unreadable SMS? No expense will be added."))return;
+    remove("skip",entry.id);closeSheet();toast("Message discarded");
+  };
+}
 
 function openPaste(){
   openSheet('<h2>Add an SMS</h2><div class="note">Copy it from Messages and paste below. Already-added ones are ignored.</div>'+
     '<textarea id="paste" class="smsbox" rows="7" placeholder="Paste SMS here" aria-label="Paste SMS"></textarea>'+
     '<button class="btn full" id="pasteAdd">Add messages</button>');
   $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
-    const parts=/\n\s*\n/.test(v)?v.split(/\n\s*\n/):v.split(/\n/); let a=0,d=0,s=0;
-    parts.forEach(p=>{ const r=ingest(p).r; r==="added"?a++:r==="dup"?d++:s++; });
-    linkOwnTransfers(); closeSheet(); toast("Added "+a+(d?" · "+d+" already in":"")+(s?" · "+s+" skipped":"")); };
+    // Single line breaks commonly occur INSIDE a bank alert.
+    // Only blank lines separate independently pasted SMS messages.
+    const parts=v.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
+    let a=0,d=0,review=0,skipped=0;
+    parts.forEach(p=>{const r=ingest(p).r;if(r==="added")a++;else if(r==="dup")d++;else if(r==="review")review++;else skipped++;});
+    if(a)linkOwnTransfers();
+    closeSheet();
+    toast("Added "+a+(d?" · "+d+" already saved":"")+(review?" · "+review+" need review":"")+(skipped?" · "+skipped+" ignored":""));
+    if(review && !a)setTimeout(openSmsReviewList,300);
+  };
 }
 
 $("exp").onclick=()=>{ const data=JSON.stringify({app:"pocket-ledger",version:APP_VERSION,exported:new Date().toISOString(),tx:S.tx,fd:S.fd,rules:S.rules,rate:S.rate},null,1);
