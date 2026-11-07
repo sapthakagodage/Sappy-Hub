@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.63";
+const APP_VERSION = "7.3.64";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3417,12 +3417,13 @@ function openSmsReviewList(){
 function openSmsReview(id){
   const entry=S.skip[id];if(!live(entry))return openSmsReviewList();
   const text=entry.raw||"";
-  const suggested=/(?:LKR|Rs\.?|SLR|AUD|USD)\s*([\d,]+(?:\.\d{1,2})?)/i.exec(text);
+  const suggested=/(LKR|Rs\.?|SLR|AUD|USD)\s*([\d,]+(?:\.\d{1,2})?)/i.exec(text);
+  const suggestedCur=suggested&&/^(AUD|USD)$/i.test(suggested[1])?suggested[1].toUpperCase():"LKR";
   let category="Other";
   openSheet('<h2>Review transaction</h2><p class="note">Please confirm the amount and details. This is not counted until you save.</p>'+
     '<div class="raw">'+esc(text)+'</div>'+
     '<label class="field"><span>Transaction name</span><input id="revName" placeholder="Shop or merchant" value=""></label>'+
-    '<label class="field"><span>Amount</span><input id="revAmount" inputmode="decimal" class="num" value="'+esc(suggested?suggested[1]:"")+'" placeholder="0.00"></label>'+
+    '<label class="field"><span>Amount</span><div class="amt"><select id="revCur">'+["LKR","AUD","USD"].map(c=>'<option'+(c===suggestedCur?' selected':'')+'>'+c+'</option>').join("")+'</select><input id="revAmount" inputmode="decimal" class="num" value="'+esc(suggested?suggested[2]:"")+'" placeholder="0.00"></div></label>'+
     '<label class="field"><span>Type</span><select id="revType"><option value="out">Expense</option><option value="in">Money in</option></select></label>'+
     '<label class="field"><span>Bank</span><select id="revBank">'+["HNB","ComBank","Sampath","BOC","CommBank AU","Bank"].map(bank=>'<option'+(new RegExp("\\b"+bank.replace(/[-/\\^$*+?.()|[\]{}]/g,"\\function openPaste(){")+"\\b","i").test(text)?' selected':'')+'>'+bank+'</option>').join("")+'</select></label>'+
     '<label class="field"><span>Transaction date</span><input id="revDate" type="date" max="'+ymd(Date.now())+'" value="'+ymd(Date.now())+'"></label>'+
@@ -3443,10 +3444,10 @@ function openSmsReview(id){
     const when=$("revDate").value;if(!when||when>ymd(Date.now()))return toast("Check transaction date");
     const idTx="s"+hashStr(text);
     if(live(S.tx[idTx]))return toast("This SMS is already saved");
-    const type=$("revType").value;
-    if(!put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur:"LKR",type,cat:category,merchant:name,
+    const type=$("revType").value,cur=$("revCur").value;
+    if(!put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur,type,cat:category,merchant:name,
       ts:sameDay(fromYmd(when),Date.now())?Date.now():fromYmd(when),
-      bank:$("revBank").value,acct:"",lkr:amount,fx:1,catSet:true,nameSet:true}))return;
+      bank:$("revBank").value,acct:"",lkr:amount*rateFor(cur),fx:rateFor(cur),catSet:true,nameSet:true}))return;
     remove("skip",entry.id);
     closeSheet();toast("Transaction added");render();
   };
@@ -3463,7 +3464,12 @@ function openPaste(){
   $("pasteAdd").onclick=()=>{ const v=$("paste").value.trim(); if(!v) return toast("Paste an SMS first");
     // Single line breaks commonly occur INSIDE a bank alert.
     // Only blank lines separate independently pasted SMS messages.
-    const parts=v.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
+    const parts=v.split(/\n\s*\n/).flatMap(block=>{
+      const lines=block.split(/\n/).map(x=>x.trim()).filter(Boolean);
+      // Preserve multi-line single alerts; split one-SMS-per-line batches
+      // only when each line independently matches a bank transaction.
+      return lines.length>1&&lines.every(x=>approvedBankAlert(cleanRaw(x)))?lines:[block.trim()];
+    }).filter(Boolean);
     let a=0,d=0,review=0,skipped=0;
     parts.forEach(p=>{const r=ingest(p).r;if(r==="added")a++;else if(r==="dup")d++;else if(r==="review")review++;else if(r==="error")skipped++;else skipped++;});
     if(a)linkOwnTransfers();
