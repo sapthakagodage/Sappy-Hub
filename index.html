@@ -1820,6 +1820,22 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
  .cash-wallet .cw-balance b{font-size:19px}
  .cash-wallet .cw-balance small{font-size:9px}
 }
+
+/* Optional, compact shared-expense action for Cash Wallet transactions. */
+.cash-expense-row{display:flex;align-items:center;min-width:0}
+.cash-expense-row>.tx{flex:1;min-width:0;width:auto;padding-right:5px}
+.cash-split-mini{width:38px;height:38px;min-width:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  gap:4px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--ink);
+  padding:0;cursor:pointer;touch-action:manipulation}
+.cash-split-mini:active{background:var(--press)}
+.cash-split-mini svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cash-expense-row>.cash-split-mini{margin-right:12px}
+.cash-split-mini.is-shared{background:var(--lime);border-color:var(--lime);color:var(--on-lime)}
+.cash-split-mini:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+.cash-source-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cash-source-line .from{flex:none}
+.cash-source-line .cash-split-mini{width:auto;min-width:38px;padding:0 9px;font-size:12px;font-weight:750}
+.cash-source-line .cash-split-mini svg{width:16px;height:16px}
 </style>
 </head>
 <body class="in-hub">
@@ -2031,7 +2047,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.74";
+const APP_VERSION = "7.3.75";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3000,11 +3016,14 @@ function cashMovementHtml(t){
   const withdrawal=isCashWithdrawal(t),credit=withdrawal||t.type==="in";
   const category=withdrawal?"Cash":pocketCat(t),c=CATS[category]||CATS.Other;
   const amount=(credit?"+":"−")+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx" data-id="'+esc(t.id)+'">'+
+  const split=canSplitExpense(t),shared=split&&(Number(t.split)>1||expenseContributors(t.id).length>0);
+  return (split?'<div class="cash-expense-row">':'')+
+    '<button class="tx" data-id="'+esc(t.id)+'">'+
     '<span class="ic" style="background:'+c.c+'">'+icon(category,20)+'</span>'+
     '<span class="mid"><div class="m">'+esc(withdrawal?"Cash withdrawal":t.merchant)+'</div>'+
     '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(category)+" · Cash")+'</div></span>'+
-    '<span class="rt"><div class="a num'+(credit?' in':'')+'">'+amount+'</div></span></button>';
+    '<span class="rt"><div class="a num'+(credit?' in':'')+'">'+amount+'</div></span></button>'+
+    (split?'<button type="button" class="cash-split-mini'+(shared?' is-shared':'')+'" data-split="'+esc(t.id)+'" title="Split this cash expense" aria-label="Split '+esc(t.merchant)+' with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg></button></div>':'');
 }
 function openCashWallet(){
   const c=cashBalance();
@@ -3025,6 +3044,7 @@ function openCashWallet(){
     '<div id="cashMoves">'+(timeline||'<div class="list"><div class="empty">No cash movements recorded yet.</div></div>')+'</div>');
   $("cashAdd").onclick=()=>openAdd(true);
   $("cashMoves").querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
+  $("cashMoves").querySelectorAll("[data-split]").forEach(b=>b.onclick=()=>openSplitSetup(b.dataset.split));
 }
 
 function trackedBalance(key){
@@ -3339,7 +3359,9 @@ function openTx(id,edit){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<label class="field tx-name-first"><span>Transaction name</span><input id="tname" type="text" value="'+esc(t.merchant)+'" autocomplete="off" aria-label="Edit transaction name"></label>'+
+    (t.bank==="Cash"&&canSplitExpense(t)?'<div class="cash-source-line">':'')+
     '<div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div>'+
+    (t.bank==="Cash"&&canSplitExpense(t)?'<button type="button" class="cash-split-mini'+(Number(t.split)>1||expenseContributors(t.id).length?' is-shared':'')+'" id="txSplit" aria-label="Split cash expense with friends" title="Split with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg>Split</button></div>':'')+
     (t.bank==="Cash"
       ?'<label class="field"><span>Amount (Rs) · edit</span><div class="cash-edit-row"><span class="cash-edit-prefix">LKR</span><input id="tamount" type="text" inputmode="decimal" autocomplete="off" class="num" value="'+esc(fmt(t.amount,Number(t.amount)%1?2:0))+'" aria-label="Cash transaction amount"></div></label>'+
        '<div class="note">'+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'
@@ -3347,7 +3369,7 @@ function openTx(id,edit){
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
-    (canSplitExpense(t)?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split with friends (optional)</button>':'')+
+    (canSplitExpense(t)&&t.bank!=="Cash"?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split with friends (optional)</button>':'')+
     catPicker(cats,cat)+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -4782,9 +4804,18 @@ function looseBacks(){ return txList().filter(isLooseBack); }
 // likely payments a payback is for: spending before it, within 30 days, bigger than the payback
 function backSuggestions(p){
   const pv=lkrOf(p);
-  return txList().filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat)&&t.ts<=p.ts+3600e3&&p.ts-t.ts<=31*864e5&&lkrOf(t)>=pv*0.15)
-    .map(t=>{ const days=(p.ts-t.ts)/864e5, linked=(backMap()[t.id]||0)>0, big=lkrOf(t)>=pv*0.95; return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)}; })
-    .sort((a,b)=>a.score-b.score).slice(0,8).map(x=>x.t);
+  return txList().filter(t=>{
+    if(!canSplitExpense(t)||t.ts>p.ts+3600e3)return false;
+    const days=(p.ts-t.ts)/864e5;
+    // Cash and card expenses can both receive bank-transfer paybacks.
+    // Keep an explicitly shared cash expense findable for up to 90 days.
+    const cashSplit=t.bank==="Cash"&&Number(t.split)>1;
+    return (days<=31&&lkrOf(t)>=pv*0.15)||(cashSplit&&days<=90);
+  }).map(t=>{
+    const days=(p.ts-t.ts)/864e5,linked=(backMap()[t.id]||0)>0,big=lkrOf(t)>=pv*0.95;
+    const sharedCash=t.bank==="Cash"&&Number(t.split)>1;
+    return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)-(sharedCash?5:0)};
+  }).sort((a,b)=>a.score-b.score).slice(0,12).map(x=>x.t);
 }
 function expenseContributors(expenseId){
   return txList().filter(t=>t.type==="in"&&t.cat==="Paid back"&&linksOf(t).includes(expenseId));
@@ -4825,7 +4856,7 @@ function openSplitSetup(expenseId){
       (valid?'<div class="fromhome"><span>Shared portion</span><b>'+rs(base)+'</b></div>'+
       '<div class="fromhome"><span>Each person’s share</span><b>'+rs(base/count)+'</b></div>'+
       '<div class="fromhome"><span>Expected from your friends</span><b>'+rs(base*(count-1)/count)+'</b></div>'+
-      '<div class="fromhome"><span>Your final share (including unshared fuel)</span><b>'+rs(amount-base+base/count)+'</b></div>'+
+      '<div class="fromhome"><span>Your final share (including any unshared amount)</span><b>'+rs(amount-base+base/count)+'</b></div>'+
       '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,base*(count-1)/count-paid))+'</b></div>':
       '<p class="note">Enter an amount greater than zero and no more than '+rs(amount)+'.</p>'):
       '<div class="fromhome"><span>Your current expense</span><b>'+rs(myShare(bill))+'</b></div>'+
