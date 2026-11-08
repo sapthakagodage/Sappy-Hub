@@ -253,6 +253,12 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-form-actions{display:flex;gap:9px;margin:18px 0 8px}.rc-form-actions .btn{flex:1;min-width:0;min-height:48px}
 .rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
 .rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}
+.rc-upload-preview{display:flex;align-items:center;gap:11px;justify-content:space-between;margin:2px 0 10px;padding:10px 12px;border:1px solid var(--line);background:var(--card2);border-radius:15px}
+.rc-upload-preview .rc-thumb{display:block;width:62px;height:55px;object-fit:cover;border-radius:10px;background:var(--card);flex:none}
+.rc-upload-preview .rc-upload-label{flex:1;min-width:0;font-size:12px;color:var(--soft);line-height:1.4}
+.rc-upload-preview .rc-remove-image{background:rgba(210,65,76,.1);color:var(--neg);border:1px solid rgba(210,65,76,.3);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800;flex:none}
+.rc-upload-preview .rc-remove-image[aria-pressed="true"]{background:var(--card);color:var(--soft);border-color:var(--line)}
+
 .travel-recap-action{background:#8FDDFF!important;color:#10242b!important;border:1px solid rgba(37,91,104,.24)!important;border-radius:18px!important;min-height:54px;font-size:15px;letter-spacing:-.01em;box-shadow:0 6px 22px rgba(67,162,197,.12);position:relative;margin:2px 0 6px}
 .travel-recap-action:after{content:"↗";position:absolute;right:19px;top:50%;transform:translateY(-50%);font-size:21px;font-weight:500}
 .travel-recap-action:active{transform:scale(.99);filter:brightness(.95)}
@@ -2065,7 +2071,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.81";
+const APP_VERSION = "7.3.82";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4188,9 +4194,40 @@ function tripTileOld(t){
     '<span class="tbody"><b>'+esc(t.name)+'</b><span class="tsub">'+esc([when,tripLoc(t)].filter(Boolean).join(" · "))+'</span>'+
     (chips.length?'<span class="tchips">'+chips.map(c=>'<i>'+esc(c)+'</i>').join("")+'</span>':'')+'</span></button>';
 }
-function compressPhoto(file){ busyStart("Preparing your photo…"); return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onerror=rej; fr.onload=()=>{ const img=new Image(); img.onerror=rej; img.onload=()=>{
-  const max=720, k=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement("canvas"); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
-  c.getContext("2d").drawImage(img,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",0.7)); }; img.src=fr.result; }; fr.readAsDataURL(file); }).finally(busyEnd); }
+// Keep enough photo detail for 1080px-wide recap exports, without filling localStorage.
+// Legacy 720px / JPEG 70% uploads remain usable; re-upload originals to improve them.
+function compressPhoto(file,routeScreenshot=false){
+ busyStart("Preparing your photo…");
+ return new Promise((resolve,reject)=>{
+  if(!file||!file.type.startsWith("image/"))return reject(new Error("Choose an image file"));
+  const fr=new FileReader();
+  fr.onerror=()=>reject(new Error("Could not read the image"));
+  fr.onload=()=>{
+   const im=new Image();im.onerror=()=>reject(new Error("Could not open the image"));
+   im.onload=()=>{
+    try{
+     const limit=routeScreenshot?1800:1920,byteLimit=routeScreenshot?950000:1150000;
+     let scale=Math.min(1,limit/Math.max(im.width,im.height));
+     let best="";
+     for(let pass=0;pass<5;pass++){
+      const c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(im.width*scale));c.height=Math.max(1,Math.round(im.height*scale));
+      const g=c.getContext("2d");g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
+      g.drawImage(im,0,0,c.width,c.height);
+      for(const quality of [0.9,0.85,0.79]){
+       const data=c.toDataURL("image/jpeg",quality);
+       best=data;if(data.length*0.75<=byteLimit){resolve(data);return;}
+      }
+      scale*=0.82;
+     }
+     resolve(best);
+    }catch(e){reject(e);}
+   };
+   im.src=fr.result;
+  };
+  fr.readAsDataURL(file);
+ }).finally(busyEnd);
+}
 function openTrip(id){
   const t=S.trip[id]; if(!t) return; const T=TYPES[t.type]||TYPES.place;
   const when=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"long",year:"numeric"}):(t.year||"Date not set");
@@ -4286,14 +4323,39 @@ function openRecapForm(id=null,planId=null){
  '<div class="rc-driving-summary"><span id="rcRoadJourney">Home → Walk start</span><b id="rcRoadSummary">'+(tripDriveValid(t)?fmt(t.drive.km,1)+" km · "+fmtDur(t.drive.min*60):"Choose home and walk start")+'</b></div>'+
  '<p class="note" id="rcRoadStatus">Driving is calculated separately from the walking journey.</p></div>'+
  '<label class="fl2"><span>Places visited (one per line)</span><textarea class="inp" id="rcStops" rows="3" placeholder="Viewpoint&#10;Tower">'+esc((t.stops||[]).map(x=>x.name).join("\n"))+'</textarea></label>'+
- '<div class="rc-section">Memories & photos</div><label class="rc-upload"><span>Scenic cover photo</span><input type="file" id="rcPhoto" accept="image/*"></label>'+
- (t.photo?'<p class="note">✓ Photo saved; upload another to replace</p>':'')+
+ '<div class="rc-section">Memories & photos</div><label class="rc-upload"><span>Scenic cover photo · improved export quality</span><input type="file" id="rcPhoto" accept="image/*"></label>'+
+ '<div class="rc-upload-preview" id="rcPhotoPreview"'+(t.photo?'':' hidden')+'><img class="rc-thumb" id="rcPhotoThumb" alt="Cover photo preview" src="'+(t.photo||"")+'"><span class="rc-upload-label" id="rcPhotoLabel">Cover photo saved</span><button type="button" class="rc-remove-image" id="rcRemovePhoto">Remove</button></div>'+
  '<label class="rc-upload"><span>Huawei Health route screenshot · optional</span><input type="file" id="rcRoute" accept="image/*"></label>'+
- (t.routeShot?'<p class="note">✓ Route screenshot saved; upload another to replace</p>':'')+
+ '<div class="rc-upload-preview" id="rcRoutePreview"'+(t.routeShot?'':' hidden')+'><img class="rc-thumb" id="rcRouteThumb" alt="Route screenshot preview" src="'+(t.routeShot||"")+'"><span class="rc-upload-label" id="rcRouteLabel">Route screenshot saved</span><button type="button" class="rc-remove-image" id="rcRemoveRoute">Remove</button></div>'+
  '<div class="rc-form-actions"><button class="btn soft" id="rcCancel" type="button">Cancel</button><button class="btn" id="rcSave" type="button" style="background:#8FDDFF;color:#12140D">'+(id?"Save changes & preview":"Save & preview")+'</button></div>');
  const setType=kind=>{t.type=kind;document.querySelectorAll('#rcTypePicker button').forEach(b=>{const on=b.dataset.type===kind;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});const workout=kind==='hike'||kind==='walk';$("rcWorkoutTitle").hidden=!workout;$("rcWorkoutFields").hidden=!workout;};
  document.querySelectorAll('#rcTypePicker button').forEach(b=>b.onclick=()=>setType(b.dataset.type));
  setType(TYPES[t.type]?t.type:'hike');$("rcCancel").onclick=()=>closeSheet();
+ const imageEdits={photo:{removed:false,url:null},routeShot:{removed:false,url:null}};
+ const bindPhotoControls=(key,inputId,previewId,thumbId,labelId,removeId)=>{
+  const input=$(inputId),preview=$(previewId),thumb=$(thumbId),label=$(labelId),remove=$(removeId),edit=imageEdits[key];
+  const original=t[key]||null;
+  const redrawPhoto=()=>{
+   if(edit.url){thumb.src=edit.url;preview.hidden=false;label.textContent="New image selected";remove.textContent="Remove";return;}
+   if(edit.removed){preview.hidden=false;thumb.removeAttribute("src");label.textContent="Image will be removed when you save";remove.textContent="Undo";remove.setAttribute("aria-pressed","true");return;}
+   remove.setAttribute("aria-pressed","false");
+   if(original){preview.hidden=false;thumb.src=original;label.textContent="Saved image · choose another to replace";remove.textContent="Remove";}
+   else{preview.hidden=true;thumb.removeAttribute("src");}
+  };
+  input.onchange=()=>{
+   if(edit.url){URL.revokeObjectURL(edit.url);edit.url=null;}
+   if(input.files?.[0]){edit.removed=false;edit.url=URL.createObjectURL(input.files[0]);}
+   redrawPhoto();
+  };
+  remove.onclick=()=>{
+   if(edit.url){URL.revokeObjectURL(edit.url);edit.url=null;input.value="";edit.removed=!!original;}
+   else{edit.removed=!edit.removed;input.value="";}
+   redrawPhoto();
+  };
+  redrawPhoto();
+ };
+ bindPhotoControls("photo","rcPhoto","rcPhotoPreview","rcPhotoThumb","rcPhotoLabel","rcRemovePhoto");
+ bindPhotoControls("routeShot","rcRoute","rcRoutePreview","rcRouteThumb","rcRouteLabel","rcRemoveRoute");
  const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
  const savedHome=S.travelHome?.lat!=null&&S.travelHome?.lng!=null?[+S.travelHome.lat,+S.travelHome.lng]:null;
  let homeCoord=t.driveHomeLat!=null&&t.driveHomeLng!=null?[+t.driveHomeLat,+t.driveHomeLng]:savedHome;
@@ -4353,8 +4415,10 @@ function openRecapForm(id=null,planId=null){
   }
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
-   if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);
-   if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);
+   if(imageEdits.photo.removed)t.photo=null;
+   else if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0],false);
+   if(imageEdits.routeShot.removed)t.routeShot=null;
+   else if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0],true);
    if(routePending)await routePending;
    const lookup=async id=>{const value=$(id).value.trim();if(!value)return null;try{const results=await geocode(value);return results[0]||null;}catch(e){return null;}};
    if(!coords.from){const o=await lookup("rcFrom");if(o)coords.from=[+o.lat,+o.lng];}
@@ -4380,7 +4444,8 @@ function openRecapForm(id=null,planId=null){
     S.travelHome={lat:homeCoord[0],lng:homeCoord[1],name:$("rcDriveHome").value.trim()};
     persist();put("cfg",{id:"travel",home:S.travelHome});
    }
-   put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
+   if(!put("trip",t))throw new Error("Trip could not be saved");
+   closeSheet();renderTravel();openTripStudio(t.id);
   }catch(e){saveButton.disabled=false;saveButton.textContent=id?"Save changes & preview":"Save & preview";toast("Could not save the trip. Please try again.");}
  };
 
