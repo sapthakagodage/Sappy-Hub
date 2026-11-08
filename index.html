@@ -4149,7 +4149,7 @@ function locateMe(center){
 function miniMap(el, t){
   loadLeaflet().then(()=>{ setTimeout(()=>{ const m=L.map(el,{zoomControl:false,attributionControl:false}); tileLayer().addTo(m);
     const c=(TYPES[t.type]||TYPES.place).c;
-    if((t.track&&t.track.length>1)||(t.drivePath&&t.drivePath.length>1)){ const pts=t.track?.length>1?t.track:t.drivePath;const ln=L.polyline(pts.map(p=>[p[0],p[1]]),{color:c,weight:5}).addTo(m); m.fitBounds(ln.getBounds(),{padding:[20,20]});
+    if((t.track&&t.track.length>1)||(t.startLat!=null&&t.startLng!=null&&t.endLat!=null&&t.endLng!=null)){ const pts=t.track?.length>1?t.track:[[t.startLat,t.startLng],[t.endLat,t.endLng]];const ln=L.polyline(pts.map(p=>[p[0],p[1]]),{color:c,weight:5}).addTo(m); m.fitBounds(ln.getBounds(),{padding:[20,20]});
       L.marker([pts[0][0],pts[0][1]],{icon:pinIcon("#FFFFFF")}).addTo(m); L.marker([pts[pts.length-1][0],pts[pts.length-1][1]],{icon:pinIcon(c)}).addTo(m); }
     else if(isFinite(t.lat)){ m.setView([t.lat,t.lng],12); L.marker([t.lat,t.lng],{icon:pinIcon(c)}).addTo(m); }
   },340); }).catch(()=>{});
@@ -4392,7 +4392,7 @@ function tsCover(ctx,img,x,y,w,h){if(!img)return;const k=Math.max(w/img.width,h/
 function tsRound(ctx,x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function tsWrap(ctx,str,x,y,maxWidth,size,lineHeight,maxLines=2){ctx.font="800 "+size+"px Manrope,Arial";let a=String(str||"My journey").split(/\s+/),line="",lines=[];for(const word of a){let test=(line?line+" ":"")+word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);lines.slice(0,maxLines).forEach((v,i)=>ctx.fillText(v,x,y+i*lineHeight));return Math.min(lines.length,maxLines);}
 function tsDrawRouteMap(ctx,t,x,y,w,h){
- const raw=t.track?.length>1?t.track:t.drivePath,pts=(raw||[]).filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));if(pts.length<2)return;
+ const raw=t.track?.length>1?t.track:null,pts=(raw||[]).filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));if(pts.length<2)return;
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();ctx.fillStyle="#bed9d4";ctx.fillRect(x,y,w,h);
  ctx.strokeStyle="rgba(255,255,255,.3)";ctx.lineWidth=2;
  for(let i=1;i<9;i++){ctx.beginPath();ctx.moveTo(x+i*w/9,y);ctx.lineTo(x+i*w/9,y+h);ctx.stroke();}
@@ -4417,7 +4417,7 @@ const tsMercator=(lat,lng,z)=>{
  return [(+lng+180)/360*n,(1-Math.log(Math.tan(p)+1/Math.cos(p))/Math.PI)/2*n];
 };
 function tsRoutePoints(t){
- const raw=(t.track?.length>1?t.track:t.drivePath?.length>1?t.drivePath:null);
+ const raw=(t.track?.length>1?t.track:null);
  if(raw)return raw.map(p=>[+p[0],+p[1]]).filter(p=>p.every(Number.isFinite));
  const a=t.startLat!=null&&t.startLng!=null?[+t.startLat,+t.startLng]:null;
  const b=t.endLat!=null&&t.endLng!=null?[+t.endLat,+t.endLng]:
@@ -4529,12 +4529,16 @@ function tsDraw(stage=4){
  ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+100);
  tsRound(ctx,60,sq?45:post?55:64,265,48,24,"rgba(9,29,40,.83)");
  tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:post?87:97,225,"800 23px Manrope,Arial","#baf1ff");
- tsRound(ctx,w-242,sq?45:post?55:64,180,48,24,"rgba(9,29,40,.83)");
- tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:post?87:97,150,"800 22px Manrope,Arial","#d0f67f");
+
+ const typeLabel=(TYPES[t.type]||TYPES.place).name.toUpperCase();ctx.font="800 22px Manrope,Arial";
+ const typeWidth=Math.max(92,Math.ceil(ctx.measureText(typeLabel).width)+45),typeX=w-60-typeWidth;
+ tsRound(ctx,typeX,sq?45:post?55:64,typeWidth,48,24,"rgba(9,29,40,.83)");
+ tsText(ctx,typeLabel,typeX+22,sq?77:post?87:97,typeWidth-42,"800 22px Manrope,Arial","#d0f67f");
  ctx.fillStyle="#c9f171";ctx.fillRect(60,sq?227:post?386:609,45,4);
  tsText(ctx,"THE JOURNEY",121,sq?235:post?395:618,300,"900 20px Manrope,Arial","#e7f3ee");
  tsText(ctx,t.name||"My journey",60,sq?328:post?495:736,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
- tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:post?552:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
+ const walkHeader=(t.startName&&t.endName)?t.startName+" → "+t.endName:(t.endName||t.loc||"");
+ tsText(ctx,[walkHeader,t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:post?552:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
  if(stage===0)return;
  const walk=t.type==="hike"||t.type==="walk",m=60,gap=14,inner=w-m*2;
  const metricTop=sq?450:post?630:895;
@@ -4561,19 +4565,26 @@ function tsDraw(stage=4){
  }
  if(stage===1)return;
  let mapY=greenY+greenH+18;
- if(t.drive?.km!=null){
+ if(tripDriveValid(t)){
   const driveH=sq?47:post?56:70;
   tsRound(ctx,m,mapY,inner,driveH,18,"#1c3440");
-  tsText(ctx,"DRIVE",m+18,mapY+(sq?29:post?36:44),110,"800 19px Manrope,Arial","#9fbdc5");
-  tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:post?36:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
+  const homeLabel=t.driveHomeName||"Home",startLabel=t.startName||"Walk start";
+  const driveText=homeLabel+" → "+startLabel+"  ·  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60);
+  tsText(ctx,driveText,m+19,mapY+(sq?30:post?36:44),inner-38,sq?"800 24px Manrope,Arial":post?"800 27px Manrope,Arial":"800 31px Manrope,Arial","#f4faf7");
   mapY+=driveH+15;
  }
- const mapH=sq?(walk?195:295):post?(walk?330:410):(walk?480:625);
+ if(walk){
+  const paceY=mapY,paceH=sq?47:post?55:68;
+  tsRound(ctx,m,paceY,inner,paceH,17,"#142e39");
+  const paceText="AVG PACE  "+tripPace(t)+"     ·     AVG SPEED  "+tripSpeed(t);
+  tsText(ctx,paceText,m+20,paceY+(sq?30:post?35:44),inner-40,sq?"800 21px Manrope,Arial":post?"800 24px Manrope,Arial":"800 28px Manrope,Arial","#d8edf2");
+  mapY+=paceH+13;
+ }
+ const mapH=sq?(walk?123:275):post?(walk?260:395):(walk?380:625);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
  const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:post?30:39);
  if(places.length)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,textY,inner,"700 21px Manrope,Arial","#bcd1d8");
- else tsText(ctx,(t.startName&&t.endName?t.startName+"  →  "+t.endName:"Every journey is a story."),m,textY,inner,"700 23px Manrope,Arial","#bdd6dd");
  const footerY=h-(sq?64:post?72:88);
  ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,footerY);ctx.lineTo(w-m,footerY);ctx.stroke();
  tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:post?36:40),400,"900 25px Manrope,Arial","#9ce9fa");
