@@ -4165,7 +4165,7 @@ function locateMe(center){
 function miniMap(el, t){
   loadLeaflet().then(()=>{ setTimeout(()=>{ const m=L.map(el,{zoomControl:false,attributionControl:false}); tileLayer().addTo(m);
     const c=(TYPES[t.type]||TYPES.place).c;
-    if((t.track&&t.track.length>1)||(t.startLat!=null&&t.startLng!=null&&t.endLat!=null&&t.endLng!=null)){ const pts=t.track?.length>1?t.track:[[t.startLat,t.startLng],[t.endLat,t.endLng]];const ln=L.polyline(pts.map(p=>[p[0],p[1]]),{color:c,weight:5}).addTo(m); m.fitBounds(ln.getBounds(),{padding:[20,20]});
+    if((t.track&&t.track.length>1)||(t.walkRoadPath?.length>1)||(t.startLat!=null&&t.startLng!=null&&t.endLat!=null&&t.endLng!=null)){ const pts=t.track?.length>1?t.track:t.walkRoadPath?.length>1?t.walkRoadPath:[[t.startLat,t.startLng],[t.endLat,t.endLng]];const ln=L.polyline(pts.map(p=>[p[0],p[1]]),{color:c,weight:5}).addTo(m); m.fitBounds(ln.getBounds(),{padding:[20,20]});
       L.marker([pts[0][0],pts[0][1]],{icon:pinIcon("#FFFFFF")}).addTo(m); L.marker([pts[pts.length-1][0],pts[pts.length-1][1]],{icon:pinIcon(c)}).addTo(m); }
     else if(isFinite(t.lat)){ m.setView([t.lat,t.lng],12); L.marker([t.lat,t.lng],{icon:pinIcon(c)}).addTo(m); }
   },340); }).catch(()=>{});
@@ -4383,11 +4383,21 @@ function openRecapForm(id=null,planId=null){
  const savedHome=S.travelHome?.lat!=null&&S.travelHome?.lng!=null?[+S.travelHome.lat,+S.travelHome.lng]:null;
  let homeCoord=t.driveHomeLat!=null&&t.driveHomeLng!=null?[+t.driveHomeLat,+t.driveHomeLng]:savedHome;
  let road=tripDriveValid(t)?t.drive:null,roadPath=tripDriveValid(t)?t.drivePath:null,routeRequest=0,routePending=null;
- let m=null,markers=[],path=null;
+ let m=null,markers=[],path=null,walkPath=t.walkRoadPath||null,walkRequest=0,walkPending=null;
+ const calculateWalkMap=async()=>{
+  const ticket=++walkRequest;walkPath=null;
+  if(!coords.from||!coords.to){if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent="Satellite map · choose both walking locations.";redraw();return;}
+  if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent="Finding a road-following route preview…";
+  const pending=recapRoadRoute(coords.from,coords.to);walkPending=pending;
+  const result=await pending;if(ticket!==walkRequest||!$("rcMap"))return;
+  walkPending=null;walkPath=result?.path||null;
+  if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent=walkPath?.length?"Satellite map · road-following route estimate (not recorded GPS).":"Route estimate unavailable · location pins are shown.";
+  redraw();
+ };
  const redraw=()=>{if(!m)return;markers.forEach(z=>m.removeLayer(z));markers=[];if(path){m.removeLayer(path);path=null;}
   if(coords.from)markers.push(L.marker(coords.from,{icon:pinIcon("#8FDDFF")}).addTo(m).bindPopup("Walk start"));
   if(coords.to)markers.push(L.marker(coords.to,{icon:pinIcon("#CDF46A")}).addTo(m).bindPopup("Walk end"));
-  if(coords.from&&coords.to){path=L.polyline([coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
+  if(coords.from&&coords.to){path=L.polyline(walkPath?.length?walkPath:[coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:walkPath?.length?null:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
   else if(coords.from||coords.to)m.setView(coords.from||coords.to,11);else m.setView([7.8731,80.7718],7);
  };
  const updateDriveLabel=()=>{if(!$("rcRoadJourney"))return;$("rcRoadJourney").textContent=($("rcDriveHome").value.trim()||"Home")+" → "+($("rcFrom").value.trim()||"Walk start");};
@@ -4400,12 +4410,16 @@ function openRecapForm(id=null,planId=null){
   $("rcRoadSummary").textContent=d?fmt(d.km,1)+" km · "+fmtDur(d.min*60):"Road route unavailable";
   $("rcRoadStatus").textContent=d?"Estimated driving route · Home to walk start.":"Road service unavailable. Select locations again to retry.";
  };
- loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});tileLayer().addTo(m);redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
+ loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});
+  const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"});
+  let fallback=false;satellite.on("tileerror",()=>{if(fallback||!m)return;fallback=true;tileLayer().addTo(m);if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent="Satellite imagery unavailable; showing road map.";});satellite.addTo(m);
+  redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
  for(const which of ["from","to","home"]){
   const key=which==="from"?"rcFrom":which==="to"?"rcTo":"rcDriveHome";
   const inp=$(key),box=$(key+"Results");let timer;
   inp.oninput=()=>{
    clearTimeout(timer);routeRequest++;if(which==="home")homeCoord=null;else coords[which]=null;
+   if(which!=="home"){walkRequest++;walkPath=null;}
    if(which!=="to"){road=null;roadPath=null;$("rcRoadSummary").textContent="Choose home and walk start";}
    updateDriveLabel();if(which!=="home")redraw();box.replaceChildren();const query=inp.value.trim();if(query.length<3)return;
    timer=setTimeout(async()=>{box.innerHTML='<div class="note">Searching…</div>';try{const results=await geocode(query);if(!box.isConnected||inp.value.trim()!==query)return;
@@ -4414,7 +4428,7 @@ function openRecapForm(id=null,planId=null){
      const point=[+o.lat,+o.lng];if(which==="home")homeCoord=point;else coords[which]=point;
      inp.value=o.name.trim();box.replaceChildren();
      if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});
-     redraw();updateDriveLabel();if(which!=="to")calculateRoad();
+     redraw();updateDriveLabel();if(which!=="to")calculateRoad();if(which!=="home")calculateWalkMap();
     });
    }catch(e){box.innerHTML='<div class="note">Search unavailable. Enter a location manually.</div>';}} ,450);
   };
@@ -4444,11 +4458,14 @@ function openRecapForm(id=null,planId=null){
    else if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0],false);
    if(imageEdits.routeShot.removed)t.routeShot=null;
    else if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0],true);
-   if(routePending)await routePending;
+   if(routePending)await routePending;if(walkPending)await walkPending;
    const lookup=async id=>{const value=$(id).value.trim();if(!value)return null;try{const results=await geocode(value);return results[0]||null;}catch(e){return null;}};
    if(!coords.from){const o=await lookup("rcFrom");if(o)coords.from=[+o.lat,+o.lng];}
    if(!coords.to){const o=await lookup("rcTo");if(o){coords.to=[+o.lat,+o.lng];Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,province:o.province||""});}}
    if(!homeCoord){const o=await lookup("rcDriveHome");if(o)homeCoord=[+o.lat,+o.lng];}
+   if(coords.from&&coords.to&&!walkPath){
+    const drawn=await recapRoadRoute(coords.from,coords.to);walkPath=drawn?.path||null;
+   }
    if(homeCoord&&coords.from&&!road){
     const d=await recapRoadRoute(homeCoord,coords.from);
     if(d){road={km:d.km,min:d.min};roadPath=d.path;}
@@ -4460,7 +4477,7 @@ function openRecapForm(id=null,planId=null){
     avgPace:walk?($("rcPace").value.trim()||null):null,avgSpeed:walk?num("rcSpeed"):null,
     startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
     endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
-    drive:road,drivePath:roadPath,driveFrom:homeCoord?homeCoord.join(","):null,
+    drive:road,drivePath:roadPath,walkRoadPath:walkPath,driveFrom:homeCoord?homeCoord.join(","):null,
     driveHomeName:$("rcDriveHome").value.trim(),driveHomeLat:homeCoord?.[0]??null,driveHomeLng:homeCoord?.[1]??null,
     stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),
     source:"Huawei Health (manual)",planId:planId||t.planId||null});
@@ -4482,7 +4499,7 @@ function tsCover(ctx,img,x,y,w,h){if(!img)return;const k=Math.max(w/img.width,h/
 function tsRound(ctx,x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function tsWrap(ctx,str,x,y,maxWidth,size,lineHeight,maxLines=2){ctx.font="800 "+size+"px Manrope,Arial";let a=String(str||"My journey").split(/\s+/),line="",lines=[];for(const word of a){let test=(line?line+" ":"")+word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);lines.slice(0,maxLines).forEach((v,i)=>ctx.fillText(v,x,y+i*lineHeight));return Math.min(lines.length,maxLines);}
 function tsDrawRouteMap(ctx,t,x,y,w,h){
- const raw=t.track?.length>1?t.track:null,pts=(raw||[]).filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));if(pts.length<2)return;
+ const raw=t.track?.length>1?t.track:(t.walkRoadPath?.length>1?t.walkRoadPath:null),pts=(raw||[]).filter(p=>Number.isFinite(+p[0])&&Number.isFinite(+p[1]));if(pts.length<2)return;
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();ctx.fillStyle="#bed9d4";ctx.fillRect(x,y,w,h);
  ctx.strokeStyle="rgba(255,255,255,.3)";ctx.lineWidth=2;
  for(let i=1;i<9;i++){ctx.beginPath();ctx.moveTo(x+i*w/9,y);ctx.lineTo(x+i*w/9,y+h);ctx.stroke();}
@@ -4507,7 +4524,7 @@ const tsMercator=(lat,lng,z)=>{
  return [(+lng+180)/360*n,(1-Math.log(Math.tan(p)+1/Math.cos(p))/Math.PI)/2*n];
 };
 function tsRoutePoints(t){
- const raw=(t.track?.length>1?t.track:null);
+ const raw=(t.track?.length>1?t.track:(t.walkRoadPath?.length>1?t.walkRoadPath:null));
  if(raw)return raw.map(p=>[+p[0],+p[1]]).filter(p=>p.every(Number.isFinite));
  const a=t.startLat!=null&&t.startLng!=null?[+t.startLat,+t.startLng]:null;
  const b=t.endLat!=null&&t.endLng!=null?[+t.endLat,+t.endLng]:
@@ -4516,7 +4533,7 @@ function tsRoutePoints(t){
 }
 function tsTileLoad(z,x,y){
  const urls=[
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/"+z+"/"+y+"/"+x,
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"+z+"/"+y+"/"+x,
   "https://a.basemaps.cartocdn.com/light_all/"+z+"/"+x+"/"+y+".png"
  ];
  return new Promise(resolve=>{
@@ -4571,7 +4588,7 @@ async function tsBuildTileMap(t,w,h){
   ctx.fillStyle=i?"#b2ed55":"#087994";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="#fff";ctx.stroke();
  });
  ctx.fillStyle="rgba(255,255,255,.88)";ctx.fillRect(0,h-21,w,21);
- ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Map tiles © Esri / CARTO · OpenStreetMap contributors",8,h-6);
+ ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Imagery © Esri / CARTO · OpenStreetMap contributors",8,h-6);
  return c;
 }
 function tsDrawMapPanel(ctx,t,x,y,w,h){
@@ -4597,7 +4614,7 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
   }
   tsText(ctx,"Map tiles unavailable",x+20,y+h/2,w-40,"800 22px Manrope,Arial","#315762");
  }
- const label=t._route?"HUAWEI WALKING ROUTE":prepared?"WALK MAP · START / END":"WALKING ROUTE PREVIEW";
+ const label=t._route?"RECORDED WALKING ROUTE":prepared?"SATELLITE WALKING MAP":"WALKING ROUTE PREVIEW";
  ctx.fillStyle="rgba(9,30,41,.88)";ctx.fillRect(x,y,w,51);
  tsText(ctx,label,x+20,y+33,w-40,"800 21px Manrope,Arial","#fff");
  ctx.fillStyle="rgba(9,30,41,.92)";ctx.fillRect(x,y+h-60,w,60);
