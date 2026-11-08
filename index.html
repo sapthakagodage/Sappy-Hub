@@ -2047,7 +2047,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.75";
+const APP_VERSION = "7.3.76";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4794,9 +4794,25 @@ function backMap(){
 function friendsOn(id){const f=new Set();Object.values(S.tx).forEach(p=>{
   if(live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(id))f.add((p.merchant||p.id).toLowerCase());
 });return f.size;}
+// A saved equal split defines the personal expense immediately. Repayments
+// settle the amount owed, but must never reduce the personal share a second time.
+// Unsplit/custom-contribution payments retain their original receipt-based logic.
+function splitPlan(t){
+  if(!canSplitExpense(t))return null;
+  const n=Number(t.split),amount=lkrOf(t);
+  if(!Number.isInteger(n)||n<2||n>100||!(amount>0))return null;
+  const raw=Number(t.splitBase);
+  const base=Number.isFinite(raw)&&raw>0?Math.min(amount,raw):amount;
+  return {people:n,base,own:amount-base+base/n,expected:base*(n-1)/n};
+}
+function stillOwed(t){
+  const plan=splitPlan(t),paid=backMap()[t.id]||0;
+  return Math.max(0,(plan?plan.expected:lkrOf(t))-paid);
+}
 function myShare(t){
   if(!t||t.type!=="out")return 0;
-  return Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
+  const plan=splitPlan(t);
+  return plan?plan.own:Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
 }
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
@@ -4842,7 +4858,7 @@ function openSplitSetup(expenseId){
     '<div id="splitPreview" style="margin-top:12px"></div>'+
     '<div class="fromhome" style="margin-top:12px"><span>Already received from others</span><b>'+rs(paid)+'</b></div>'+
     (contributors.length?contributors.map(p=>'<div class="fromhome"><span>'+esc(p.merchant)+'</span><b>'+rs(lkrOf(p))+'</b></div>').join(""):'')+
-    '<p class="note">The equal share is a target, not an automatic refund. Your spending changes only when paybacks are actually received and linked.</p>'+
+    '<p class="note">An equal split counts only your share as spending immediately. Payments back settle the balance owed and update the receiving wallet; they do not reduce your share twice. Custom contributions continue to use actual linked repayments.</p>'+
     '<button class="btn full" id="splitSave">Save split</button>'+
     '<button class="link" id="splitCancel" style="display:block;margin:12px auto 0">Cancel</button>');
   const paint=()=>{
@@ -4883,11 +4899,11 @@ function openSplitSetup(expenseId){
 }
 function openAddContributor(expenseId){
   const bill=S.tx[expenseId];if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
-  // Recalculate from the actual linked receipts, not a planned split.
-  const remaining=myShare(bill);
+  // Add a repayment only up to the unsettled amount owed by others.
+  const remaining=stillOwed(bill);
   openSheet('<h2>Add received payback</h2>'+
     '<p class="note">'+esc(bill.merchant)+' · You paid '+rs(lkrOf(bill))+'. Add money only after someone has actually paid you. If their bank SMS is already in Activity, link that instead to avoid duplicates.</p>'+
-    '<div class="fromhome"><span>Not yet reimbursed</span><b>'+rs(remaining)+'</b></div>'+
+    '<div class="fromhome"><span>Still to collect</span><b>'+rs(remaining)+'</b></div>'+
     '<label class="field"><span>Who paid you?</span><input id="cpName" placeholder="e.g. Brother" autocomplete="off"></label>'+
     '<label class="field"><span>Amount received (Rs)</span><input id="cpAmount" inputmode="decimal" class="num" placeholder="e.g. 10000"></label>'+
     '<label class="field"><span>Received on</span><input id="cpDate" type="date" value="'+ymd(Date.now())+'"></label>'+
@@ -4898,8 +4914,8 @@ function openAddContributor(expenseId){
     const name=$("cpName").value.trim(),amount=parseFloat(String($("cpAmount").value||"").replace(/,/g,""));
     if(!name)return toast("Enter the person's name");
     if(!Number.isFinite(amount)||amount<=0)return toast("Enter the amount received");
-    const left=myShare(bill);
-    if(amount>left+0.005)return toast("Amount exceeds the unreimbursed balance");
+    const left=stillOwed(bill);
+    if(amount>left+0.005)return toast("Amount exceeds the amount still owed");
     const d=$("cpDate").value?fromYmd($("cpDate").value):Date.now();
     const ts=sameDay(d,Date.now())?Date.now():d;
     const entry={id:"m"+uid(),src:"manual",amount,cur:"LKR",type:"in",cat:"Paid back",
@@ -4931,14 +4947,14 @@ function openLink(id){
       if(!one){$("lkContributors").innerHTML="";return;}
       const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
       const paid=others.reduce((a,t)=>a+lkrOf(t),0)+(linkedHere?0:P);
-      const net=Math.max(0,lkrOf(one)-paid);
+      const net=splitPlan(one)?myShare(one):Math.max(0,lkrOf(one)-paid);
       $("lkContributors").innerHTML='<div class="fromhome" style="margin-top:12px"><span>Expense</span><b>'+rs(lkrOf(one))+'</b></div>'+
         others.map(t=>'<div class="fromhome"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
         (!linkedHere?'<div class="fromhome"><span>'+esc(p.merchant)+' (selected)</span><b>'+rs(P)+'</b></div>':'')+
         (Number(one.split)>1?'<div class="fromhome"><span>Shared portion · '+one.split+' people (including you)</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one)))+'</b></div>'+
         '<div class="fromhome"><span>Each person’s shared portion</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))/one.split)+'</b></div>'+
         '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))*(one.split-1)/one.split-paid))+'</b></div>':'')+
-        '<div class="fromhome"><span>Your current expense</span><b>'+rs(net)+'</b></div>';
+        '<div class="fromhome"><span>Your personal expense</span><b>'+rs(net)+'</b></div>';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
   };
