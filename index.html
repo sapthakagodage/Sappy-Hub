@@ -4348,27 +4348,42 @@ function openRecapForm(id=null,planId=null){
  $("rcSave").onclick=async()=>{
   const name=$("rcName").value.trim();if(!name)return toast("Add a trip name");
   const num=k=>$(k).value===""?null:Number($(k).value);
-  for(const key of ["rcDist","rcMinutes","rcSteps","rcCalories"]){let x=num(key);if(x!=null&&(!Number.isFinite(x)||x<0))return toast("Check the numbers");}
-  try{if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);}
-  catch(e){return toast("Could not prepare the image");}
-  if(routePending)await routePending;
-   for(const [kind,key] of [["from","rcFrom"],["to","rcTo"]]){
-     if(coords[kind]||!$(key).value.trim())continue;
-     try{const matches=await geocode($(key).value.trim());const o=matches[0];if(!o)continue;
-       coords[kind]=[+o.lat,+o.lng];
-       if(kind==="to")Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,province:o.province||""});
-     }catch(e){}
+  for(const key of ["rcDist","rcMinutes","rcSteps","rcCalories","rcSpeed"]){
+   const value=num(key);if(value!=null&&(!Number.isFinite(value)||value<0))return toast("Check the workout numbers");
+  }
+  const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
+  try{
+   if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0]);
+   if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0]);
+   if(routePending)await routePending;
+   const lookup=async id=>{const value=$(id).value.trim();if(!value)return null;try{const results=await geocode(value);return results[0]||null;}catch(e){return null;}};
+   if(!coords.from){const o=await lookup("rcFrom");if(o)coords.from=[+o.lat,+o.lng];}
+   if(!coords.to){const o=await lookup("rcTo");if(o){coords.to=[+o.lat,+o.lng];Object.assign(t,{lat:o.lat,lng:o.lng,cc:o.cc,country:o.country,province:o.province||""});}}
+   if(!homeCoord){const o=await lookup("rcDriveHome");if(o)homeCoord=[+o.lat,+o.lng];}
+   if(homeCoord&&coords.from&&!road){
+    const d=await recapRoadRoute(homeCoord,coords.from);
+    if(d){road={km:d.km,min:d.min};roadPath=d.path;}
    }
-   if(coords.from&&coords.to&&!road){const d=await recapRoadRoute(coords.from,coords.to);if(d){road={km:d.km,min:d.min};roadPath=d.path;}}
-  const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim();
-  Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),dist:t.type==='place'?null:num("rcDist"),dur:t.type==='place'||mins==null?null:Math.round(mins*60),
-   moving:t.type==='place'||mins==null?null:Math.round(mins*60),steps:t.type==='place'?null:num("rcSteps"),calories:t.type==='place'?null:num("rcCalories"),
-   startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
-   endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,drive:road,drivePath:roadPath,driveFrom:coords.from?coords.from.join(","):null,
-   stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),source:"Huawei Health (manual)",planId:planId||t.planId||null});
-  if(coords.to){t.lat=coords.to[0];t.lng=coords.to[1];t.loc=to||t.loc;}else if(to)t.loc=to;
-  put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
+   const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim(),walk=t.type==="hike"||t.type==="walk";
+   Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),
+    dist:walk?num("rcDist"):null,dur:walk&&mins!=null?Math.round(mins*60):null,
+    moving:walk&&mins!=null?Math.round(mins*60):null,steps:walk?num("rcSteps"):null,calories:walk?num("rcCalories"):null,
+    avgPace:walk?($("rcPace").value.trim()||null):null,avgSpeed:walk?num("rcSpeed"):null,
+    startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
+    endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
+    drive:road,drivePath:roadPath,driveFrom:homeCoord?homeCoord.join(","):null,
+    driveHomeName:$("rcDriveHome").value.trim(),driveHomeLat:homeCoord?.[0]??null,driveHomeLng:homeCoord?.[1]??null,
+    stops:$("rcStops").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,12).map(name=>({name})),
+    source:"Huawei Health (manual)",planId:planId||t.planId||null});
+   if(coords.to){t.lat=coords.to[0];t.lng=coords.to[1];t.loc=to||t.loc;}else if(to)t.loc=to;
+   if(homeCoord&&$("rcDriveHome").value.trim()){
+    S.travelHome={lat:homeCoord[0],lng:homeCoord[1],name:$("rcDriveHome").value.trim()};
+    persist();put("cfg",{id:"travel",home:S.travelHome});
+   }
+   put("trip",t);closeSheet();renderTravel();openTripStudio(t.id);
+  }catch(e){saveButton.disabled=false;saveButton.textContent=id?"Save changes & preview":"Save & preview";toast("Could not save the trip. Please try again.");}
  };
+
 }
 let tsCurrent=null,tsFormat="story",tsTimer=null,tsStage=0;
 function tsStop(){if(tsTimer){clearInterval(tsTimer);tsTimer=null;}const b=$("tsPlay");if(b)b.textContent="▶ Play recap";$("tripStudio").classList.remove("ts-animate");}
