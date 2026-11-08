@@ -2251,7 +2251,7 @@ function put(kind,obj){
   return true;
 }
 function saveRules(){ put("cfg",{id:"rules",map:Object.assign({},S.rules),acct:Object.assign({},S.bankByAcct)}); }
-function remove(kind, id){ put(kind, {id, del:true}); }
+function remove(kind, id){ return put(kind, {id, del:true}); }
 // A deleted SMS keeps its ID as a tombstone so future SMS syncs cannot recreate it.
 function deletePayment(id){
   const t=S.tx[id];
@@ -4314,7 +4314,7 @@ function openTrip(id){
   $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return;
-    remove("trip",t.id);
+    if(!remove("trip",t.id))return;
     for(const key of [t.photoHQKey,t.routeShotHQKey])if(key)tripMediaAction("delete",key).catch(()=>{});
     closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
 }
@@ -4353,22 +4353,40 @@ function openTripForm(id){
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
   if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
-  $("fPhoto").onchange=async e=>{ const file=e.target.files[0];if(!file)return;try{
-    t.photo=await compressPhoto(file,false);
-    $("fPhotoBox").style.backgroundImage="url("+t.photo+")";
-    $("fPhotoBox").querySelector("span").textContent="Change photo";
-    $("fRemovePhoto").hidden=false;
-   }catch(_){toast("Couldn’t read that photo");} };
+  let legacyUrl=null,removedPhoto=false;
+  const existingHQ=t.photoHQKey||null;
+  $("fPhoto").onchange=e=>{
+   const file=e.target.files[0];if(!file)return;
+   if(legacyUrl)URL.revokeObjectURL(legacyUrl);
+   legacyUrl=URL.createObjectURL(file);removedPhoto=false;
+   $("fPhotoBox").style.backgroundImage="url("+legacyUrl+")";
+   $("fPhotoBox").querySelector("span").textContent="Change photo";
+   $("fRemovePhoto").hidden=false;
+  };
   $("fRemovePhoto").onclick=()=>{
-   t.photo=null;$("fPhoto").value="";$("fPhotoBox").style.backgroundImage="none";
+   if(legacyUrl){URL.revokeObjectURL(legacyUrl);legacyUrl=null;}
+   removedPhoto=true;t.photo=null;t.photoHQKey=null;$("fPhoto").value="";
+   $("fPhotoBox").style.backgroundImage="none";
    $("fPhotoBox").querySelector("span").textContent="＋ Add a photo";$("fRemovePhoto").hidden=true;
   };
-  $("fSave").onclick=()=>{
-    const name=$("fName").value.trim(); if(!name) return toast("Add a name");
-    const dist=t.dist||0, sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
-    const date=$("fDate").value||"";
-    if(!put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:t.cc==="LK"?($("fProvince").value||""):"",dist,moving:sec,dur:sec})))return;
-    closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
+  $("fSave").onclick=async()=>{
+   const name=$("fName").value.trim();if(!name)return toast("Add a name");
+   const sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
+   const date=$("fDate").value||"",button=$("fSave");button.disabled=true;
+   let createdKey=null;
+   try{
+    if($("fPhoto").files[0]){
+     const media=await tripMediaPrepare(t,"photo",$("fPhoto").files[0]);
+     t.photo=media.fallback;t.photoHQKey=media.key;createdKey=media.key;
+    }else if(removedPhoto){t.photo=null;t.photoHQKey=null;}
+    if(!put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:t.cc==="LK"?($("fProvince").value||""):"",dist:t.dist||0,moving:sec,dur:sec})))throw Error("save");
+    if(existingHQ&&existingHQ!==t.photoHQKey)tripMediaAction("delete",existingHQ).catch(()=>{});
+    if(legacyUrl)URL.revokeObjectURL(legacyUrl);
+    closeSheet();renderTravel();drawMap();toast(id?"Saved":"Trip added");
+   }catch(e){
+    if(createdKey)tripMediaAction("delete",createdKey).catch(()=>{});
+    button.disabled=false;toast("Could not save this trip");
+   }
   };
 }
 
