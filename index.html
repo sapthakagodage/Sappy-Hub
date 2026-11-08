@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.69";
+const APP_VERSION = "7.3.70";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2214,7 +2214,7 @@ function deletePayment(id){
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 15;
+const PARSER_VERSION = 16;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -2241,7 +2241,13 @@ function approvedBankAlert(s){
   const structured=/\b(?:a\/?c|acct|account|card)\b/i.test(s)&&
     /\b(?:debited|credited|debit|credit|spent|withdrawn|withdrawal|paid|transaction|txn)\b/i.test(s)&&
     /(?:LKR|Rs\.?|SLR|AUD|USD)\s*[\d,]+/i.test(s)&&smsReportedBalance(s)!==null;
-  return combankCard || ((bankTag||hotline)&&(movement||reason)&&acct) || structured;
+  // HNB's actual purchase/internet card format uses "Amount(Approx.)",
+  // "Av.Bal" and a hotline; it need not contain the word "debited".
+  const hnbCard=/^HNB SMS ALERT\s*:\s*(?:INTERNET|PURCHASE|POS|ATM|DEBIT|CREDIT|TRANSFER|WITHDRAWAL|DEPOSIT)\b/i.test(s)
+    &&hotline&&/\b(?:account|a\/?c)\s*:/i.test(s)
+    &&/\bAmount\s*\(Approx\.\)\s*:\s*[\d,.]+\s*(?:LKR|USD|AUD)\b/i.test(s)
+    &&/\bAv\.\s*Bal\s*:/i.test(s);
+  return hnbCard || combankCard || ((bankTag||hotline)&&(movement||reason)&&acct) || structured;
 }
 
 function parseSms(raw){
@@ -2536,9 +2542,17 @@ function reparseAll(force){
     if(!live(t)||!t.raw)return;
     if(t.src==="sms-review"){
       const parsed=parseSms(t.raw);
-      if(parsed&&parsed.balance!=null&&t.balance==null){
-        S.tx[t.id]=Object.assign({},t,{balance:parsed.balance,bank:parsed.bank,acct:parsed.acct||t.acct,u:Date.now()});
-        S.dirty["tx:"+t.id]=1;fixed++;
+      if(parsed){
+        // Previous review screens saved no account suffix and marked "Other"
+        // as user-classified. Repair both, without inventing a second expense.
+        const n=Object.assign({},t,{
+          amount:parsed.amount,cur:parsed.cur,type:parsed.type,ts:parsed.ts,
+          bank:parsed.bank,acct:parsed.acct||t.acct,
+          balance:parsed.balance!=null?parsed.balance:t.balance,
+          lkr:parsed.amount*rateFor(parsed.cur),fx:rateFor(parsed.cur)
+        });
+        if(n.cat==="Other")n.catSet=false;
+        if(JSON.stringify(n)!==JSON.stringify(t)){n.u=Date.now();S.tx[t.id]=n;S.dirty["tx:"+t.id]=1;fixed++;}
       }
       return;
     }
@@ -3483,7 +3497,7 @@ function openSmsReview(id){
     if(balance!==null&&(!Number.isFinite(balance)||balance<0))return toast("Check available balance");
     if(!put("tx",{id:idTx,src:"sms-review",raw:text,amount,cur,type,cat:category,merchant:name,
       ts:sameDay(fromYmd(when),Date.now())?Date.now():fromYmd(when),
-      bank:$("revBank").value,acct:"",balance,lkr:amount*rateFor(cur),fx:rateFor(cur),catSet:true,nameSet:true}))return;
+      bank:$("revBank").value,acct:"",balance,lkr:amount*rateFor(cur),fx:rateFor(cur),catSet:category!=="Other",nameSet:true}))return;
     remove("skip",entry.id);
     closeSheet();toast("Transaction added");render();
   };
