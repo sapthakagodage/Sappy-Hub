@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.72";
+const APP_VERSION = "7.3.73";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2214,7 +2214,7 @@ function deletePayment(id){
 
 /* =============== SMS parser =============== */
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
-const PARSER_VERSION = 17;
+const PARSER_VERSION = 18;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank"};
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
@@ -2271,8 +2271,8 @@ function parseSms(raw){
 
   const L=s.toLowerCase();
   let isFd = /(fixed deposit|\bfd\b|term deposit|for funding a\/?c|funding a\/?c)/.test(L);
-  const iC = L.search(/(credited|deposited|received|salary|refund|reversal|reversed|cash ?back)/);
-  const iD = L.search(/(debited|purchase|spent|withdraw|payment|paid|txn at|transaction at|\bdr\b|\bpos\b|charged)/);
+  const iC = L.search(/\b(credited|credit|deposited|deposit|received|salary|refund|reversal|reversed|cash ?back)\b/);
+  const iD = L.search(/\b(debited|debit|purchase|spent|withdraw|payment|paid|txn at|transaction at|dr|pos|charged)\b/);
   let type = (iC>=0 && (iD<0 || iC<iD) && !isFd) ? "in" : "out";
   if(iC<0 && iD<0 && /\bcr\b/.test(L)) type="in";
 
@@ -2281,7 +2281,7 @@ function parseSms(raw){
   // "Reason:" field (HNB and others)
   let merchant="", isBill=false, isTransfer=false, where="";
   if(combankCard){merchant=combankCard[1].trim();where=merchant;}
-  const rm = s.match(/\breason\s*[:\-]\s*(.+?)(?=\s+(?:bal|avl|av\.|available|protect|hotline|call|do not)\b|$)/i);
+  const rm = s.match(/\breason\s*[:\-]\s*(.+?)(?=,\s*(?:amount|av\.?\s*bal|date|time|hot\s*line)\b|\s+(?:bal|avl|av\.|available|protect|hotline|call|do not)\b|$)/i);
   if(rm){
     const reason=rm[1]; where=reason;
     isBill = /bill ?pmt|bill ?pay/i.test(reason);
@@ -2369,8 +2369,19 @@ function parseSms(raw){
 
   const COMPANY=/\b(pty|ltd|lt|pvt|plc|limited|inc|llc|technolog|solutions|services|holdings|company|corp|bank|group|enterprises|trading|international|lanka|institute|university|insurance|assurance|finance|leasing|gov|ministry|dept|salary|sal|refund|reversal|interest|dividend|cashback)\b/i;
   const nm=merchant.trim(), wc=nm.split(/\s+/).length;
-  const isPerson = type==="in" && !isFd && !!rm && merchant!=="Salary" && !/own ?a\/?c|own account|fund ?tr/i.test(s) &&
-    /^[A-Za-z.' ]+$/.test(nm) && wc>=2 && wc<=4 && !COMPANY.test(nm+" "+where);
+  const personalName=x=>{
+    const name=String(x||"").replace(/^(?:ceft|slips|ib|mb|ob|trf|transfer|received from|from|by)\s*[:\/\-]?\s*/i,"").replace(/\s+(?:ref|reference|txn|transaction|id|a\/c|account)\b.*$/i,"").trim();
+    const words=name.split(/\s+/);
+    return words.length>=2&&words.length<=5&&words.every(w=>/^[A-Za-z][A-Za-z.'-]*$/.test(w))&&!COMPANY.test(name)&&
+      !/^(?:card payment|money in|cash deposit|fixed deposit|bank transfer|online transfer|interest payment)$/i.test(name);
+  };
+  const clearlyBusiness=COMPANY.test(nm+" "+where)||/\b(?:salary|payroll|interest|dividend|cashback|refund|reversal|insurance|pension)\b/i.test(s);
+  const ownCredit=/own ?a\/?c|own account|\bfcy\b|conversion|funding a\/c/i.test(s);
+  const reasonName=rm?rm[1].split(/[\/|]/).map(v=>v.trim()).find(personalName):null;
+  const locationName=s.match(/\blocation\s*:\s*([^,]+)/i)?.[1]?.trim();
+  const isPerson=type==="in"&&!isFd&&!ownCredit&&!clearlyBusiness&&
+    (/\b(?:paid back|payback|reimburse(?:ment|d)?|repayment|split bill|shared expense)\b/i.test(s)||
+      personalName(reasonName||"")||personalName(locationName||"")||personalName(nm));
   return {id:"s"+hashStr(s), src:"sms", raw:s, amount, cur, type, merchant, where, ts, bank, acct, balance, isFd, isTransfer, isPerson};
 }
 function guessCat(t){
@@ -2379,7 +2390,12 @@ function guessCat(t){
   if(t.type==="out" && /\batm\b|cash withdrawal|cash withdrawn/i.test((t.merchant||"")+" "+(t.raw||""))) return "Cash";
   const key=t.merchant.toLowerCase();
   if(S.rules[key]) return S.rules[key]==="Health"?"My Health":S.rules[key];
-  if(t.type==="in"){ if(/own ?a\/?c|own account|\bfcy\b|conversion/i.test(t.raw||"")) return "Transfers"; return t.isPerson?"Paid back":"Income"; }
+  if(t.type==="in"){
+    if(/own ?a\/?c|own account|\bfcy\b|conversion/i.test(t.raw||""))return "Transfers";
+    if(t.isPerson)return "Paid back";
+    if(/\b(?:salary|payroll|interest|dividend|refund|reversal|cashback|insurance|pension)\b/i.test((t.raw||"")+" "+t.merchant))return "Income";
+    return "Other"; // Do not silently turn an unknown reimbursement into income.
+  }
   if(t.isTransfer) return "Transfers";
   if(/\bfcy\b|conversion|currency exch|foreign exch/i.test(t.where||"")) return "Transfers";
   const hay=(t.merchant+" "+(t.where||"")).toLowerCase();
@@ -2568,7 +2584,10 @@ function reparseAll(force){
     const n=Object.assign({},t,{amount:p.amount,cur:p.cur,type:p.type,ts:p.ts,acct:p.acct,balance:p.balance,isFd:p.isFd,isTransfer:p.isTransfer,isPerson:p.isPerson,where:p.where});
     if(!t.nameSet) n.merchant=p.merchant;
     if(!t.bankSet) n.bank=p.bank;
-    if(!t.catSet) n.cat=guessCat(n);
+    if(!t.catSet){
+      const suggested=guessCat(n);
+      n.cat=t.cat==="Income"&&suggested==="Other"?"Income":suggested;
+    }
     n.lkr=n.amount*rateFor(n.cur);
     if(JSON.stringify(n)!==JSON.stringify(t)){ n.u=Date.now(); S.tx[t.id]=n; S.dirty["tx:"+t.id]=1; fixed++; }
     if(n.cat==="Fixed deposit" && n.type==="out" && !S.fd["f"+t.id]){ S.fd["f"+t.id]={id:"f"+t.id, bank:n.bank, amount:n.amount, cur:n.cur, rate:0, start:ymd(n.ts), months:12, note:"From SMS", u:Date.now()}; S.dirty["fd:f"+t.id]=1; }
@@ -2788,23 +2807,23 @@ function monthSpend(y,m){
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
 const short = n => fmt(Math.round(n));
-const isUnsorted=t=>live(t)&&t.type==="out"&&t.cat==="Other"&&!t.catSet;
+const isUnsorted=t=>live(t)&&t.cat==="Other"&&!t.catSet&&(t.type==="out"||t.type==="in");
 function unsorted(){ return txList().filter(isUnsorted); }
 function openSort(id){
   const t=S.tx[id]; if(!t) return; let cat=null;
   const left=unsorted().length;
-  openSheet('<h2>Which category?</h2><div class="note">'+(left>1?left+' payments to sort · ':'')+'Pick one. It’s remembered for this shop.</div>'+
+  openSheet('<h2>'+(t.type==="in"?"Money received — what was it?":"Which category?")+'</h2><div class="note">'+(left>1?left+' payments to sort · ':'')+(t.type==="in"?"Choose Paid back for a repayment or Income for actual earnings.":"Pick one. It’s remembered for this shop.")+'</div>'+
     '<div class="sortcard"><b>'+esc(t.merchant)+'</b><span class="num">−'+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2)+' · '+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+(t.bank&&t.bank!=="Bank"?' · '+esc(t.bank):'')+'</span></div>'+
-    catPicker(PICK.concat(["Fixed deposit","Other"]),null)+
-    gymPicker(t,null)+
+    catPicker(t.type==="in"?["Paid back","Income","Transfers"]:PICK.concat(["Fixed deposit","Other"]),null)+
+    (t.type==="in"?"":gymPicker(t,null))+
     '<label class="chk"><input type="checkbox" id="srem" checked> Always use this for '+esc(t.merchant)+'</label>'+
     '<div class="btns"><button class="btn" id="sSave" style="flex:1">Save</button><button class="btn soft" id="sLater">Later</button></div>'+
     '<button type="button" class="btn warn" id="sDelete" style="width:100%;margin-top:10px;text-align:center">Delete payment</button>');
-  const updateGym=wireGymPicker(t,()=>cat);
+  const updateGym=t.type==="in"?()=>{}:wireGymPicker(t,()=>cat);
   wirePicker(c=>{cat=c;updateGym();});
   $("sSave").onclick=()=>{ if(!cat) return toast("Pick a category");
     const saved=Object.assign({},t,{cat,catSet:true});
-    applyGymFields(saved,cat);
+    if(t.type==="out")applyGymFields(saved,cat);
     put("tx",saved);
     if($("srem").checked){ const k=t.merchant.toLowerCase(); S.rules[k]=cat; saveRules();
       unsorted().filter(o=>o.merchant.toLowerCase()===k).forEach(o=>put("tx",Object.assign({},o,{cat,catSet:true}))); }
@@ -2874,7 +2893,7 @@ function renderSoon(){
   if(loose.length) $("soonBox").insertAdjacentHTML("afterbegin",'<button class="soon linkb" id="linkBanner"><span class="si2" style="background:#9EE6C6">'+icon("Paid back",18)+'</span><span class="tx2"><b>'+loose.length+' payback'+(loose.length>1?'s':'')+' to link</b><span>Tap to match '+(loose.length>1?'them':'it')+' with the payment'+(loose.length>1?'s':'')+' you made</span></span><span class="wn">Link</span></button>');
   if($("linkBanner")) $("linkBanner").onclick=()=>openLink(loose[0].id);
   const un=unsorted();
-  if(un.length){ $("soonBox").insertAdjacentHTML("afterbegin",'<button class="soon sortb" id="sortBanner"><span class="si2" style="background:#FFD36E">'+icon("Shopping",18)+'</span><span class="tx2"><b>'+un.length+' payment'+(un.length>1?'s':'')+' to sort</b><span>Pick a category · remembered next time</span></span><span class="wn">Sort</span></button>');
+  if(un.length){ $("soonBox").insertAdjacentHTML("afterbegin",'<button class="soon sortb" id="sortBanner"><span class="si2" style="background:#FFD36E">'+icon("Shopping",18)+'</span><span class="tx2"><b>'+un.length+' payment'+(un.length>1?'s':'')+' to sort</b><span>Confirm received payments or expenses</span></span><span class="wn">Sort</span></button>');
     $("sortBanner").onclick=()=>openSort(un[0].id); }
   // A message that really cannot be parsed is also surfaced here, NOT
   // buried inside the manual Add SMS screen. It is never counted as spending.
