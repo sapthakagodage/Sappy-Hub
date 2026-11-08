@@ -4680,7 +4680,7 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
  ctx.fillStyle="#bdd5d2";ctx.fillRect(x,y,w,h);
  const prepared=tsFormat==="square"?t._mapSquare:tsFormat==="portrait"?t._mapPortrait:t._mapStory;
- if(prepared&&tsMapMode!=="health")ctx.drawImage(prepared,x,y,w,h);
+ if(prepared&&(tsMapMode!=="health"||!t._route))ctx.drawImage(prepared,x,y,w,h);
  else if(t._route){
   const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
   ctx.fillStyle="#e5eee8";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
