@@ -4187,6 +4187,7 @@ async function showFromHome(t){
 /* ===== Sappy Travel v2: manual trips with one photo ===== */
 function tripLoc(t){ return t.loc || t.country || ""; }
 function tripDriveValid(t){return !!(t&&t.drive&&Number.isFinite(+t.drive.km)&&Number.isFinite(+t.drive.min)&&t.driveHomeLat!=null&&t.driveHomeLng!=null&&t.startLat!=null&&t.startLng!=null);}
+function tripClock(sec){if(sec==null||!Number.isFinite(+sec))return "—";const v=Math.max(0,Math.round(+sec));return [Math.floor(v/3600),Math.floor(v%3600/60),v%60].map(x=>String(x).padStart(2,"0")).join(":");}
 function tripPace(t){if(t.avgPace)return t.avgPace;const mins=(t.dur??t.moving)/60,d=+t.dist;if(!(mins>0&&d>0))return "—";const sec=Math.round(mins*60/d);return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")+" /km";}
 function tripSpeed(t){if(t.avgSpeed!=null&&Number.isFinite(+t.avgSpeed))return fmt(+t.avgSpeed,2)+" km/h";const mins=(t.dur??t.moving)/60,d=+t.dist;return mins>0&&d>0?fmt(d*60/mins,2)+" km/h":"—";}
 
@@ -4299,7 +4300,7 @@ function openTrip(id){
     '<div class="tdmap" id="tdMap"></div>'+
     '<div class="tgrid"><div><span>Date</span><b>'+(t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"Not set")+'</b></div>'+
     ((t.type==='hike'||t.type==='walk')?'<div><span>Walking distance</span><b class="num">'+(t.dist==null?'—':fmt(t.dist,1)+' km')+'</b></div>'+
-    '<div><span>Walking time</span><b class="num">'+fmtDur(t.dur??t.moving)+'</b></div>'+
+    '<div><span>Walking time</span><b class="num">'+tripClock(t.dur??t.moving)+'</b></div>'+
     '<div><span>Avg pace</span><b class="num">'+esc(tripPace(t))+'</b></div>'+
     '<div><span>Avg speed</span><b class="num">'+esc(tripSpeed(t))+'</b></div>':'')+
     '<div><span>Drive · Home → Walk start</span><b class="num">'+(tripDriveValid(t)?esc((t.driveHomeName||"Home")+" → "+(t.startName||"Start")):"—")+'</b></div>'+
@@ -4524,7 +4525,8 @@ function openRecapForm(id=null,planId=null){
   for(const key of ["rcDist","rcHours","rcMins","rcSecs","rcSteps","rcCalories","rcSpeed"]){
    const value=num(key);if(value!=null&&(!Number.isFinite(value)||value<0))return toast("Check the workout numbers");
   }
-  if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59)return toast("Minutes and seconds must be 00–59");
+  if(!["rcHours","rcMins","rcSecs"].every(k=>$(k).value===""||Number.isInteger(Number($(k).value))))return toast("Use whole hours, minutes and seconds");
+  if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59||Number($("rcHours").value)>999)return toast("Use valid HH:MM:SS values");
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
    const priorKeys={photo:t.photoHQKey||null,routeShot:t.routeShotHQKey||null};
@@ -4748,7 +4750,7 @@ function tsDraw(stage=4){
   tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:post?33:38),inner*.45,"800 20px Manrope,Arial","#315137");
   tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:post?33:38),inner*.42,"800 20px Manrope,Arial","#315137");
   tsText(ctx,t.dist!=null?fmt(t.dist,1)+" km":"—",m+24,greenY+(sq?76:post?89:106),inner*.43,sq?"900 44px Manrope,Arial":"900 61px Manrope,Arial","#132b25");
-  tsText(ctx,fmtDur(t.dur??t.moving),m+inner*.53,greenY+(sq?76:post?89:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
+  tsText(ctx,tripClock(t.dur??t.moving),m+inner*.53,greenY+(sq?76:post?89:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
  }else{
   tsText(ctx,"DESTINATION VISITED",m+24,greenY+(sq?31:post?37:43),inner-48,"800 22px Manrope,Arial","#315137");
   tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:post?90:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
