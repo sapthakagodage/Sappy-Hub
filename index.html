@@ -4313,7 +4313,10 @@ function openTrip(id){
   miniMap($("tdMap"),t);
   $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
-  $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return; remove("trip",t.id); closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
+  $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return;
+    remove("trip",t.id);
+    for(const key of [t.photoHQKey,t.routeShotHQKey])if(key)tripMediaAction("delete",key).catch(()=>{});
+    closeSheet(); renderTravel(); drawMap(false); toast("Deleted"); };
 }
 function openTripForm(id){
   const t=id?Object.assign({},S.trip[id]):{id:"t"+uid(),type:"hike",date:ymd(Date.now())};
@@ -4775,10 +4778,11 @@ async function tsPrepareMaps(t,id){
  if(!t)return;
  tsLoadingMaps=true;
  const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
+ const walking=t.type==="hike"||t.type==="walk";
  const [story,square,portrait]=await Promise.all([
-  tsBuildTileMap(t,960,480).catch(()=>null),
-  tsBuildTileMap(t,960,195).catch(()=>null),
-   tsBuildTileMap(t,960,360).catch(()=>null)
+  tsBuildTileMap(t,960,walking?395:650).catch(()=>null),
+  tsBuildTileMap(t,960,walking?176:315).catch(()=>null),
+  tsBuildTileMap(t,960,walking?290:450).catch(()=>null)
  ]);
  if(!tsCurrent||tsCurrent.id!==id)return;
  t._mapStory=story;t._mapSquare=square;t._mapPortrait=portrait;tsLoadingMaps=false;
