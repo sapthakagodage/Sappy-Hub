@@ -4671,27 +4671,38 @@ function tsDraw(stage=4){
   tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:post?90:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
  }
  if(stage===1)return;
- let mapY=greenY+greenH+18;
- if(tripDriveValid(t)){
-  const driveH=sq?47:post?56:70;
-  tsRound(ctx,m,mapY,inner,driveH,18,"#1c3440");
-  const homeLabel=t.driveHomeName||"Home",startLabel=t.startName||"Walk start";
-  const driveText=homeLabel+" → "+startLabel+"  ·  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60);
-  tsText(ctx,driveText,m+19,mapY+(sq?30:post?36:44),inner-38,sq?"800 24px Manrope,Arial":post?"800 27px Manrope,Arial":"800 31px Manrope,Arial","#f4faf7");
-  mapY+=driveH+15;
- }
- if(walk){
-  const paceY=mapY,paceH=sq?47:post?55:68;
-  tsRound(ctx,m,paceY,inner,paceH,17,"#142e39");
-  const paceText="AVG PACE  "+tripPace(t)+"     ·     AVG SPEED  "+tripSpeed(t);
-  tsText(ctx,paceText,m+20,paceY+(sq?30:post?35:44),inner-40,sq?"800 21px Manrope,Arial":post?"800 24px Manrope,Arial":"800 28px Manrope,Arial","#d8edf2");
-  mapY+=paceH+13;
- }
- const mapH=sq?(walk?165:275):post?(walk?260:395):(walk?380:625);
+ const mapY=greenY+greenH+18;
+ const mapH=sq?(walk?176:315):post?(walk?290:450):(walk?395:650);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
- const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:post?30:39);
- if(places.length)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,textY,inner,"700 21px Manrope,Arial","#bcd1d8");
+ let nextY=mapY+mapH+11;
+ if(walk){
+  const tileGap=14,tileW=(inner-tileGap)/2,tileH=sq?62:post?83:94;
+  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
+   const x=m+i*(tileW+tileGap),y=nextY;
+   tsRound(ctx,x,y,tileW,tileH,19,"#193640");
+   tsText(ctx,label,x+18,y+(sq?22:post?29:31),tileW-32,"800 18px Manrope,Arial","#9fdbe8");
+   tsText(ctx,value,x+18,y+(sq?50:post?64:72),tileW-32,sq?"900 29px Manrope,Arial":post?"900 37px Manrope,Arial":"900 42px Manrope,Arial","#eefbff");
+  });
+  nextY+=tileH+12;
+ }
+ if(tripDriveValid(t)){
+  const driveH=sq?51:post?63:74;
+  tsRound(ctx,m,nextY,inner,driveH,18,"#20323c");
+  // Small vector car icon stays sharp in every exported image size.
+  const ix=m+17,iy=nextY+(driveH-32)/2;
+  ctx.save();ctx.strokeStyle="#c9f171";ctx.fillStyle="#c9f171";ctx.lineWidth=3;ctx.lineCap="round";
+  ctx.beginPath();ctx.moveTo(ix+5,iy+15);ctx.lineTo(ix+11,iy+8);ctx.lineTo(ix+31,iy+8);ctx.lineTo(ix+38,iy+15);ctx.closePath();ctx.stroke();
+  ctx.beginPath();ctx.roundRect(ix+2,iy+15,39,13,5);ctx.stroke();
+  for(const cx of [ix+11,ix+32]){ctx.beginPath();ctx.arc(cx,iy+29,4,0,Math.PI*2);ctx.fill();}
+  ctx.restore();
+  const home=t.driveHomeName||"Home",start=t.startName||"Walk start";
+  const line=home+" → "+start+"  ·  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60);
+  tsText(ctx,line,m+74,nextY+(sq?33:post?40:46),inner-89,sq?"800 23px Manrope,Arial":post?"800 28px Manrope,Arial":"800 31px Manrope,Arial","#f3fbf7");
+  nextY+=driveH+10;
+ }
+ const places=(t.stops||[]).map(v=>v.name).filter(Boolean),footerLimit=h-(sq?64:post?72:88);
+ if(places.length&&footerLimit-nextY>40)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,nextY+27,inner,"700 20px Manrope,Arial","#bcd1d8");
  const footerY=h-(sq?64:post?72:88);
  ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,footerY);ctx.lineTo(w-m,footerY);ctx.stroke();
  tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:post?36:40),400,"900 25px Manrope,Arial","#9ce9fa");
