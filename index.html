@@ -4295,32 +4295,56 @@ function openRecapForm(id=null,planId=null){
  document.querySelectorAll('#rcTypePicker button').forEach(b=>b.onclick=()=>setType(b.dataset.type));
  setType(TYPES[t.type]?t.type:'hike');$("rcCancel").onclick=()=>closeSheet();
  const coords={from:t.startLat!=null?[+t.startLat,+t.startLng]:null,to:t.endLat!=null?[+t.endLat,+t.endLng]:(t.lat!=null?[+t.lat,+t.lng]:null)};
- let m=null,markers=[],path=null,road=t.drive||null,roadPath=t.drivePath||null,routeRequest=0,routePending=null;
- const calculateRoad=async()=>{const ticket=++routeRequest;road=null;roadPath=null;
- if(!coords.from||!coords.to){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";redraw();return;}
- $("rcRoadKm").textContent="…";$("rcRoadTime").textContent="…";$("rcRoadStatus").textContent="Calculating driving route…";
- const pending=recapRoadRoute(coords.from,coords.to);routePending=pending;const d=await pending;if(ticket!==routeRequest||!$("rcRoadKm"))return;routePending=null;
- road=d?{km:d.km,min:d.min}:null;roadPath=d?.path||null;
- $("rcRoadKm").textContent=d?fmt(d.km,1)+" km":"Unavailable";
- $("rcRoadTime").textContent=d?fmtDur(d.min*60):"Unavailable";
- $("rcRoadStatus").textContent=d?"Driving estimates are based on road routing.":"Routing service unavailable. Please try again.";redraw();
+ const savedHome=S.travelHome?.lat!=null&&S.travelHome?.lng!=null?[+S.travelHome.lat,+S.travelHome.lng]:null;
+ let homeCoord=t.driveHomeLat!=null&&t.driveHomeLng!=null?[+t.driveHomeLat,+t.driveHomeLng]:savedHome;
+ let road=tripDriveValid(t)?t.drive:null,roadPath=tripDriveValid(t)?t.drivePath:null,routeRequest=0,routePending=null;
+ let m=null,markers=[],path=null;
+ const redraw=()=>{if(!m)return;markers.forEach(z=>m.removeLayer(z));markers=[];if(path){m.removeLayer(path);path=null;}
+  if(coords.from)markers.push(L.marker(coords.from,{icon:pinIcon("#8FDDFF")}).addTo(m).bindPopup("Walk start"));
+  if(coords.to)markers.push(L.marker(coords.to,{icon:pinIcon("#CDF46A")}).addTo(m).bindPopup("Walk end"));
+  if(coords.from&&coords.to){path=L.polyline([coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
+  else if(coords.from||coords.to)m.setView(coords.from||coords.to,11);else m.setView([7.8731,80.7718],7);
  };
- const redraw=()=>{if(!m)return;markers.forEach(x=>m.removeLayer(x));markers=[];if(path){m.removeLayer(path);path=null;}
-  if(coords.from)markers.push(L.marker(coords.from,{icon:pinIcon("#8FDDFF")}).addTo(m).bindPopup("Start"));
-  if(coords.to)markers.push(L.marker(coords.to,{icon:pinIcon("#CDF46A")}).addTo(m).bindPopup("Destination"));
-  if(coords.from&&coords.to){path=L.polyline(roadPath?.length?roadPath:[coords.from,coords.to],{color:"#8FDDFF",weight:4,dashArray:roadPath?.length?null:"8 10"}).addTo(m);m.fitBounds(path.getBounds(),{padding:[30,30],maxZoom:13});}
-  else if(coords.from||coords.to)m.setView(coords.from||coords.to,11);else m.setView([7.8731,80.7718],7);};
+ const updateDriveLabel=()=>{if(!$("rcRoadJourney"))return;$("rcRoadJourney").textContent=($("rcDriveHome").value.trim()||"Home")+" → "+($("rcFrom").value.trim()||"Walk start");};
+ const calculateRoad=async()=>{const token=++routeRequest;road=null;roadPath=null;updateDriveLabel();
+  if(!homeCoord||!coords.from){$("rcRoadSummary").textContent="Choose home and walk start";$("rcRoadStatus").textContent="Driving is separate from your walking route.";return;}
+  $("rcRoadSummary").textContent="Calculating road distance…";$("rcRoadStatus").textContent="Finding the driving route from home to walk start.";
+  const pending=recapRoadRoute(homeCoord,coords.from);routePending=pending;const d=await pending;
+  if(token!==routeRequest||!$("rcRoadSummary"))return;
+  routePending=null;road=d?{km:d.km,min:d.min}:null;roadPath=d?.path||null;
+  $("rcRoadSummary").textContent=d?fmt(d.km,1)+" km · "+fmtDur(d.min*60):"Road route unavailable";
+  $("rcRoadStatus").textContent=d?"Estimated driving route · Home to walk start.":"Road service unavailable. Select locations again to retry.";
+ };
  loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});tileLayer().addTo(m);redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
- for(const which of ["from","to"]){
-  const inp=$(which==="from"?"rcFrom":"rcTo"),box=$(which==="from"?"rcFromResults":"rcToResults");let timer;
-  inp.oninput=()=>{routeRequest++;coords[which]=null;road=null;roadPath=null;redraw();if($("rcRoadKm")){$("rcRoadKm").textContent="—";$("rcRoadTime").textContent="—";$("rcRoadStatus").textContent="Select both locations to calculate a road route.";}clearTimeout(timer);box.innerHTML="";const query=inp.value.trim();if(query.length<3)return;
+ for(const which of ["from","to","home"]){
+  const key=which==="from"?"rcFrom":which==="to"?"rcTo":"rcDriveHome";
+  const inp=$(key),box=$(key+"Results");let timer;
+  inp.oninput=()=>{
+   clearTimeout(timer);routeRequest++;if(which==="home")homeCoord=null;else coords[which]=null;
+   if(which!=="to"){road=null;roadPath=null;$("rcRoadSummary").textContent="Choose home and walk start";}
+   updateDriveLabel();if(which!=="home")redraw();box.replaceChildren();const query=inp.value.trim();if(query.length<3)return;
    timer=setTimeout(async()=>{box.innerHTML='<div class="note">Searching…</div>';try{const results=await geocode(query);if(!box.isConnected||inp.value.trim()!==query)return;
     box.innerHTML=results.slice(0,5).map((o,i)=>'<button data-i="'+i+'"><b>'+esc(o.name)+'</b><span>'+esc(o.full)+'</span></button>').join("")||'<div class="note">No matches</div>';
-    box.querySelectorAll("button").forEach(button=>button.onclick=()=>{const o=results[+button.dataset.i];if(!o)return;clearTimeout(timer);coords[which]=[+o.lat,+o.lng];inp.value=o.name.trim();box.replaceChildren();
-     if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});redraw();calculateRoad();});
-   }catch(e){box.innerHTML='<div class="note">Search unavailable. Enter a name manually.</div>';}} ,450);
+    box.querySelectorAll("button").forEach(button=>button.onclick=()=>{const o=results[+button.dataset.i];if(!o)return;clearTimeout(timer);
+     const point=[+o.lat,+o.lng];if(which==="home")homeCoord=point;else coords[which]=point;
+     inp.value=o.name.trim();box.replaceChildren();
+     if(which==="to")Object.assign(t,{lat:o.lat,lng:o.lng,loc:inp.value,cc:o.cc,country:o.country,province:o.province||""});
+     redraw();updateDriveLabel();if(which!=="to")calculateRoad();
+    });
+   }catch(e){box.innerHTML='<div class="note">Search unavailable. Enter a location manually.</div>';}} ,450);
   };
  }
+ updateDriveLabel();
+ const recomputeWorkout=()=>{const d=Number($("rcDist").value),min=Number($("rcMinutes").value);
+  if(!(d>0&&min>0))return;
+  const seconds=Math.round(min*60/d),pace=Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0")+" /km";
+  if(!$("rcPace").dataset.custom)$("rcPace").value=pace;
+  if(!$("rcSpeed").dataset.custom)$("rcSpeed").value=(d*60/min).toFixed(2);
+ };
+ $("rcPace").oninput=()=>{$("rcPace").dataset.custom="1";};
+ $("rcSpeed").oninput=()=>{$("rcSpeed").dataset.custom="1";};
+ $("rcDist").oninput=recomputeWorkout;$("rcMinutes").oninput=recomputeWorkout;
+ if(!t.avgPace||t.avgSpeed==null)recomputeWorkout();
  $("rcSave").onclick=async()=>{
   const name=$("rcName").value.trim();if(!name)return toast("Add a trip name");
   const num=k=>$(k).value===""?null:Number($(k).value);
