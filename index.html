@@ -2046,7 +2046,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
   <div class="ts-head"><strong>✦ Trip Recap Studio</strong><button class="ts-close" id="tsClose">Done ✕</button></div>
   <div class="ts-preview"><canvas id="tsCanvas" width="1080" height="1920" aria-label="Trip recap preview"></canvas></div>
   <div class="ts-actions">
-    <button id="tsStory" class="on">Story 9:16</button><button id="tsSquare">Post 1:1</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
+    <button id="tsStory" class="on">Story 9:16</button><button id="tsPortrait">Post 3:4</button><button id="tsSquare">Post 1:1</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
   </div>
   <p class="ts-note" id="tsMapStatus">Preparing your trip recap…</p>
 </div>
@@ -2057,7 +2057,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.79";
+const APP_VERSION = "7.3.80";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4428,7 +4428,7 @@ async function tsBuildTileMap(t,w,h){
 function tsDrawMapPanel(ctx,t,x,y,w,h){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
  ctx.fillStyle="#bdd5d2";ctx.fillRect(x,y,w,h);
- const prepared=tsFormat==="square"?t._mapSquare:t._mapStory;
+ const prepared=tsFormat==="square"?t._mapSquare:tsFormat==="portrait"?t._mapPortrait:t._mapStory;
  if(prepared)ctx.drawImage(prepared,x,y,w,h);
  else if(t._route){
   const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
@@ -4459,84 +4459,85 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
 }
 function tsDraw(stage=4){
  const c=$("tsCanvas"),t=tsCurrent;if(!c||!t)return;
- const ctx=c.getContext("2d"),sq=tsFormat==="square",w=1080,h=sq?1080:1920;
+ const ctx=c.getContext("2d"),sq=tsFormat==="square",post=tsFormat==="portrait",w=1080,h=sq?1080:post?1440:1920;
  if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;
  const wrap=c.parentElement;if(wrap){const aw=Math.max(1,wrap.clientWidth-4),ah=Math.max(1,wrap.clientHeight-4),scale=Math.min(aw/w,ah/h);c.style.width=Math.round(w*scale)+"px";c.style.height=Math.round(h*scale)+"px";}
  ctx.fillStyle="#08131b";ctx.fillRect(0,0,w,h);
- const hero=sq?432:875;
+ const hero=sq?432:post?610:875;
  if(t._hero)tsCover(ctx,t._hero,0,0,w,hero);
  else{const g=ctx.createLinearGradient(0,0,w,hero);g.addColorStop(0,"#2f7684");g.addColorStop(.55,"#164355");g.addColorStop(1,"#0b1b28");ctx.fillStyle=g;ctx.fillRect(0,0,w,hero);}
  const sh=ctx.createLinearGradient(0,0,0,hero+100);sh.addColorStop(0,"rgba(1,10,17,.12)");sh.addColorStop(.55,"rgba(1,10,17,.04)");sh.addColorStop(.82,"rgba(1,10,17,.61)");sh.addColorStop(1,"#08131b");
  ctx.fillStyle=sh;ctx.fillRect(0,0,w,hero+100);
- tsRound(ctx,60,sq?45:64,265,48,24,"rgba(9,29,40,.83)");
- tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:97,225,"800 23px Manrope,Arial","#baf1ff");
- tsRound(ctx,w-242,sq?45:64,180,48,24,"rgba(9,29,40,.83)");
- tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:97,150,"800 22px Manrope,Arial","#d0f67f");
- ctx.fillStyle="#c9f171";ctx.fillRect(60,sq?227:609,45,4);
- tsText(ctx,"THE JOURNEY",121,sq?235:618,300,"900 20px Manrope,Arial","#e7f3ee");
- tsText(ctx,t.name||"My journey",60,sq?328:736,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
- tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
+ tsRound(ctx,60,sq?45:post?55:64,265,48,24,"rgba(9,29,40,.83)");
+ tsText(ctx,"✦  SAPPY TRAVEL",82,sq?77:post?87:97,225,"800 23px Manrope,Arial","#baf1ff");
+ tsRound(ctx,w-242,sq?45:post?55:64,180,48,24,"rgba(9,29,40,.83)");
+ tsText(ctx,(TYPES[t.type]||TYPES.place).name.toUpperCase(),w-213,sq?77:post?87:97,150,"800 22px Manrope,Arial","#d0f67f");
+ ctx.fillStyle="#c9f171";ctx.fillRect(60,sq?227:post?386:609,45,4);
+ tsText(ctx,"THE JOURNEY",121,sq?235:post?395:618,300,"900 20px Manrope,Arial","#e7f3ee");
+ tsText(ctx,t.name||"My journey",60,sq?328:post?495:736,960,sq?"900 67px Manrope,Arial":"900 83px Manrope,Arial","#ffffff");
+ tsText(ctx,[t.endName||t.loc||"",t.date?niceDate(t.date):""].filter(Boolean).join("  •  "),63,sq?383:post?552:802,930,sq?"600 27px Manrope,Arial":"600 30px Manrope,Arial","#daebef");
  if(stage===0)return;
  const walk=t.type==="hike"||t.type==="walk",m=60,gap=14,inner=w-m*2;
- const metricTop=sq?450:895;
+ const metricTop=sq?450:post?630:895;
  if(walk){
   const metrics=[["STEPS",t.steps==null?"—":fmt(t.steps)],["CALORIES",t.calories==null?"—":fmt(t.calories)+" kcal"]];
-  const cellW=(inner-gap)/2,cellH=sq?80:125;
+  const cellW=(inner-gap)/2,cellH=sq?80:post?102:125;
   metrics.forEach((pair,i)=>{const x=m+i*(cellW+gap),y=metricTop;
    tsRound(ctx,x,y,cellW,cellH,20,"#162e3a");
-   tsText(ctx,pair[0],x+22,y+(sq?28:41),cellW-44,"800 19px Manrope,Arial","#8fb8c2");
-   tsText(ctx,pair[1],x+22,y+(sq?64:92),cellW-44,sq?"900 33px Manrope,Arial":"900 45px Manrope,Arial","#ffffff");
+   tsText(ctx,pair[0],x+22,y+(sq?28:post?33:41),cellW-44,"800 19px Manrope,Arial","#8fb8c2");
+   tsText(ctx,pair[1],x+22,y+(sq?64:post?75:92),cellW-44,sq?"900 33px Manrope,Arial":"900 45px Manrope,Arial","#ffffff");
   });
  }
- const greenY=metricTop+(walk?(sq?94:143):0),greenH=sq?101:142;
+ const greenY=metricTop+(walk?(sq?94:post?116:143):0),greenH=sq?101:post?118:142;
  tsRound(ctx,m,greenY,inner,greenH,24,"#c9f171");
  ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(m+5,greenY+5,inner-10,greenH-10,20);ctx.stroke();
  if(walk){
-  tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:38),inner*.45,"800 20px Manrope,Arial","#315137");
-  tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:38),inner*.42,"800 20px Manrope,Arial","#315137");
-  tsText(ctx,t.dist!=null?fmt(t.dist,1)+" km":"—",m+24,greenY+(sq?76:106),inner*.43,sq?"900 44px Manrope,Arial":"900 61px Manrope,Arial","#132b25");
-  tsText(ctx,fmtDur(t.dur??t.moving),m+inner*.53,greenY+(sq?76:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
+  tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:post?33:38),inner*.45,"800 20px Manrope,Arial","#315137");
+  tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:post?33:38),inner*.42,"800 20px Manrope,Arial","#315137");
+  tsText(ctx,t.dist!=null?fmt(t.dist,1)+" km":"—",m+24,greenY+(sq?76:post?89:106),inner*.43,sq?"900 44px Manrope,Arial":"900 61px Manrope,Arial","#132b25");
+  tsText(ctx,fmtDur(t.dur??t.moving),m+inner*.53,greenY+(sq?76:post?89:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
  }else{
-  tsText(ctx,"DESTINATION VISITED",m+24,greenY+(sq?31:43),inner-48,"800 22px Manrope,Arial","#315137");
-  tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
+  tsText(ctx,"DESTINATION VISITED",m+24,greenY+(sq?31:post?37:43),inner-48,"800 22px Manrope,Arial","#315137");
+  tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:post?90:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
  }
  if(stage===1)return;
  let mapY=greenY+greenH+18;
  if(t.drive?.km!=null){
-  const driveH=sq?47:70;
+  const driveH=sq?47:post?56:70;
   tsRound(ctx,m,mapY,inner,driveH,18,"#1c3440");
-  tsText(ctx,"DRIVE",m+18,mapY+(sq?29:44),110,"800 19px Manrope,Arial","#9fbdc5");
-  tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
+  tsText(ctx,"DRIVE",m+18,mapY+(sq?29:post?36:44),110,"800 19px Manrope,Arial","#9fbdc5");
+  tsText(ctx,fmt(t.drive.km,1)+" km   ·   "+fmtDur(t.drive.min*60),m+155,mapY+(sq?29:post?36:44),inner-175,sq?"800 24px Manrope,Arial":"800 33px Manrope,Arial","#f4faf7");
   mapY+=driveH+15;
  }
- const mapH=sq?(walk?195:295):(walk?480:625);
+ const mapH=sq?(walk?195:295):post?(walk?330:410):(walk?480:625);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
- const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:39);
+ const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:post?30:39);
  if(places.length)tsText(ctx,"STOPS  ·  "+places.slice(0,4).join("   /   "),m,textY,inner,"700 21px Manrope,Arial","#bcd1d8");
  else tsText(ctx,(t.startName&&t.endName?t.startName+"  →  "+t.endName:"Every journey is a story."),m,textY,inner,"700 23px Manrope,Arial","#bdd6dd");
- const footerY=h-(sq?64:88);
+ const footerY=h-(sq?64:post?72:88);
  ctx.strokeStyle="rgba(198,228,233,.27)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(m,footerY);ctx.lineTo(w-m,footerY);ctx.stroke();
- tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:40),400,"900 25px Manrope,Arial","#9ce9fa");
- ctx.textAlign="right";tsText(ctx,"KEEP EXPLORING",w-m,h-(sq?30:40),300,"800 20px Manrope,Arial","#a6bec4");ctx.textAlign="left";
+ tsText(ctx,"SAPPY TRAVEL",m,h-(sq?30:post?36:40),400,"900 25px Manrope,Arial","#9ce9fa");
+ ctx.textAlign="right";tsText(ctx,"KEEP EXPLORING",w-m,h-(sq?30:post?36:40),300,"800 20px Manrope,Arial","#a6bec4");ctx.textAlign="left";
 }
 let tsLoadingMaps=false;
 async function tsPrepareMaps(t,id){
  if(!t)return;
  tsLoadingMaps=true;
  const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
- const [story,square]=await Promise.all([
+ const [story,square,portrait]=await Promise.all([
   tsBuildTileMap(t,960,480).catch(()=>null),
-  tsBuildTileMap(t,960,195).catch(()=>null)
+  tsBuildTileMap(t,960,195).catch(()=>null),
+   tsBuildTileMap(t,960,360).catch(()=>null)
  ]);
  if(!tsCurrent||tsCurrent.id!==id)return;
- t._mapStory=story;t._mapSquare=square;tsLoadingMaps=false;
- if(note)note.textContent=(story||square)?"Map ready · pins and route included in the image":"Map tiles unavailable · showing the route preview";
+ t._mapStory=story;t._mapSquare=square;t._mapPortrait=portrait;tsLoadingMaps=false;
+ if(note)note.textContent=(story||square||portrait)?"Map ready · pins and route included in the image":"Map tiles unavailable · showing the route preview";
  tsDraw();
 }
 async function openTripStudio(id){
  const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
- $("tsStory").classList.add("on");$("tsSquare").classList.remove("on");
+ $("tsStory").classList.add("on");$("tsPortrait").classList.remove("on");$("tsSquare").classList.remove("on");
  $("tripStudio").hidden=false;closeSheet();
  const [hero,route]=await Promise.all([tsImage(t.photo),tsImage(t.routeShot)]);
  if(!tsCurrent||tsCurrent.id!==id)return;tsCurrent._hero=hero;tsCurrent._route=route;tsDraw();
@@ -4544,8 +4545,14 @@ async function openTripStudio(id){
 }
 function tsClose(){tsStop();$("tripStudio").hidden=true;tsCurrent=null;}
 $("tsClose").onclick=tsClose;
-$("tsStory").onclick=()=>{tsStop();tsFormat="story";$("tsStory").classList.add("on");$("tsSquare").classList.remove("on");tsDraw();};
-$("tsSquare").onclick=()=>{tsStop();tsFormat="square";$("tsSquare").classList.add("on");$("tsStory").classList.remove("on");tsDraw();};
+function tsSelectFormat(format){
+  tsStop();tsFormat=format;
+  [["tsStory","story"],["tsPortrait","portrait"],["tsSquare","square"]].forEach(([id,value])=>$(id).classList.toggle("on",format===value));
+  tsDraw();
+}
+$("tsStory").onclick=()=>tsSelectFormat("story");
+$("tsPortrait").onclick=()=>tsSelectFormat("portrait");
+$("tsSquare").onclick=()=>tsSelectFormat("square");
 $("tsPlay").onclick=()=>{if(tsTimer){tsStop();tsDraw();return;}
  tsStage=0;$("tripStudio").classList.add("ts-animate");$("tsPlay").textContent="Stop";
  tsDraw(0);tsTimer=setInterval(()=>{tsStage++;if(tsStage>4){tsStage=0;}tsDraw(tsStage);},2300);
@@ -4554,7 +4561,7 @@ $("tsCanvas").onclick=()=>{if(tsTimer){tsStop();tsDraw();}};
 $("tsShare").onclick=async()=>{if(!tsCurrent)return;
  if(tsLoadingMaps){toast("Preparing the route map…");return;}
  tsStop();tsDraw(4);$("tsCanvas").toBlob(async blob=>{
- if(!blob)return toast("Could not export image");const f=new File([blob],"sappy-travel-"+(tsCurrent.date||"trip")+(tsFormat==="story"?"-story":"-post")+".png",{type:"image/png"});
+ if(!blob)return toast("Could not export image");const f=new File([blob],"sappy-travel-"+(tsCurrent.date||"trip")+(tsFormat==="story"?"-story-9x16":tsFormat==="portrait"?"-post-3x4":"-post-1x1")+".png",{type:"image/png"});
  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:tsCurrent.name});return;}catch(e){if(e.name==="AbortError")return;}}
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
  },"image/png");};
