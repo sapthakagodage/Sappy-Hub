@@ -4204,9 +4204,60 @@ function tripTileOld(t){
     '<span class="tbody"><b>'+esc(t.name)+'</b><span class="tsub">'+esc([when,tripLoc(t)].filter(Boolean).join(" · "))+'</span>'+
     (chips.length?'<span class="tchips">'+chips.map(c=>'<i>'+esc(c)+'</i>').join("")+'</span>':'')+'</span></button>';
 }
+/* Full-resolution Travel photos are stored as original Blobs in IndexedDB.
+   Trip records retain a compact JPEG fallback so synced trips still display elsewhere. */
+function tripMediaDb(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB)return reject(new Error("Media storage unavailable"));
+  const req=indexedDB.open("sappy-travel-media",1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("images"))req.result.createObjectStore("images");};
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error||new Error("Media database error"));
+ });
+}
+async function tripMediaAction(action,key,blob){
+ const db=await tripMediaDb();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("images",action==="get"?"readonly":"readwrite");
+  const store=tx.objectStore("images");
+  const req=action==="put"?store.put(blob,key):action==="delete"?store.delete(key):store.get(key);
+  let value=null;
+  req.onsuccess=()=>{value=req.result;};
+  tx.oncomplete=()=>{db.close();resolve(value);};
+  tx.onerror=()=>{db.close();reject(tx.error||new Error("Could not store photo"));};
+  tx.onabort=()=>{db.close();reject(tx.error||new Error("Photo storage interrupted"));};
+ });
+}
+async function tripMediaPrepare(t,kind,file){
+ const key=t.id+":"+kind+":"+uid();
+ let saved=false;
+ try{await tripMediaAction("put",key,file);saved=true;}
+ catch(e){console.warn("Full-resolution media unavailable, using compressed backup",e);}
+ try{
+  const fallback=await compressPhoto(file,kind==="routeShot",saved);
+  return {fallback,key:saved?key:null};
+ }catch(e){
+  if(saved)try{await tripMediaAction("delete",key);}catch(_){}
+  throw e;
+ }
+}
+async function tripMediaImage(t,kind){
+ const key=t[kind+"HQKey"];
+ if(key){
+  try{
+   const blob=await tripMediaAction("get",key);
+   if(blob){
+    const u=URL.createObjectURL(blob),img=await tsImage(u);
+    if(img){try{await img.decode();}catch(e){}URL.revokeObjectURL(u);return img;}
+    URL.revokeObjectURL(u);
+   }
+  }catch(e){console.warn("Could not load full-resolution photo",e);}
+ }
+ return tsImage(t[kind]);
+}
 // Keep enough photo detail for 1080px-wide recap exports, without filling localStorage.
 // Legacy 720px / JPEG 70% uploads remain usable; re-upload originals to improve them.
-function compressPhoto(file,routeScreenshot=false){
+function compressPhoto(file,routeScreenshot=false,compact=false){
  busyStart("Preparing your photo…");
  return new Promise((resolve,reject)=>{
   if(!file||!file.type.startsWith("image/"))return reject(new Error("Choose an image file"));
@@ -4216,7 +4267,8 @@ function compressPhoto(file,routeScreenshot=false){
    const im=new Image();im.onerror=()=>reject(new Error("Could not open the image"));
    im.onload=()=>{
     try{
-     const limit=routeScreenshot?1800:1920,byteLimit=routeScreenshot?950000:1150000;
+     const limit=compact?1200:(routeScreenshot?1800:1920);
+     const byteLimit=compact?360000:(routeScreenshot?950000:1150000);
      let scale=Math.min(1,limit/Math.max(im.width,im.height));
      let best="";
      for(let pass=0;pass<5;pass++){
@@ -4224,7 +4276,7 @@ function compressPhoto(file,routeScreenshot=false){
       c.width=Math.max(1,Math.round(im.width*scale));c.height=Math.max(1,Math.round(im.height*scale));
       const g=c.getContext("2d");g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
       g.drawImage(im,0,0,c.width,c.height);
-      for(const quality of [0.9,0.85,0.79]){
+      for(const quality of (compact?[0.86,0.80,0.74]:[0.92,0.88,0.82])){
        const data=c.toDataURL("image/jpeg",quality);
        best=data;if(data.length*0.75<=byteLimit){resolve(data);return;}
       }
@@ -4454,10 +4506,16 @@ function openRecapForm(id=null,planId=null){
   if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59)return toast("Minutes and seconds must be 00–59");
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
-   if(imageEdits.photo.removed)t.photo=null;
-   else if($("rcPhoto").files[0])t.photo=await compressPhoto($("rcPhoto").files[0],false);
-   if(imageEdits.routeShot.removed)t.routeShot=null;
-   else if($("rcRoute").files[0])t.routeShot=await compressPhoto($("rcRoute").files[0],true);
+   const priorKeys={photo:t.photoHQKey||null,routeShot:t.routeShotHQKey||null};
+   const freshKeys=[];
+   if(imageEdits.photo.removed){t.photo=null;t.photoHQKey=null;}
+   else if($("rcPhoto").files[0]){
+    const media=await tripMediaPrepare(t,"photo",$("rcPhoto").files[0]);t.photo=media.fallback;t.photoHQKey=media.key;if(media.key)freshKeys.push(media.key);
+   }
+   if(imageEdits.routeShot.removed){t.routeShot=null;t.routeShotHQKey=null;}
+   else if($("rcRoute").files[0]){
+    const media=await tripMediaPrepare(t,"routeShot",$("rcRoute").files[0]);t.routeShot=media.fallback;t.routeShotHQKey=media.key;if(media.key)freshKeys.push(media.key);
+   }
    if(routePending)await routePending;if(walkPending)await walkPending;
    const lookup=async id=>{const value=$(id).value.trim();if(!value)return null;try{const results=await geocode(value);return results[0]||null;}catch(e){return null;}};
    if(!coords.from){const o=await lookup("rcFrom");if(o)coords.from=[+o.lat,+o.lng];}
@@ -4486,7 +4544,11 @@ function openRecapForm(id=null,planId=null){
     S.travelHome={lat:homeCoord[0],lng:homeCoord[1],name:$("rcDriveHome").value.trim()};
     persist();put("cfg",{id:"travel",home:S.travelHome});
    }
-   if(!put("trip",t))throw new Error("Trip could not be saved");
+   if(!put("trip",t)){
+    for(const key of freshKeys)tripMediaAction("delete",key).catch(()=>{});
+    throw new Error("Trip could not be saved");
+   }
+   for(const key of Object.values(priorKeys))if(key&&key!==t.photoHQKey&&key!==t.routeShotHQKey)tripMediaAction("delete",key).catch(()=>{});
    closeSheet();renderTravel();openTripStudio(t.id);
   }catch(e){saveButton.disabled=false;saveButton.textContent=id?"Save changes & preview":"Save & preview";toast("Could not save the trip. Please try again.");}
  };
@@ -4727,7 +4789,7 @@ async function openTripStudio(id){
  const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
  $("tsStory").classList.add("on");$("tsPortrait").classList.remove("on");$("tsSquare").classList.remove("on");
  $("tripStudio").hidden=false;closeSheet();
- const [hero,route]=await Promise.all([tsImage(t.photo),tsImage(t.routeShot)]);
+ const [hero,route]=await Promise.all([tripMediaImage(t,"photo"),tripMediaImage(t,"routeShot")]);
  if(!tsCurrent||tsCurrent.id!==id)return;tsCurrent._hero=hero;tsCurrent._route=route;tsDraw();
  await tsPrepareMaps(tsCurrent,id);
 }
