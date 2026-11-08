@@ -2031,7 +2031,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.70";
+const APP_VERSION = "7.3.71";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2636,10 +2636,9 @@ let view="home", month=new Date(); month.setDate(1); month.setHours(0,0,0,0);
 let focusCat=null, filter="All", accFilter="all";
 const TITLES={home:"Overview",activity:"Activity",savings:"Savings",sms:"Add SMS"};
 function renderSms(){
-  const sk=Object.values(S.skip).filter(live).length;
-  $("skipRow").hidden=!sk;
-  $("skipD").textContent=sk+" SMS need review. Nothing is discarded or counted until confirmed.";
-  $("skipRetry").textContent="Review";
+  // Keep the manual SMS page focused on pasting messages.
+  // Pending messages are surfaced on the Pocket Overview alongside Payments to sort.
+  $("skipRow").hidden=true;
 }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
 // Spending cycles run 22nd–21st; AUD income on the 20th–21st funds the next cycle.
@@ -2867,7 +2866,17 @@ function renderSoon(){
   const un=unsorted();
   if(un.length){ $("soonBox").insertAdjacentHTML("afterbegin",'<button class="soon sortb" id="sortBanner"><span class="si2" style="background:#FFD36E">'+icon("Shopping",18)+'</span><span class="tx2"><b>'+un.length+' payment'+(un.length>1?'s':'')+' to sort</b><span>Pick a category · remembered next time</span></span><span class="wn">Sort</span></button>');
     $("sortBanner").onclick=()=>openSort(un[0].id); }
-  const todo=[$("sortBanner"),$("linkBanner")].filter(Boolean);
+  // A message that really cannot be parsed is also surfaced here, NOT
+  // buried inside the manual Add SMS screen. It is never counted as spending.
+  const unread=Object.values(S.skip).filter(live);
+  if(unread.length){
+    $("soonBox").insertAdjacentHTML("afterbegin",
+      '<button class="soon sortb" id="smsReviewBanner"><span class="si2" style="background:#FFD36E">'+icon("Other",18)+'</span>'+
+      '<span class="tx2"><b>'+unread.length+' SMS '+(unread.length===1?'needs':'need')+' review</b>'+
+      '<span>Could not read automatically · Tap to review</span></span><span class="wn">Review</span></button>');
+    $("smsReviewBanner").onclick=openSmsReviewList;
+  }
+  const todo=[$("sortBanner"),$("smsReviewBanner"),$("linkBanner")].filter(Boolean);
   if(todo.length){ const box=document.createElement("div"); box.className="todo"; box.innerHTML='<div class="todo-h">To do</div>'; todo.forEach(x=>box.appendChild(x)); $("soonBox").prepend(box); }
   $("soonBox").querySelectorAll(".soon[data-k]").forEach(b=>b.onclick=()=>{ if(b.dataset.k==="fd") openFd(b.dataset.id); else openSub(b.dataset.id); });
   if($("soonMore")) $("soonMore").onclick=()=>{ document.body.classList.add("in-hub"); openNoti(); };
@@ -3458,7 +3467,11 @@ function openSmsReviewList(){
     '<div class="list">'+items.map(k=>'<button class="tx" data-review="'+esc(k.id)+'"><span class="mid"><div class="m">'+esc(k.raw.slice(0,65))+'</div><div class="c">Tap to review · not counted yet</div></span><span class="rt">›</span></button>').join("")+'</div>'+
     '<button class="btn soft full" id="reviewRetry" style="margin-top:12px">Try reading again</button>');
   document.querySelectorAll("[data-review]").forEach(b=>b.onclick=()=>openSmsReview(b.dataset.review));
-  $("reviewRetry").onclick=()=>{reparseAll(true);openSmsReviewList();};
+  $("reviewRetry").onclick=()=>{
+    reparseAll(true);
+    if(Object.values(S.skip).some(live))openSmsReviewList();
+    else{closeSheet();toast("All pending messages have been processed");}
+  };
 }
 function openSmsReview(id){
   const entry=S.skip[id];if(!live(entry))return openSmsReviewList();
