@@ -254,6 +254,7 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
 .rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}
 .rc-upload-preview{display:flex;align-items:center;gap:11px;justify-content:space-between;margin:2px 0 10px;padding:10px 12px;border:1px solid var(--line);background:var(--card2);border-radius:15px}
+.rc-upload-preview[hidden],.rc-upload-preview .rc-thumb:not([src]){display:none!important}
 .rc-upload-preview .rc-thumb{display:block;width:62px;height:55px;object-fit:cover;border-radius:10px;background:var(--card);flex:none}
 .rc-upload-preview .rc-upload-label{flex:1;min-width:0;font-size:12px;color:var(--soft);line-height:1.4}
 .rc-upload-preview .rc-remove-image{background:rgba(210,65,76,.1);color:var(--neg);border:1px solid rgba(210,65,76,.3);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800;flex:none}
@@ -4267,7 +4268,8 @@ function openTripForm(id){
     '<label class="fl2"><span>Hours</span><input class="inp num" id="fH" inputmode="numeric" data-plain="1" value="'+h+'" placeholder="2"></label>'+
     '<label class="fl2"><span>Minutes</span><input class="inp num" id="fM" inputmode="numeric" data-plain="1" value="'+m+'" placeholder="30"></label></div>'+
     '<div class="fl2"><span style="display:block;font-size:13px;color:var(--soft);margin-bottom:6px;font-weight:600">Photo (one)</span>'+
-    '<label class="photopick" id="fPhotoBox" style="'+(t.photo?'background-image:url('+t.photo+')':'')+'"><input type="file" id="fPhoto" accept="image/*" hidden><span>'+(t.photo?'Change photo':'＋ Add a photo')+'</span></label></div>'+
+    '<label class="photopick" id="fPhotoBox" style="'+(t.photo?'background-image:url('+t.photo+')':'')+'"><input type="file" id="fPhoto" accept="image/*" hidden><span>'+(t.photo?'Change photo':'＋ Add a photo')+'</span></label>'+
+    '<button type="button" class="btn warn" id="fRemovePhoto"'+(t.photo?'':' hidden')+' style="margin-top:9px">Remove photo</button></div>'+
     '<button class="btn full" id="fSave">Save</button>');
   const toggleTripProvince=()=>{
     const isSriLankan=t.cc==="LK";
@@ -4287,12 +4289,21 @@ function openTripForm(id){
         $("pq").value=t.loc; if(!$("fName").value.trim()) $("fName").value=o.name; $("pres").innerHTML='<div class="note">✓ Pinned on the map</div>'; });
     }catch(e){ $("pres").innerHTML='<div class="note">Search needs internet.</div>'; } },500); };
   if($("fType")){ const tb=()=>{ const box=$("fH")&&$("fH").closest("div[style*=grid]"); const lab=box&&box.previousElementSibling; const hide=$("fType").value==="place"; if(box) box.hidden=hide; if(lab&&/Time on the trail/.test(lab.textContent)) lab.hidden=hide; }; $("fType").onchange=tb; tb(); }
-  $("fPhoto").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ t.photo=await compressPhoto(f); $("fPhotoBox").style.backgroundImage="url("+t.photo+")"; $("fPhotoBox").querySelector("span").textContent="Change photo"; }catch(_){ toast("Couldn’t read that photo"); } };
+  $("fPhoto").onchange=async e=>{ const file=e.target.files[0];if(!file)return;try{
+    t.photo=await compressPhoto(file,false);
+    $("fPhotoBox").style.backgroundImage="url("+t.photo+")";
+    $("fPhotoBox").querySelector("span").textContent="Change photo";
+    $("fRemovePhoto").hidden=false;
+   }catch(_){toast("Couldn’t read that photo");} };
+  $("fRemovePhoto").onclick=()=>{
+   t.photo=null;$("fPhoto").value="";$("fPhotoBox").style.backgroundImage="none";
+   $("fPhotoBox").querySelector("span").textContent="＋ Add a photo";$("fRemovePhoto").hidden=true;
+  };
   $("fSave").onclick=()=>{
     const name=$("fName").value.trim(); if(!name) return toast("Add a name");
     const dist=t.dist||0, sec=$("fType").value==="place"?0:((parseInt($("fH").value)||0)*60+(parseInt($("fM").value)||0))*60;
     const date=$("fDate").value||"";
-    put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:t.cc==="LK"?($("fProvince").value||""):"",dist,moving:sec,dur:sec}));
+    if(!put("trip",Object.assign(t,{name,date,year:date?+date.slice(0,4):(t.year||new Date().getFullYear()),type:$("fType").value,province:t.cc==="LK"?($("fProvince").value||""):"",dist,moving:sec,dur:sec})))return;
     closeSheet(); renderTravel(); drawMap(); toast(id?"Saved":"Trip added");
   };
 }
