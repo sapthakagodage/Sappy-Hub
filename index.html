@@ -2057,7 +2057,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.78";
+const APP_VERSION = "7.3.79";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3032,7 +3032,7 @@ function cashMovementHtml(t){
     '<span class="ic" style="background:'+c.c+'">'+icon(category,20)+'</span>'+
     '<span class="mid"><div class="m">'+esc(withdrawal?"Cash withdrawal":t.merchant)+'</div>'+
     '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(category)+" · Cash")+'</div></span>'+
-    '<span class="rt">'+personalExpenseAmountHtml(t,amount)</span></button>'+
+    '<span class="rt">'+personalExpenseAmountHtml(t,amount)+'</span></button>'+
     (split?'<button type="button" class="cash-split-mini'+(shared?' is-shared':'')+'" data-split="'+esc(t.id)+'" title="Split this cash expense" aria-label="Split '+esc(t.merchant)+' with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg></button></div>':'');
 }
 function openCashWallet(){
