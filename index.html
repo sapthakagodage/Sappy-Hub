@@ -250,6 +250,15 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-workout-help{grid-column:1/-1;font-size:11px;color:var(--soft);margin:-4px 0 3px}
 .rc-metric-fields .fl2{min-width:0}
 .rc-metric-fields input{min-width:0;width:100%;box-sizing:border-box}
+.rc-metric-fields .rc-metric-tile{padding:13px 12px 12px;border:1px solid var(--line);background:var(--card2);border-radius:17px;margin:0;min-width:0}
+.rc-metric-fields .rc-metric-tile>span{font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.025em;color:var(--soft);margin-bottom:9px}
+.rc-metric-fields .rc-metric-tile input{min-height:44px;border-radius:11px;font-size:17px;font-weight:800;background:var(--card)}
+.rc-metric-fields .rc-time-tile{grid-column:1/-1}
+.rc-time-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.rc-time-parts label{min-width:0}
+.rc-time-parts span{display:block;font-size:11px;color:var(--soft);margin:0 0 5px;text-align:center}
+.rc-time-parts input{text-align:center!important;padding:10px 4px!important;font-variant-numeric:tabular-nums}
+.rc-map-caption{font-size:11px;line-height:1.4;color:var(--soft);margin:-5px 0 11px}
 .rc-form-actions{display:flex;gap:9px;margin:18px 0 8px}.rc-form-actions .btn{flex:1;min-width:0;min-height:48px}
 .rc-upload{display:block;padding:14px;border:1px dashed var(--line);border-radius:16px;background:var(--card2);margin:9px 0}
 .rc-upload span{display:block;color:var(--soft);font-size:12px;margin-bottom:8px}
@@ -2072,7 +2081,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.82";
+const APP_VERSION = "7.3.83";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4318,17 +4327,20 @@ function openRecapForm(id=null,planId=null){
  field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
  '<label class="fl2 travel-date-field"><span>Date</span><input class="inp" type="date" id="rcDate" value="'+esc(t.date||"")+'"></label>'+
  '<div class="rc-section" id="rcWorkoutTitle">Workout details from Huawei Health</div><div id="rcWorkoutFields" class="rc-metric-fields">'+
- '<label class="fl2"><span>Walking distance (km) · manual</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
- '<label class="fl2"><span>Walking time (minutes) · manual</span><input class="inp" type="number" min="0" step="1" id="rcMinutes" value="'+(t.dur!=null?Math.round(t.dur/60):(t.moving!=null?Math.round(t.moving/60):""))+'" placeholder="155"></label>'+
- '<label class="fl2"><span>Avg pace (min/km)</span><input class="inp" id="rcPace" inputmode="text" value="'+esc(t.avgPace||"")+'" placeholder="13:12 /km"></label>'+
- '<label class="fl2"><span>Avg speed (km/h)</span><input class="inp" id="rcSpeed" type="number" min="0" step=".01" value="'+esc(t.avgSpeed??"")+'" placeholder="3.63"></label>'+
+ '<label class="fl2 rc-metric-tile"><span>Walking distance · km</span><input class="inp" type="number" min="0" step=".01" id="rcDist" value="'+esc(v("dist"))+'" placeholder="8.4"></label>'+
+ '<div class="rc-metric-tile rc-time-tile"><span>Walking time · HH : MM : SS</span><div class="rc-time-parts">'+
+ '<label><span>Hours</span><input class="inp" id="rcHours" type="number" inputmode="numeric" min="0" max="999" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)/3600):"")+'" placeholder="02"></label>'+
+ '<label><span>Minutes</span><input class="inp" id="rcMins" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor(((t.dur??t.moving)%3600)/60):"")+'" placeholder="35"></label>'+
+ '<label><span>Seconds</span><input class="inp" id="rcSecs" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)%60):"")+'" placeholder="20"></label></div></div>'+
+ '<label class="fl2 rc-metric-tile"><span>Avg pace · min/km</span><input class="inp" id="rcPace" inputmode="text" value="'+esc(t.avgPace||"")+'" placeholder="13:12 /km"></label>'+
+ '<label class="fl2 rc-metric-tile"><span>Avg speed · km/h</span><input class="inp" id="rcSpeed" type="number" min="0" step=".01" value="'+esc(t.avgSpeed??"")+'" placeholder="3.63"></label>'+
  '<p class="rc-workout-help">Calculated automatically from walking distance and time. You can edit the values.</p>'+
- '<label class="fl2"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
- '<label class="fl2"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
+ '<label class="fl2 rc-metric-tile"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
+ '<label class="fl2 rc-metric-tile"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
  '<div class="rc-section">Walking journey & map</div>'+
  field("Walk from","rcFrom",t.startName||"","Starting point of walk")+'<div class="results" id="rcFromResults"></div>'+
  field("Walk to","rcTo",t.endName||t.loc||"","End of walking route")+'<div class="results" id="rcToResults"></div>'+
- '<p class="note">These locations describe the actual walk. Walking distance and time come from your Huawei Health details above.</p><div class="rc-map" id="rcMap"></div>'+
+ '<p class="note">These locations describe the actual walk. The blue route follows roads where available; your manually entered Huawei distance is authoritative.</p><div class="rc-map" id="rcMap"></div><p class="rc-map-caption" id="rcWalkMapStatus">Satellite map · select a start and end to preview the route.</p>'+
  '<div class="rc-driving-card"><div class="rc-driving-title">Drive to your walk</div><p class="rc-driving-note">Home → Walk start. Search your house location to calculate road distance and driving time.</p>'+
  field("Driving from · My home","rcDriveHome",t.driveHomeName||(S.travelHome?.name||""),"Search your home address")+'<div class="results" id="rcDriveHomeResults"></div>'+
  '<div class="rc-driving-summary"><span id="rcRoadJourney">Home → Walk start</span><b id="rcRoadSummary">'+(tripDriveValid(t)?fmt(t.drive.km,1)+" km · "+fmtDur(t.drive.min*60):"Choose home and walk start")+'</b></div>'+
@@ -4408,7 +4420,8 @@ function openRecapForm(id=null,planId=null){
   };
  }
  updateDriveLabel();
- const recomputeWorkout=()=>{const d=Number($("rcDist").value),min=Number($("rcMinutes").value);
+ const readWalkSeconds=()=>{const h=Number($("rcHours").value||0),m=Number($("rcMins").value||0),sec=Number($("rcSecs").value||0);return h*3600+m*60+sec;};
+ const recomputeWorkout=()=>{const d=Number($("rcDist").value),min=readWalkSeconds()/60;
   if(!(d>0&&min>0))return;
   const seconds=Math.round(min*60/d),pace=Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0")+" /km";
   if(!$("rcPace").dataset.custom)$("rcPace").value=pace;
@@ -4416,14 +4429,15 @@ function openRecapForm(id=null,planId=null){
  };
  $("rcPace").oninput=()=>{$("rcPace").dataset.custom="1";};
  $("rcSpeed").oninput=()=>{$("rcSpeed").dataset.custom="1";};
- $("rcDist").oninput=recomputeWorkout;$("rcMinutes").oninput=recomputeWorkout;
+ $("rcDist").oninput=recomputeWorkout;["rcHours","rcMins","rcSecs"].forEach(k=>$(k).oninput=recomputeWorkout);
  if(!t.avgPace||t.avgSpeed==null)recomputeWorkout();
  $("rcSave").onclick=async()=>{
   const name=$("rcName").value.trim();if(!name)return toast("Add a trip name");
   const num=k=>$(k).value===""?null:Number($(k).value);
-  for(const key of ["rcDist","rcMinutes","rcSteps","rcCalories","rcSpeed"]){
+  for(const key of ["rcDist","rcHours","rcMins","rcSecs","rcSteps","rcCalories","rcSpeed"]){
    const value=num(key);if(value!=null&&(!Number.isFinite(value)||value<0))return toast("Check the workout numbers");
   }
+  if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59)return toast("Minutes and seconds must be 00–59");
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
    if(imageEdits.photo.removed)t.photo=null;
@@ -4439,10 +4453,10 @@ function openRecapForm(id=null,planId=null){
     const d=await recapRoadRoute(homeCoord,coords.from);
     if(d){road={km:d.km,min:d.min};roadPath=d.path;}
    }
-   const date=$("rcDate").value,mins=num("rcMinutes"),to=$("rcTo").value.trim(),walk=t.type==="hike"||t.type==="walk";
+   const date=$("rcDate").value,totalSeconds=readWalkSeconds(),hasTime=["rcHours","rcMins","rcSecs"].some(k=>$(k).value!==""),to=$("rcTo").value.trim(),walk=t.type==="hike"||t.type==="walk";
    Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),
-    dist:walk?num("rcDist"):null,dur:walk&&mins!=null?Math.round(mins*60):null,
-    moving:walk&&mins!=null?Math.round(mins*60):null,steps:walk?num("rcSteps"):null,calories:walk?num("rcCalories"):null,
+    dist:walk?num("rcDist"):null,dur:walk&&hasTime?Math.round(totalSeconds):null,
+    moving:walk&&hasTime?Math.round(totalSeconds):null,steps:walk?num("rcSteps"):null,calories:walk?num("rcCalories"):null,
     avgPace:walk?($("rcPace").value.trim()||null):null,avgSpeed:walk?num("rcSpeed"):null,
     startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
     endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
