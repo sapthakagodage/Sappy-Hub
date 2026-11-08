@@ -4488,11 +4488,11 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
  ctx.fillStyle="#bdd5d2";ctx.fillRect(x,y,w,h);
  const prepared=tsFormat==="square"?t._mapSquare:tsFormat==="portrait"?t._mapPortrait:t._mapStory;
- if(prepared)ctx.drawImage(prepared,x,y,w,h);
- else if(t._route){
+ if(t._route){
   const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
   ctx.fillStyle="#e5eee8";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
- }else{
+ }else if(prepared)ctx.drawImage(prepared,x,y,w,h);
+ else{
   const pts=tsRoutePoints(t);
   ctx.strokeStyle="rgba(255,255,255,.4)";ctx.lineWidth=2;
   for(let i=1;i<9;i++){ctx.beginPath();ctx.moveTo(x+i*w/9,y);ctx.lineTo(x+i*w/9,y+h);ctx.stroke();}
@@ -4507,7 +4507,7 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
   }
   tsText(ctx,"Map tiles unavailable",x+20,y+h/2,w-40,"800 22px Manrope,Arial","#315762");
  }
- const label=prepared?"ROAD MAP · FROM / TO":t._route?"HUAWEI HEALTH ROUTE":"ROUTE PREVIEW";
+ const label=t._route?"HUAWEI WALKING ROUTE":prepared?"WALK MAP · START / END":"WALKING ROUTE PREVIEW";
  ctx.fillStyle="rgba(9,30,41,.88)";ctx.fillRect(x,y,w,51);
  tsText(ctx,label,x+20,y+33,w-40,"800 21px Manrope,Arial","#fff");
  ctx.fillStyle="rgba(9,30,41,.92)";ctx.fillRect(x,y+h-60,w,60);
@@ -4580,7 +4580,7 @@ function tsDraw(stage=4){
   tsText(ctx,paceText,m+20,paceY+(sq?30:post?35:44),inner-40,sq?"800 21px Manrope,Arial":post?"800 24px Manrope,Arial":"800 28px Manrope,Arial","#d8edf2");
   mapY+=paceH+13;
  }
- const mapH=sq?(walk?123:275):post?(walk?260:395):(walk?380:625);
+ const mapH=sq?(walk?165:275):post?(walk?260:395):(walk?380:625);
  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
  if(stage===2)return;
  const places=(t.stops||[]).map(v=>v.name).filter(Boolean),textY=mapY+mapH+(sq?25:post?30:39);
