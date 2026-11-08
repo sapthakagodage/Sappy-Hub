@@ -597,6 +597,16 @@ html.sappy-suspended #splash{display:flex!important;opacity:1!important;visibili
 .sheet .trend .tb{color:var(--ink)}
 .sheet .trend .tb .col i{background:var(--chip)}
 
+/* Personal spending vs original amount */
+.tx .rt .old-expense{font-size:12px;font-weight:600;color:var(--faint);text-decoration:line-through;line-height:1.25}
+.tx .rt .effective-expense{color:var(--pos);font-weight:800}
+.tx .rt .personal-expense-note{font-size:10px;color:var(--soft);font-weight:600}
+.personal-expense-detail{background:var(--card2);border-radius:var(--r-md);padding:12px 14px;margin:12px 0}
+.personal-expense-detail .personal-expense-title{font-size:12px;color:var(--soft);font-weight:700;margin-bottom:7px}
+.personal-expense-detail .personal-expense-values{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.personal-expense-detail .old-expense{color:var(--faint);font-weight:700;text-decoration:line-through}
+.personal-expense-detail .effective-expense{color:var(--pos);font-size:20px;font-weight:800}
+.personal-expense-detail .personal-expense-note{font-size:12px;color:var(--soft);margin-top:5px}
 /* transactions */
 .day{font-size:13px;font-weight:700;color:var(--faint);margin:18px 6px 8px}
 .list{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden;padding:4px 0}
@@ -2047,7 +2057,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.77";
+const APP_VERSION = "7.3.78";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3022,7 +3032,7 @@ function cashMovementHtml(t){
     '<span class="ic" style="background:'+c.c+'">'+icon(category,20)+'</span>'+
     '<span class="mid"><div class="m">'+esc(withdrawal?"Cash withdrawal":t.merchant)+'</div>'+
     '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(category)+" · Cash")+'</div></span>'+
-    '<span class="rt"><div class="a num'+(credit?' in':'')+'">'+amount+'</div></span></button>'+
+    '<span class="rt">'+personalExpenseAmountHtml(t,amount)</span></button>'+
     (split?'<button type="button" class="cash-split-mini'+(shared?' is-shared':'')+'" data-split="'+esc(t.id)+'" title="Split this cash expense" aria-label="Split '+esc(t.merchant)+' with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg></button></div>':'');
 }
 function openCashWallet(){
@@ -3139,10 +3149,26 @@ function timeAgo(ts){ const d=Math.floor((Date.now()-ts)/864e5); return d<=0?"To
 /* ---------- list ---------- */
 function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(ts);d.setHours(0,0,0,0); const n=(t-d)/864e5;
   return n===0?"Today":n===1?"Yesterday":new Date(ts).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"}); }
+function personalExpenseAmountHtml(t, original){
+  if(!canSplitExpense(t))return '<div class="a num'+(t.type==="in"?' in':'')+'">'+original+'</div>';
+  const paid=lkrOf(t),effective=myShare(t);
+  if(!(effective<paid-0.005))return '<div class="a num">'+original+'</div>';
+  return '<div class="old-expense num">'+original+'</div>'+
+    '<div class="a num effective-expense">−'+rs(effective)+'</div>'+
+    '<div class="personal-expense-note">Your expense</div>';
+}
+function personalExpenseDetailHtml(t){
+  if(!canSplitExpense(t))return '';
+  const paid=lkrOf(t),effective=myShare(t);
+  if(!(effective<paid-0.005))return '';
+  return '<div class="personal-expense-detail"><div class="personal-expense-title">Amount counted in '+esc(catLabel(pocketCat(t)))+'</div>'+
+    '<div class="personal-expense-values"><span class="old-expense num">'+rs(paid)+'</span><span class="effective-expense num">'+rs(effective)+'</span></div>'+
+    '<div class="personal-expense-note">The full payment remains recorded in your cash or bank wallet.</div></div>';
+}
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt"><div class="a num'+(pos?' in':'')+'">'+main+'</div>'+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt">'+personalExpenseAmountHtml(t,main)+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -3368,6 +3394,7 @@ function openTx(id,edit){
       :'<div class="note num">'+(t.type==="in"?"+":"−")+esc(t.cur)+' '+fmt(t.amount,2)+(t.cur!=="LKR"?(t.fxReal?' = '+rs(lkrOf(t))+' (HNB rate '+t.fx+')':' ≈ '+rs(lkrOf(t))+' (market rate)'):'')+' · '+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>')+
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
+    personalExpenseDetailHtml(t)+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     (canSplitExpense(t)&&t.bank!=="Cash"?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split with friends (optional)</button>':'')+
     catPicker(cats,cat)+
