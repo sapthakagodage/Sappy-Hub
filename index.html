@@ -2070,7 +2070,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
   <div class="ts-head"><strong>✦ Trip Recap Studio</strong><button class="ts-close" id="tsClose">Done ✕</button></div>
   <div class="ts-preview"><canvas id="tsCanvas" width="1080" height="1920" aria-label="Trip recap preview"></canvas></div>
   <div class="ts-actions">
-    <button id="tsStory" class="on">Story 9:16</button><button id="tsPortrait">Post 3:4</button><button id="tsSquare">Post 1:1</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
+    <button id="tsStory" class="on">Story 9:16</button><button id="tsPortrait">Post 3:4</button><button id="tsSquare">Post 1:1</button><button id="tsMapToggle" hidden>Map: Satellite</button><button id="tsPlay">▶ Play recap</button><button id="tsShare" class="primary">↗ Share image</button>
   </div>
   <p class="ts-note" id="tsMapStatus">Preparing your trip recap…</p>
 </div>
@@ -4577,7 +4577,7 @@ function openRecapForm(id=null,planId=null){
  };
 
 }
-let tsCurrent=null,tsFormat="story",tsTimer=null,tsStage=0;
+let tsCurrent=null,tsFormat="story",tsTimer=null,tsStage=0,tsMapMode="satellite";
 function tsStop(){if(tsTimer){clearInterval(tsTimer);tsTimer=null;}const b=$("tsPlay");if(b)b.textContent="▶ Play recap";$("tripStudio").classList.remove("ts-animate");}
 function tsImage(src){return new Promise(resolve=>{if(!src)return resolve(null);const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>resolve(null);i.src=src;});}
 function tsCover(ctx,img,x,y,w,h){if(!img)return;const k=Math.max(w/img.width,h/img.height),cw=w/k,ch=h/k;ctx.drawImage(img,(img.width-cw)/2,(img.height-ch)/2,cw,ch,x,y,w,h);}
@@ -4680,10 +4680,11 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();
  ctx.fillStyle="#bdd5d2";ctx.fillRect(x,y,w,h);
  const prepared=tsFormat==="square"?t._mapSquare:tsFormat==="portrait"?t._mapPortrait:t._mapStory;
- if(t._route){
+ if(prepared&&tsMapMode!=="health")ctx.drawImage(prepared,x,y,w,h);
+ else if(t._route){
   const im=t._route,k=Math.min(w/im.width,h/im.height),iw=im.width*k,ih=im.height*k;
   ctx.fillStyle="#e5eee8";ctx.fillRect(x,y,w,h);ctx.drawImage(im,x+(w-iw)/2,y+(h-ih)/2,iw,ih);
- }else if(prepared)ctx.drawImage(prepared,x,y,w,h);
+ }
  else{
   const pts=tsRoutePoints(t);
   ctx.strokeStyle="rgba(255,255,255,.4)";ctx.lineWidth=2;
@@ -4699,7 +4700,7 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
   }
   tsText(ctx,"Map tiles unavailable",x+20,y+h/2,w-40,"800 22px Manrope,Arial","#315762");
  }
- const label=t._route?"RECORDED WALKING ROUTE":prepared?"SATELLITE WALKING MAP":"WALKING ROUTE PREVIEW";
+ const label=(prepared&&tsMapMode!=="health")?"SATELLITE WALKING MAP":t._route?"HUAWEI HEALTH WALK ROUTE":"WALKING ROUTE PREVIEW";
  ctx.fillStyle="rgba(9,30,41,.88)";ctx.fillRect(x,y,w,51);
  tsText(ctx,label,x+20,y+33,w-40,"800 21px Manrope,Arial","#fff");
  ctx.fillStyle="rgba(9,30,41,.92)";ctx.fillRect(x,y+h-60,w,60);
@@ -4810,7 +4811,8 @@ async function tsPrepareMaps(t,id){
  tsDraw();
 }
 async function openTripStudio(id){
- const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;
+ const t=S.trip[id];if(!t)return;tsStop();tsCurrent=Object.assign({},t);tsFormat="story";tsStage=4;tsMapMode="satellite";
+ $("tsMapToggle").hidden=!(t.routeShot||t.routeShotHQKey);$("tsMapToggle").textContent="Map: Satellite";
  $("tsStory").classList.add("on");$("tsPortrait").classList.remove("on");$("tsSquare").classList.remove("on");
  $("tripStudio").hidden=false;closeSheet();
  const [hero,route]=await Promise.all([tripMediaImage(t,"photo"),tripMediaImage(t,"routeShot")]);
@@ -4824,6 +4826,7 @@ function tsSelectFormat(format){
   [["tsStory","story"],["tsPortrait","portrait"],["tsSquare","square"]].forEach(([id,value])=>$(id).classList.toggle("on",format===value));
   tsDraw();
 }
+$("tsMapToggle").onclick=()=>{tsStop();tsMapMode=tsMapMode==="satellite"?"health":"satellite";$("tsMapToggle").textContent=tsMapMode==="satellite"?"Map: Satellite":"Map: Health route";tsDraw();};
 $("tsStory").onclick=()=>tsSelectFormat("story");
 $("tsPortrait").onclick=()=>tsSelectFormat("portrait");
 $("tsSquare").onclick=()=>tsSelectFormat("square");
