@@ -2047,7 +2047,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.76";
+const APP_VERSION = "7.3.77";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4820,18 +4820,21 @@ function looseBacks(){ return txList().filter(isLooseBack); }
 // likely payments a payback is for: spending before it, within 30 days, bigger than the payback
 function backSuggestions(p){
   const pv=lkrOf(p);
+  // Cash expenses can be entered after a reimbursement was already recorded.
+  // Include every eligible manual cash payment regardless of transaction date;
+  // keep existing date-based suggestions for card/bank expenses.
   return txList().filter(t=>{
-    if(!canSplitExpense(t)||t.ts>p.ts+3600e3)return false;
+    if(!canSplitExpense(t))return false;
+    if(t.bank==="Cash")return true;
+    if(t.ts>p.ts+3600e3)return false;
     const days=(p.ts-t.ts)/864e5;
-    // Cash and card expenses can both receive bank-transfer paybacks.
-    // Keep an explicitly shared cash expense findable for up to 90 days.
-    const cashSplit=t.bank==="Cash"&&Number(t.split)>1;
-    return (days<=31&&lkrOf(t)>=pv*0.15)||(cashSplit&&days<=90);
+    return days<=31&&lkrOf(t)>=pv*0.15;
   }).map(t=>{
-    const days=(p.ts-t.ts)/864e5,linked=(backMap()[t.id]||0)>0,big=lkrOf(t)>=pv*0.95;
+    const days=Math.abs(p.ts-t.ts)/864e5,linked=(backMap()[t.id]||0)>0,big=lkrOf(t)>=pv*0.95;
     const sharedCash=t.bank==="Cash"&&Number(t.split)>1;
-    return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)-(sharedCash?5:0)};
-  }).sort((a,b)=>a.score-b.score).slice(0,12).map(x=>x.t);
+    const recentCash=t.bank==="Cash"&&t.ts>p.ts;
+    return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)-(sharedCash?5:0)-(recentCash?4:0)};
+  }).sort((a,b)=>a.score-b.score).map(x=>x.t);
 }
 function expenseContributors(expenseId){
   return txList().filter(t=>t.type==="in"&&t.cat==="Paid back"&&linksOf(t).includes(expenseId));
@@ -4928,11 +4931,11 @@ function openLink(id){
   const p=S.tx[id];if(!p)return;
   const cur=linksOf(p),sug=backSuggestions(p);
   cur.forEach(cid=>{if(S.tx[cid]&&!sug.some(t=>t.id===cid))sug.unshift(S.tx[cid]);});
-  const sel=new Set(cur.length?cur:(sug[0]?[sug[0].id]:[]));
+  const sel=new Set(cur);
   const P=lkrOf(p);
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
   openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. More than one person can reimburse the same expense, with different amounts.</p>'+
-    (sug.length?'<div class="list" style="margin-top:12px" id="lkList">'+sug.map(row).join("")+'</div><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
+    (sug.length?'<label class="fl2" style="margin-top:12px"><span>Find an expense (including newly added cash payments)</span><input class="inp" id="lkSearch" type="search" placeholder="Search name, amount or date"></label><div class="list" style="margin-top:12px;max-height:38vh;overflow-y:auto" id="lkList">'+sug.map(row).join("")+'</div><p class="note" id="lkSearchEmpty" hidden>No matching expenses. Try another name or amount.</p><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
       :'<p class="note">No recent expenses found to link. This payment remains unlinked.</p>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
     (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button><button class="link" id="lkSplit" style="display:block;margin:12px auto 0">Equal split or custom amounts</button>':'')+
@@ -4960,6 +4963,17 @@ function openLink(id){
   };
   const linkSelected=()=>{if(!sel.size)return false;const n=Object.assign({},p,{links:[...sel]});delete n.linkTo;put("tx",n);return true;};
   document.querySelectorAll("#lkList .lrow").forEach(b=>b.onclick=()=>{const k=b.dataset.id;sel.has(k)?sel.delete(k):sel.add(k);paint();});
+  if($("lkSearch"))$("lkSearch").oninput=()=>{
+    const term=$("lkSearch").value.trim().toLowerCase();
+    let showing=0;
+    document.querySelectorAll("#lkList .lrow").forEach(b=>{
+      const t=S.tx[b.dataset.id],date=new Date(t.ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}).toLowerCase();
+      const hay=(t.merchant+" "+t.bank+" "+pocketCat(t)+" "+fmt(lkrOf(t))+" "+lkrOf(t)+" "+date).toLowerCase();
+      b.hidden=!!term&&!hay.includes(term);
+      if(!b.hidden)showing++;
+    });
+    $("lkSearchEmpty").hidden=showing>0;
+  };
   paint();
   if($("lkSave"))$("lkSave").onclick=()=>{if(!linkSelected())return toast("Select an expense");closeSheet();toast("Payback linked");render();setTimeout(nextLink,450);};
   if($("lkSplit"))$("lkSplit").onclick=()=>{
