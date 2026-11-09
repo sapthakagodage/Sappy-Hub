@@ -4255,12 +4255,12 @@ async function tripMediaImage(t,kind){
    const blob=await tripMediaAction("get",key);
    if(blob){
     const u=URL.createObjectURL(blob),img=await tsImage(u);
-    if(img){try{await img.decode();}catch(e){}URL.revokeObjectURL(u);return img;}
+    if(img){try{await img.decode();}catch(e){}(t._mediaUrls||(t._mediaUrls=[])).push(u);t[kind+"Source"]="Original photo";return img;}
     URL.revokeObjectURL(u);
    }
   }catch(e){console.warn("Could not load full-resolution photo",e);}
  }
- return tsImage(t[kind]);
+ t[kind+"Source"]="Compressed backup";return tsImage(t[kind]);
 }
 // Keep enough photo detail for 1080px-wide recap exports, without filling localStorage.
 // Legacy 720px / JPEG 70% uploads remain usable; re-upload originals to improve them.
@@ -4736,10 +4736,13 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
  tsText(ctx,t.endName||t.loc||"Destination",x+w*.57,y+h-22,w*.38,"800 21px Manrope,Arial","#edfbe2");
  ctx.restore();
 }
-function tsDraw(stage=4){
+function tsDraw(stage=4,exportScale=1){
  const c=$("tsCanvas"),t=tsCurrent;if(!c||!t)return;
  const ctx=c.getContext("2d"),sq=tsFormat==="square",post=tsFormat==="portrait",w=1080,h=sq?1080:post?1440:1920;
- if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;
+ const pixelW=Math.round(w*exportScale),pixelH=Math.round(h*exportScale);
+ if(c.width!==pixelW)c.width=pixelW;if(c.height!==pixelH)c.height=pixelH;
+ ctx.setTransform(exportScale,0,0,exportScale,0,0);
+ ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
  const wrap=c.parentElement;if(wrap){const aw=Math.max(1,wrap.clientWidth-4),ah=Math.max(1,wrap.clientHeight-4),scale=Math.min(aw/w,ah/h);c.style.width=Math.round(w*scale)+"px";c.style.height=Math.round(h*scale)+"px";}
  ctx.fillStyle="#08131b";ctx.fillRect(0,0,w,h);
  const hero=sq?432:post?610:875;
@@ -4836,7 +4839,7 @@ let tsLoadingMaps=false;
 async function tsPrepareMaps(t,id){
  if(!t)return;
  tsLoadingMaps=true;
- const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
+ const note=$("tsMapStatus");if(note)note.textContent="Loading labeled walking map…";
  const walking=t.type==="hike"||t.type==="walk";
  const [story,square,portrait]=await Promise.all([
   tsBuildTileMap(t,walking?528:960,walking?520:650).catch(()=>null),
@@ -4845,7 +4848,11 @@ async function tsPrepareMaps(t,id){
  ]);
  if(!tsCurrent||tsCurrent.id!==id)return;
  t._mapStory=story;t._mapSquare=square;t._mapPortrait=portrait;tsLoadingMaps=false;
- if(note)note.textContent=(story||square||portrait)?"Map ready · pins and route included in the image":"Map tiles unavailable · showing the route preview";
+ if(note){
+  const mapInfo=(story||square||portrait)?"Labeled map ready":"Map imagery unavailable · route preview";
+  const hero=t._hero,photoInfo=hero?(t.photoSource||"Saved photo")+" · "+hero.naturalWidth+"×"+hero.naturalHeight:"No cover photo";
+  note.textContent=mapInfo+" · "+photoInfo;
+ }
  tsDraw();
 }
 async function openTripStudio(id){
@@ -4853,11 +4860,11 @@ async function openTripStudio(id){
  $("tsMapToggle").hidden=!(t.routeShot||t.routeShotHQKey);$("tsMapToggle").textContent="Map: Satellite";
  $("tsStory").classList.add("on");$("tsPortrait").classList.remove("on");$("tsSquare").classList.remove("on");
  $("tripStudio").hidden=false;closeSheet();
- const [hero,route]=await Promise.all([tripMediaImage(t,"photo"),tripMediaImage(t,"routeShot")]);
+ const [hero,route]=await Promise.all([tripMediaImage(tsCurrent,"photo"),tripMediaImage(tsCurrent,"routeShot")]);
  if(!tsCurrent||tsCurrent.id!==id)return;tsCurrent._hero=hero;tsCurrent._route=route;tsDraw();
  await tsPrepareMaps(tsCurrent,id);
 }
-function tsClose(){tsStop();$("tripStudio").hidden=true;tsCurrent=null;}
+function tsClose(){tsStop();$("tripStudio").hidden=true;if(tsCurrent?._mediaUrls)tsCurrent._mediaUrls.forEach(u=>URL.revokeObjectURL(u));tsCurrent=null;}
 $("tsClose").onclick=tsClose;
 function tsSelectFormat(format){
   tsStop();tsFormat=format;
@@ -4875,7 +4882,9 @@ $("tsPlay").onclick=()=>{if(tsTimer){tsStop();tsDraw();return;}
 $("tsCanvas").onclick=()=>{if(tsTimer){tsStop();tsDraw();}};
 $("tsShare").onclick=async()=>{if(!tsCurrent)return;
  if(tsLoadingMaps){toast("Preparing the route map…");return;}
- tsStop();tsDraw(4);$("tsCanvas").toBlob(async blob=>{
+ tsStop();tsDraw(4,1.5);$("tsCanvas").toBlob(async blob=>{
+  // Restore the lightweight preview after producing the high-resolution PNG.
+  tsDraw(4);
  if(!blob)return toast("Could not export image");const f=new File([blob],"sappy-travel-"+(tsCurrent.date||"trip")+(tsFormat==="story"?"-story-9x16":tsFormat==="portrait"?"-post-3x4":"-post-1x1")+".png",{type:"image/png"});
  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:tsCurrent.name});return;}catch(e){if(e.name==="AbortError")return;}}
  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
