@@ -2082,7 +2082,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.87";
+const APP_VERSION = "7.3.88";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3181,15 +3181,22 @@ function personalExpenseAmountHtml(t, original){
 }
 function personalExpenseDetailHtml(t){
   if(!canSplitExpense(t))return '';
-  const equal=equalExpenseShare(t);if(!equal)return '';
-  const group=equal.group,amount=lkrOf(t),share=equal.amount;
-  const participants=group.friends.map(p=>'<div class="split-person"><span>'+esc(p.name)+'</span><b>'+rsAllocated(share)+'</b></div>').join("");
-  return '<section class="split-summary" aria-label="Equal expense breakdown">'+
-    '<div class="split-summary-title">Payment breakdown <span>Equal split · '+group.n+' people</span></div>'+
+  const applied=linkedPaybackDetails(t),equal=equalExpenseShare(t);
+  if(!applied.length)return '';
+  const amount=lkrOf(t),mine=myShare(t),group=equal?.group;
+  const names=new Map();
+  applied.forEach(p=>{
+    const key=p.name.trim().toLowerCase(),person=names.get(key)||{name:p.name,amount:0};
+    person.amount+=p.amount;names.set(key,person);
+  });
+  const rows=group?group.friends.map(p=>'<div class="split-person"><span>'+esc(p.name)+'</span><b>'+rsAllocated(equal.amount)+'</b></div>').join(""):
+    [...names.values()].map(p=>'<div class="split-person"><span>'+esc(p.name)+' paid back</span><b>'+rsAllocated(p.amount)+'</b></div>').join("");
+  return '<section class="split-summary" aria-label="Repayment breakdown">'+
+    '<div class="split-summary-title">Payment breakdown <span>'+(group?'Equal share · '+group.n+' people':'Actual paybacks')+'</span></div>'+
     '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rsAllocated(amount)+'</b></div>'+
-    '<div><small>Your expense</small><b class="split-accent">'+rsAllocated(share)+'</b></div></div>'+
-    '<div class="split-person-list">'+participants+
-    '<div class="split-person split-person-me"><span>You</span><b>'+rsAllocated(share)+'</b></div></div>'+
+    '<div><small>Your expense</small><b class="split-accent">'+rsAllocated(mine)+'</b></div></div>'+
+    '<div class="split-person-list">'+rows+
+    '<div class="split-person split-person-me"><span>You</span><b>'+rsAllocated(mine)+'</b></div></div>'+
     '</section>';
 }
 function txHtml(t){
@@ -5140,16 +5147,26 @@ function equalPaybackGroups(){
       const name=(p.merchant||"").trim()||"Friend";
       const generic=/^(paid back|credit|credited|deposit|transfer|funds received|unknown|other|cash|bank)$/i.test(name);
       const key=generic?p.id:name.toLocaleLowerCase();
-      if(!people.has(key))people.set(key,{name:generic?"Friend":name,id:p.id});
+      const person=people.get(key)||{name:generic?"Friend":name,id:p.id,received:0};
+      person.received+=lkrOf(p);
+      people.set(key,person);
     });
-    const friends=[...people.values()],n=friends.length+1,group={expenses,friends,n};
+    const friends=[...people.values()],n=friends.length+1;
+    // Two matching reimbursements usually indicate a three-person shared outing.
+    // Three or more separate people establish an equal group even when their
+    // transfers differ due to external net settlement.
+    // One payer, or two clearly unequal payers, remain actual deductions.
+    // This preserves family contributions such as 105000 - 50000 - 20000.
+    const equal=friends.length>=3||(friends.length===2&&
+      Math.abs(friends[0].received-friends[1].received)<=Math.max(1,Math.min(friends[0].received,friends[1].received)*.02));
+    const group={expenses,friends,n,equal};
     expenses.forEach(t=>groups[t.id]=group);
   });
   equalGroupCache=groups;equalGroupVer=dataVer;return groups;
 }
 function equalExpenseShare(t){
   const group=equalPaybackGroups()[t.id];
-  return group?{group,amount:lkrOf(t)/group.n}:null;
+  return group&&group.equal?{group,amount:lkrOf(t)/group.n}:null;
 }
 function stillOwed(t){
   // Used only as a safeguard when manually entering a receipt, NOT as a
@@ -5160,7 +5177,7 @@ function stillOwed(t){
 function myShare(t){
   if(!t||t.type!=="out")return 0;
   const equal=equalExpenseShare(t);
-  return equal?equal.amount:lkrOf(t);
+  return equal?equal.amount:Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
 }
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
@@ -5222,16 +5239,11 @@ function openLink(id){
     if($("lkSum"))$("lkSum").textContent=ids.length?ids.length+" expense"+(ids.length>1?"s":"")+" · "+rs(ids.reduce((a,k)=>a+lkrOf(S.tx[k]),0)):"Select an expense";
     if($("lkAddPerson"))$("lkAddPerson").hidden=!one;
     if($("lkContributors")){
-      const preview=ids.map(id=>{
-        const t=S.tx[id],g=equalPaybackGroups()[id];
-        const known=new Set((g?.friends||[]).map(p=>p.id));
-        // Count this payer only if this receipt was not already part of
-        // the selected expense's linked group.
-        const count=(g?.friends.length||0)+(known.has(p.id)?0:1)+1;
-        return '<div class="split-person"><span>'+esc(t.merchant)+' · '+count+' people</span><b>Your share '+rsAllocated(lkrOf(t)/count)+'</b></div>';
-      });
-      $("lkContributors").innerHTML=preview.length?'<div class="split-summary" style="margin-top:12px">'+
-        '<div class="split-summary-title">Equal shares after linking</div>'+preview.join("")+'</div>':'';
+      const allocations=paybackLinkPreview(p,ids);
+      $("lkContributors").innerHTML=allocations.length?'<div class="split-summary" style="margin-top:12px">'+
+        '<div class="split-summary-title">Link preview</div>'+
+        allocations.map(entry=>'<div class="split-person"><span>'+esc(S.tx[entry.id].merchant)+' · estimated repayment applied</span><b>'+rsAllocated(entry.allocated)+'</b></div>').join("")+
+        '<div class="split-summary-hint">The final expense shows equal shares for recognised groups, or actual deductions for unequal contributions.</div></div>':'';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
   };
