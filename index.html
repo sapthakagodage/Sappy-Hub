@@ -4492,7 +4492,8 @@ function openRecapForm(id=null,planId=null){
  };
  loadLeaflet().then(()=>{if(!$("rcMap"))return;m=L.map($("rcMap"),{zoomControl:false,attributionControl:false});
   const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"});
-  let fallback=false;satellite.on("tileerror",()=>{if(fallback||!m)return;fallback=true;tileLayer().addTo(m);if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent="Satellite imagery unavailable; showing road map.";});satellite.addTo(m);
+  let fallback=false;satellite.on("tileerror",()=>{if(fallback||!m)return;fallback=true;tileLayer().addTo(m);if($("rcWalkMapStatus"))$("rcWalkMapStatus").textContent="Satellite imagery unavailable; showing labeled road map.";});satellite.addTo(m);
+  L.tileLayer("https://a.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png",{maxZoom:19,opacity:1,attribution:"Labels © CARTO · © OpenStreetMap contributors"}).addTo(m);
   redraw();setTimeout(()=>{if(m&&$("rcMap"))m.invalidateSize();},350);}).catch(()=>{if($("rcMap"))$("rcMap").textContent="Map requires internet";});
  for(const which of ["from","to","home"]){
   const key=which==="from"?"rcFrom":which==="to"?"rcTo":"rcDriveHome";
