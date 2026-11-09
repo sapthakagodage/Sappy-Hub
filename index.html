@@ -2082,7 +2082,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.91";
+const APP_VERSION = "7.3.92";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4195,7 +4195,20 @@ async function showFromHome(t){
 function tripLoc(t){ return t.loc || t.country || ""; }
 function tripDriveValid(t){return !!(t&&t.drive&&Number.isFinite(+t.drive.km)&&Number.isFinite(+t.drive.min)&&t.driveHomeLat!=null&&t.driveHomeLng!=null&&t.startLat!=null&&t.startLng!=null);}
 function tripClock(sec){if(sec==null||!Number.isFinite(+sec))return "—";const v=Math.max(0,Math.round(+sec));return [Math.floor(v/3600),Math.floor(v%3600/60),v%60].map(x=>String(x).padStart(2,"0")).join(":");}
-function tripPace(t){if(t.avgPace){const value=String(t.avgPace).trim();return /\/\s*km\b/i.test(value)?value:value.replace(/\s*\/\s*$/,"")+" /km";}const mins=(t.dur??t.moving)/60,d=+t.dist;if(!(mins>0&&d>0))return "—";const sec=Math.round(mins*60/d);return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")+" /km";}
+function tripPace(t){
+ const value=String(t.avgPace||"").trim();
+ if(value){
+  // Accept Huawei 16'32", legacy 16:32 and either with /km. Display one style consistently.
+  const match=value.match(/^(\d+)\s*[:'′]\s*(\d{1,2})\s*(?:(?:"|″))?\s*(?:\/\s*km)?$/i);
+  if(match&&+match[2]<60)return Number(match[1])+"'"+match[2].padStart(2,"0")+'" /km';
+  return /\/\s*km\b/i.test(value)?value:value+" /km";
+ }
+ const mins=(t.dur??t.moving)/60,d=+t.dist;
+ if(!(mins>0&&d>0))return "—";
+ const sec=Math.round(mins*60/d);
+ return Math.floor(sec/60)+"'"+String(sec%60).padStart(2,"0")+'" /km';
+}
+function tripHeartRate(t){return t.avgHeartRate!=null&&Number.isFinite(+t.avgHeartRate)&&+t.avgHeartRate>0?Math.round(+t.avgHeartRate)+" bpm":"—";}
 function tripSpeed(t){if(t.avgSpeed!=null&&Number.isFinite(+t.avgSpeed))return fmt(+t.avgSpeed,2)+" km/h";const mins=(t.dur??t.moving)/60,d=+t.dist;return mins>0&&d>0?fmt(d*60/mins,2)+" km/h":"—";}
 
 function tripTile(t){
@@ -4309,6 +4322,7 @@ function openTrip(id){
     ((t.type==='hike'||t.type==='walk')?'<div><span>Walking distance</span><b class="num">'+(t.dist==null?'—':fmt(t.dist,1)+' km')+'</b></div>'+
     '<div><span>Walking time</span><b class="num">'+tripClock(t.dur??t.moving)+'</b></div>'+
     '<div><span>Avg pace</span><b class="num">'+esc(tripPace(t))+'</b></div>'+
+    '<div><span>Avg heart rate</span><b class="num">'+esc(tripHeartRate(t))+'</b></div>'+
     '<div><span>Avg speed</span><b class="num">'+esc(tripSpeed(t))+'</b></div>':'')+
     '<div><span>Drive · Home → Walk start</span><b class="num">'+(tripDriveValid(t)?esc((t.driveHomeName||"Home")+" → "+(t.startName||"Start")):"—")+'</b></div>'+
     '<div><span>Driving distance</span><b class="num" id="tFromKm">'+(tripDriveValid(t)?fmt(t.drive.km,1)+' km':'—')+'</b></div>'+
@@ -4413,8 +4427,9 @@ function openRecapForm(id=null,planId=null){
  '<label><span>Hours</span><input class="inp" id="rcHours" type="number" inputmode="numeric" min="0" max="999" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)/3600):"")+'" placeholder="02"></label>'+
  '<label><span>Minutes</span><input class="inp" id="rcMins" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor(((t.dur??t.moving)%3600)/60):"")+'" placeholder="35"></label>'+
  '<label><span>Seconds</span><input class="inp" id="rcSecs" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)%60):"")+'" placeholder="20"></label></div></div>'+
- '<label class="fl2 rc-metric-tile"><span>Avg pace · min/km</span><input class="inp" id="rcPace" inputmode="text" value="'+esc(t.avgPace||"")+'" placeholder="13:12 /km"></label>'+
- '<label class="fl2 rc-metric-tile"><span>Avg speed · km/h</span><input class="inp" id="rcSpeed" type="number" min="0" step=".01" value="'+esc(t.avgSpeed??"")+'" placeholder="3.63"></label>'+
+ '<label class="fl2 rc-metric-tile"><span>Avg pace · min/km</span><input class="inp" id="rcPace" inputmode="text" value="'+esc(t.avgPace?tripPace(t):"")+'" placeholder="16\'32\" /km"></label>'+
+ '<label class="fl2 rc-metric-tile"><span>Avg speed · km/h</span><input class="inp" id="rcSpeed" type="number" min="0" step=".01" value="'+esc(t.avgSpeed??"")+'" placeholder="3.33"></label>'+ 
+ '<label class="fl2 rc-metric-tile"><span>Avg heart rate · bpm</span><input class="inp" id="rcHeartRate" type="number" inputmode="numeric" min="0" max="250" step="1" value="'+esc(t.avgHeartRate??"")+'" placeholder="145"></label>'+
  '<p class="rc-workout-help">Calculated automatically from walking distance and time. You can edit the values.</p>'+
  '<label class="fl2 rc-metric-tile"><span>Steps</span><input class="inp" type="number" min="0" step="1" id="rcSteps" value="'+esc(v("steps"))+'" placeholder="12450"></label>'+
  '<label class="fl2 rc-metric-tile"><span>Calories (kcal)</span><input class="inp" type="number" min="0" step="1" id="rcCalories" value="'+esc(v("calories"))+'" placeholder="580"></label></div>'+
@@ -4519,7 +4534,7 @@ function openRecapForm(id=null,planId=null){
  const readWalkSeconds=()=>{const h=Number($("rcHours").value||0),m=Number($("rcMins").value||0),sec=Number($("rcSecs").value||0);return h*3600+m*60+sec;};
  const recomputeWorkout=()=>{const d=Number($("rcDist").value),min=readWalkSeconds()/60;
   if(!(d>0&&min>0))return;
-  const seconds=Math.round(min*60/d),pace=Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0")+" /km";
+  const seconds=Math.round(min*60/d),pace=Math.floor(seconds/60)+"'"+String(seconds%60).padStart(2,"0")+'" /km';
   if(!$("rcPace").dataset.custom)$("rcPace").value=pace;
   if(!$("rcSpeed").dataset.custom)$("rcSpeed").value=(d*60/min).toFixed(2);
  };
@@ -4530,11 +4545,14 @@ function openRecapForm(id=null,planId=null){
  $("rcSave").onclick=async()=>{
   const name=$("rcName").value.trim();if(!name)return toast("Add a trip name");
   const num=k=>$(k).value===""?null:Number($(k).value);
-  for(const key of ["rcDist","rcHours","rcMins","rcSecs","rcSteps","rcCalories","rcSpeed"]){
+  for(const key of ["rcDist","rcHours","rcMins","rcSecs","rcSteps","rcCalories","rcSpeed","rcHeartRate"]){
    const value=num(key);if(value!=null&&(!Number.isFinite(value)||value<0))return toast("Check the workout numbers");
   }
   if(!["rcHours","rcMins","rcSecs"].every(k=>$(k).value===""||Number.isInteger(Number($(k).value))))return toast("Use whole hours, minutes and seconds");
   if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59||Number($("rcHours").value)>999)return toast("Use valid HH:MM:SS values");
+  if(num("rcHeartRate")!=null&&(!Number.isInteger(num("rcHeartRate"))||num("rcHeartRate")>250))return toast("Check average heart rate (bpm)");
+  const paceValue=$("rcPace").value.trim();
+  if(paceValue&&!/^(\d+)\s*[:'′]\s*(\d{1,2})\s*(?:"|″)?\s*(?:\/\s*km)?$/i.test(paceValue))return toast("Use pace like 16'32\" /km");
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
    const priorKeys={photo:t.photoHQKey||null,routeShot:t.routeShotHQKey||null};
@@ -4563,7 +4581,8 @@ function openRecapForm(id=null,planId=null){
    Object.assign(t,{name,date,year:date?+date.slice(0,4):new Date().getFullYear(),
     dist:walk?num("rcDist"):null,dur:walk&&hasTime?Math.round(totalSeconds):null,
     moving:walk&&hasTime?Math.round(totalSeconds):null,steps:walk?num("rcSteps"):null,calories:walk?num("rcCalories"):null,
-    avgPace:walk?($("rcPace").value.trim()||null):null,avgSpeed:walk?num("rcSpeed"):null,
+    avgPace:walk?(paceValue?tripPace({avgPace:paceValue}):null):null,avgSpeed:walk?num("rcSpeed"):null,
+    avgHeartRate:walk?num("rcHeartRate"):null,
     startName:$("rcFrom").value.trim(),endName:to,startLat:coords.from?.[0]??null,startLng:coords.from?.[1]??null,
     endLat:coords.to?.[0]??null,endLng:coords.to?.[1]??null,
     drive:road,drivePath:roadPath,walkRoadPath:walkPath,driveFrom:homeCoord?homeCoord.join(","):null,
