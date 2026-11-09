@@ -2090,7 +2090,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.95";
+const APP_VERSION = "7.3.96";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4708,18 +4708,42 @@ function tsMapNameLabels(ctx,t,pts,toXY,w,h){
  insert(t.startName||"Walk start",pts[0]);
  if(t._walkLocality)insert(t._walkLocality.name,t._walkLocality.p);
  insert(t.endName||t.loc||"Walk end",pts[pts.length-1]);
- const boxes=[];ctx.save();ctx.font="700 16px Arial";ctx.textBaseline="middle";
+ const boxes=[];ctx.save();ctx.textBaseline="middle";
  for(const n of names){
-  const q=toXY(n.p),name=n.name.length>22?n.name.slice(0,21)+"…":n.name;
-  const bw=Math.min(w-16,Math.ceil(ctx.measureText(name).width)+22),bh=30;
+  const q=toXY(n.p),bh=33,pad=11,maxTextWidth=Math.max(75,w-38);
+  // Use the complete place name, with a smaller font or two lines when needed.
+  let fontSize=17;
+  while(fontSize>12){ctx.font="700 "+fontSize+"px Arial";if(ctx.measureText(n.name).width<=maxTextWidth)break;fontSize--;}
+  ctx.font="700 "+fontSize+"px Arial";
+  let lines=[n.name];
+  if(ctx.measureText(n.name).width>maxTextWidth){
+   const words=n.name.split(/\s+/),out=[];let current="";
+   for(const word of words){
+    const next=current?current+" "+word:word;
+    if(current&&ctx.measureText(next).width>maxTextWidth){out.push(current);current=word;}else current=next;
+   }
+   if(current)out.push(current);
+   lines=out;
+  }
+  // On compact maps don't overlay a giant name on top of the route.
+  if(lines.length>2){lines=lines.slice(0,2);const last=lines[1];while(lines[1].length>1&&ctx.measureText(lines[1]+"…").width>maxTextWidth)lines[1]=lines[1].slice(0,-1);lines[1]+="…";}
+  const height=lines.length>1?47:bh;
+  const textWidth=Math.max(...lines.map(line=>Math.min(maxTextWidth,ctx.measureText(line).width)));
+  const bw=Math.min(w-16,Math.ceil(textWidth)+pad*2);
   const x=Math.max(8,Math.min(w-bw-8,q[0]-bw/2));
-  let y=Math.max(55,Math.min(h-85,q[1]-43));
-  if(boxes.some(b=>x<b.x+b.w+7&&x+bw>b.x-7&&y<b.y+b.h+7&&y+bh>b.y-7)){y=Math.min(h-85,y+38);}
-  if(boxes.some(b=>x<b.x+b.w+5&&x+bw>b.x-5&&y<b.y+b.h+5&&y+bh>b.y-5))continue;
-  boxes.push({x,y,w:bw,h:bh});
+  let y=Math.max(55,Math.min(h-65-height,q[1]-height-11));
+  if(boxes.some(b=>x<b.x+b.w+7&&x+bw>b.x-7&&y<b.y+b.h+7&&y+height>b.y-7)){
+   const down=y+height+8,up=y-height-8;
+   if(down+height<=h-65)y=down;else if(up>=55)y=up;
+  }
+  // Keep the main endpoint labels above optional middle labels if crowded.
+  if(boxes.some(b=>x<b.x+b.w+4&&x+bw>b.x-4&&y<b.y+b.h+4&&y+height>b.y-4))continue;
+  boxes.push({x,y,w:bw,h:height});
   ctx.fillStyle="rgba(8,29,38,.9)";ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1;
-  ctx.beginPath();ctx.roundRect(x,y,bw,bh,9);ctx.fill();ctx.stroke();
-  ctx.fillStyle="#fff";ctx.fillText(name,x+11,y+bh/2,bw-18);
+  ctx.beginPath();ctx.roundRect(x,y,bw,height,9);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#fff";
+  const lineH=fontSize+3,startY=y+(height-(lines.length-1)*lineH)/2;
+  lines.forEach((line,i)=>ctx.fillText(line,x+pad,startY+i*lineH,bw-pad*2));
  }
  ctx.restore();
 }
@@ -4736,19 +4760,21 @@ async function tsFindWalkLocality(t){
 }
 async function tsBuildTileMap(t,w,h){
  const pts=tsRoutePoints(t);if(!pts.length)return null;
- const all=pts.slice();
- const lats=all.map(p=>p[0]),lons=all.map(p=>p[1]);
- let z=11;
- if(all.length>1){
-  for(z=14;z>=2;z--){
-   const q=all.map(p=>tsMercator(p[0],p[1],z));
-   const xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);
-   if(Math.max(...xs)-Math.min(...xs)<w*.68&&Math.max(...ys)-Math.min(...ys)<h*.60)break;
-  }
+ // Map framing is based on this format's *actual* canvas dimensions.
+ // Reserve edge space for place names and top/bottom map captions.
+ const all=pts.slice(),xPad=Math.max(80,Math.min(145,w*.25)),topPad=95,bottomPad=105;
+ const availableW=Math.max(80,w-2*xPad),availableH=Math.max(80,h-topPad-bottomPad);
+ let z=2;
+ for(let trial=16;trial>=2;trial--){
+  const q=all.map(p=>tsMercator(p[0],p[1],trial));
+  const xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);
+  const rangeX=Math.max(...xs)-Math.min(...xs),rangeY=Math.max(...ys)-Math.min(...ys);
+  if(rangeX<=availableW&&rangeY<=availableH){z=trial;break;}
  }
- z=Math.max(2,Math.min(14,z));
  const q=all.map(p=>tsMercator(p[0],p[1],z)),xs=q.map(p=>p[0]),ys=q.map(p=>p[1]);
- const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+ const cx=(Math.min(...xs)+Math.max(...xs))/2;
+ // Offset the route slightly toward the map's usable content region.
+ const cy=(Math.min(...ys)+Math.max(...ys))/2+(bottomPad-topPad)/2;
  const left=cx-w/2,top=cy-h/2,firstX=Math.floor(left/256),lastX=Math.floor((left+w)/256);
  const firstY=Math.floor(top/256),lastY=Math.floor((top+h)/256),maxIndex=Math.pow(2,z);
  const c=document.createElement("canvas");c.width=w;c.height=h;const ctx=c.getContext("2d");
