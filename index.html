@@ -1870,20 +1870,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 }
 
 /* Optional, compact shared-expense action for Cash Wallet transactions. */
-.cash-expense-row{display:flex;align-items:center;min-width:0}
-.cash-expense-row>.tx{flex:1;min-width:0;width:auto;padding-right:5px}
-.cash-split-mini{width:38px;height:38px;min-width:38px;flex:none;display:inline-flex;align-items:center;justify-content:center;
-  gap:4px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--ink);
-  padding:0;cursor:pointer;touch-action:manipulation}
-.cash-split-mini:active{background:var(--press)}
-.cash-split-mini svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.cash-expense-row>.cash-split-mini{margin-right:12px}
-.cash-split-mini.is-shared{background:var(--lime);border-color:var(--lime);color:var(--on-lime)}
-.cash-split-mini:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
-.cash-source-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.cash-source-line .from{flex:none}
-.cash-source-line .cash-split-mini{width:auto;min-width:38px;padding:0 9px;font-size:12px;font-weight:750}
-.cash-source-line .cash-split-mini svg{width:16px;height:16px}
+
 </style>
 </head>
 <body class="in-hub">
@@ -2095,7 +2082,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.84";
+const APP_VERSION = "7.3.85";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3062,16 +3049,13 @@ function cashBalance(){
 }
 function cashMovementHtml(t){
   const withdrawal=isCashWithdrawal(t),credit=withdrawal||t.type==="in";
-  const category=withdrawal?"Cash":pocketCat(t),c=CATS[category]||CATS.Other;
-  const amount=(credit?"+":"−")+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  const split=canSplitExpense(t),shared=split&&(Number(t.split)>1||expenseContributors(t.id).length>0);
-  return (split?'<div class="cash-expense-row">':'')+
-    '<button class="tx" data-id="'+esc(t.id)+'">'+
-    '<span class="ic" style="background:'+c.c+'">'+icon(category,20)+'</span>'+
+  const cat=withdrawal?"Cash":pocketCat(t),col=CATS[cat]||CATS.Other;
+  const value=(credit?"+":"−")+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
+  return '<button class="tx" data-id="'+esc(t.id)+'">'+
+    '<span class="ic" style="background:'+col.c+'">'+icon(cat,20)+'</span>'+
     '<span class="mid"><div class="m">'+esc(withdrawal?"Cash withdrawal":t.merchant)+'</div>'+
-    '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(category)+" · Cash")+'</div></span>'+
-    '<span class="rt">'+personalExpenseAmountHtml(t,amount)+'</span></button>'+
-    (split?'<button type="button" class="cash-split-mini'+(shared?' is-shared':'')+'" data-split="'+esc(t.id)+'" title="Split this cash expense" aria-label="Split '+esc(t.merchant)+' with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg></button></div>':'');
+    '<div class="c">'+esc(withdrawal?"Added to wallet · "+(t.bank||"Bank"):catLabel(cat)+" · Cash")+'</div></span>'+
+    '<span class="rt">'+personalExpenseAmountHtml(t,value)+'</span></button>';
 }
 function openCashWallet(){
   const c=cashBalance();
@@ -3092,7 +3076,6 @@ function openCashWallet(){
     '<div id="cashMoves">'+(timeline||'<div class="list"><div class="empty">No cash movements recorded yet.</div></div>')+'</div>');
   $("cashAdd").onclick=()=>openAdd(true);
   $("cashMoves").querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
-  $("cashMoves").querySelectorAll("[data-split]").forEach(b=>b.onclick=()=>openSplitSetup(b.dataset.split));
 }
 
 function trackedBalance(key){
@@ -3187,30 +3170,28 @@ function timeAgo(ts){ const d=Math.floor((Date.now()-ts)/864e5); return d<=0?"To
 /* ---------- list ---------- */
 function dayLabel(ts){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(ts);d.setHours(0,0,0,0); const n=(t-d)/864e5;
   return n===0?"Today":n===1?"Yesterday":new Date(ts).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"}); }
+function rsAllocated(v){return "Rs "+fmt(Math.max(0,v),Math.abs(v-Math.round(v))>=.005?2:0);}
 function personalExpenseAmountHtml(t, original){
   if(!canSplitExpense(t))return '<div class="a num'+(t.type==="in"?' in':'')+'">'+original+'</div>';
   const paid=lkrOf(t),effective=myShare(t);
   if(!(effective<paid-0.005))return '<div class="a num">'+original+'</div>';
   return '<div class="old-expense num">'+original+'</div>'+
-    '<div class="a num effective-expense">−'+rs(effective)+'</div>'+
+    '<div class="a num effective-expense">−'+rsAllocated(effective)+'</div>'+
     '<div class="personal-expense-note">Your expense</div>';
 }
 function personalExpenseDetailHtml(t){
   if(!canSplitExpense(t))return '';
-  const amount=lkrOf(t),net=myShare(t),group=linkedSplitGroups()[t.id],equal=autoEqualPlan(t),manual=!group&&splitPlan(t);
-  if(!group&&!manual)return '';
-  const people=group?group.people:[];
-  const creditors=people.map(p=>{
-    const share=equal?amount/(people.length+1):group.total>0?p.amount*amount/group.total:0;
-    return '<div class="split-person"><span>'+esc(p.name)+'</span><b>'+rs(share)+'</b></div>';
-  }).join("");
-  return '<section class="split-summary" aria-label="Expense split details">'+
-    '<div class="split-summary-title">Payment breakdown <span>'+(equal?'Equal split · '+(people.length+1)+' people':group?'Linked repayments':'Manual split')+'</span></div>'+
-    '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rs(amount)+'</b></div>'+
-    '<div><small>Your expense</small><b class="split-accent">'+rs(net)+'</b></div></div>'+
-    (creditors?'<div class="split-person-list">'+creditors+'</div>':'')+
-    '<div class="split-person split-person-me"><span>Your portion · '+esc(catLabel(pocketCat(t)))+'</span><b>'+rs(net)+'</b></div>'+
-    (group?'<div class="split-summary-hint">'+(equal?'Equal amounts detected in linked repayments.':'Unequal repayments reduce your expense by the amount actually received.')+'</div>':'')+
+  const credited=linkedPaybackDetails(t);if(!credited.length)return '';
+  const people=new Map();
+  credited.forEach(p=>{const key=p.name.trim().toLowerCase(),row=people.get(key)||{name:p.name,amount:0};
+    row.amount+=p.amount;people.set(key,row);
+  });
+  return '<section class="split-summary" aria-label="Repayment breakdown">'+
+    '<div class="split-summary-title">Payment breakdown <span>'+esc(catLabel(pocketCat(t)))+'</span></div>'+
+    '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rsAllocated(lkrOf(t))+'</b></div>'+
+    '<div><small>Your expense</small><b class="split-accent">'+rsAllocated(myShare(t))+'</b></div></div>'+
+    '<div class="split-person-list">'+[...people.values()].map(p=>'<div class="split-person"><span>'+esc(p.name)+' paid back</span><b>'+rsAllocated(p.amount)+'</b></div>').join("")+'</div>'+
+    '<div class="split-summary-hint">Each repayment is allocated to the expenses it is linked to.</div>'+
     '</section>';
 }
 function txHtml(t){
@@ -3433,9 +3414,7 @@ function openTx(id,edit){
   if(!banks.includes(t.bank)) banks.unshift(t.bank);
   const accName=t.bank==="Cash"?"Cash":(t.bank&&t.bank!=="Bank"&&t.bank!=="Manual")?t.bank+(t.acct?" ••"+t.acct:""):(t.bank==="Manual"?"Added by hand":"Unknown account");
   openSheet('<label class="field tx-name-first"><span>Transaction name</span><input id="tname" type="text" value="'+esc(t.merchant)+'" autocomplete="off" aria-label="Edit transaction name"></label>'+
-    (t.bank==="Cash"&&canSplitExpense(t)?'<div class="cash-source-line">':'')+
     '<div class="from"><span>'+(t.type==="in"?"Received in":"Paid from")+'</span><b>'+esc(accName)+'</b></div>'+
-    (t.bank==="Cash"&&canSplitExpense(t)?'<button type="button" class="cash-split-mini'+(Number(t.split)>1||expenseContributors(t.id).length?' is-shared':'')+'" id="txSplit" aria-label="Split cash expense with friends" title="Split with friends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M2 20v-2a6 6 0 0 1 12 0v2M17 10a3 3 0 1 0-1-5.8M17 14a5 5 0 0 1 5 5v1"/></svg>Split</button></div>':'')+
     (t.bank==="Cash"
       ?'<label class="field"><span>Amount (Rs) · edit</span><div class="cash-edit-row"><span class="cash-edit-prefix">LKR</span><input id="tamount" type="text" inputmode="decimal" autocomplete="off" class="num" value="'+esc(fmt(t.amount,Number(t.amount)%1?2:0))+'" aria-label="Cash transaction amount"></div></label>'+
        '<div class="note">'+new Date(t.ts).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'
@@ -3444,7 +3423,6 @@ function openTx(id,edit){
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     personalExpenseDetailHtml(t)+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
-    (canSplitExpense(t)&&t.bank!=="Cash"?'<button type="button" class="btn soft full" id="txSplit" style="margin:10px 0">Split with friends (optional)</button>':'')+
     catPicker(cats,cat)+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
@@ -3455,7 +3433,6 @@ function openTx(id,edit){
   const updateGym=wireGymPicker(t,()=>cat);
   wirePicker(c=>{cat=c;updateGym();});
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
-  if($("txSplit")) $("txSplit").onclick=()=>openSplitSetup(t.id);
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
@@ -5110,72 +5087,39 @@ function renderCal(){
 /* =============== shared payments: your share, linked paybacks, split =============== */
 let backCache=null, backVer=-1, dataVer=0;
 function linksOf(t){ return (t.links||(t.linkTo?[t.linkTo]:[])).filter(id=>live(S.tx[id])); }
+let backDetails={};
 function backMap(){
-  if(backVer===dataVer && backCache)return backCache;
-  const credited={}, refunds=Object.values(S.tx).filter(t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&linksOf(t).length).sort((a,b)=>a.ts-b.ts);
-  // Count the ACTUAL linked reimbursement, rather than assuming equal shares.
-  // A reimbursement can cover several bills; distribute it by their remaining
-  // unreimbursed amounts and never reduce spending below zero.
-  refunds.forEach(p=>{
-    const ids=[...new Set(linksOf(p))].filter(id=>S.tx[id]&&S.tx[id].type==="out"&&!NOT_SPENDING.has(S.tx[id].cat));
-    const left=ids.map(id=>Math.max(0,lkrOf(S.tx[id])-(credited[id]||0)));
-    const total=left.reduce((x,v)=>x+v,0);
-    const amount=Math.min(Math.max(0,lkrOf(p)),total);
-    if(!total||!amount)return;
-    ids.forEach((id,i)=>{credited[id]=(credited[id]||0)+amount*left[i]/total;});
-  });
-  backCache=credited;backVer=dataVer;return credited;
-}
-function friendsOn(id){const f=new Set();Object.values(S.tx).forEach(p=>{
-  if(live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(id))f.add((p.merchant||p.id).toLowerCase());
-});return f.size;}
-// Connected repayment groups: a receipt may be allocated to several bills.
-let sharedGroupVer=-1,sharedGroupCache={};
-function linkedSplitGroups(){
-  if(sharedGroupVer===dataVer)return sharedGroupCache;
-  const payments=Object.values(S.tx).filter(p=>live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).length);
-  const byBill={};
-  payments.forEach(p=>linksOf(p).filter(id=>canSplitExpense(S.tx[id])).forEach(id=>(byBill[id]||(byBill[id]=[])).push(p)));
-  const result={},visited=new Set();
-  Object.keys(byBill).forEach(seed=>{
-    if(visited.has(seed))return;
-    const bills=new Set([seed]),receipts=new Map(),queue=[seed];
-    while(queue.length){const id=queue.pop();if(visited.has(id))continue;visited.add(id);
-      (byBill[id]||[]).forEach(p=>{receipts.set(p.id,p);linksOf(p).filter(k=>canSplitExpense(S.tx[k])).forEach(k=>{if(!bills.has(k)){bills.add(k);queue.push(k);}});});
-    }
-    const expenses=[...bills].map(id=>S.tx[id]).filter(canSplitExpense),refunds=[...receipts.values()];
-    const total=expenses.reduce((v,t)=>v+lkrOf(t),0),byName=new Map();
-    refunds.forEach(p=>{const name=(p.merchant||"").trim()||("Repayment "+p.id),key=name.toLowerCase();
-      const old=byName.get(key)||{name,amount:0};old.amount+=lkrOf(p);byName.set(key,old);
+  if(backVer===dataVer&&backCache)return backCache;
+  const credited={},details={};
+  const receipts=Object.values(S.tx).filter(p=>live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).length).sort((a,b)=>a.ts-b.ts);
+  receipts.forEach(p=>{
+    const ids=[...new Set(linksOf(p))].filter(id=>canSplitExpense(S.tx[id]));
+    const remaining=ids.map(id=>Math.max(0,lkrOf(S.tx[id])-(credited[id]||0)));
+    const total=remaining.reduce((s,v)=>s+v,0),value=Math.min(Math.max(0,lkrOf(p)),total);
+    if(!total||!value)return;
+    ids.forEach((id,i)=>{
+      const paid=value*remaining[i]/total;
+      credited[id]=(credited[id]||0)+paid;
+      (details[id]||(details[id]=[])).push({id:p.id,name:p.merchant||"Paid back",amount:paid});
     });
-    const people=[...byName.values()],n=people.length+1,expected=total/n;
-    const exact=people.length>0&&expected>0&&people.every(v=>Math.abs(v.amount-expected)<=Math.max(2,expected*.005));
-    // Two matching repayments can identify a three-way split even before
-    // every bill in that shared outing has been selected.
-    const interim=expenses.length===1&&people.length>=2&&people.every(v=>v.amount>=expected-2)&&people.every(v=>Math.abs(v.amount-people[0].amount)<=Math.max(2,people[0].amount*.005));
-    const group={expenses,refunds,people,total,n,autoEqual:exact||interim};
-    expenses.forEach(t=>result[t.id]=group);
   });
-  sharedGroupCache=result;sharedGroupVer=dataVer;return result;
+  backDetails=details;backCache=credited;backVer=dataVer;return credited;
 }
-function autoEqualPlan(t){const g=linkedSplitGroups()[t.id];return g&&g.autoEqual?{group:g,own:lkrOf(t)/g.n,expected:lkrOf(t)*(g.n-1)/g.n}:null;}
-function splitPlan(t){
-  if(!canSplitExpense(t))return null;
-  const n=Number(t.split),amount=lkrOf(t);
-  if(!Number.isInteger(n)||n<2||n>100||!(amount>0))return null;
-  const raw=Number(t.splitBase),base=Number.isFinite(raw)&&raw>0?Math.min(amount,raw):amount;
-  return {people:n,base,own:amount-base+base/n,expected:base*(n-1)/n};
+function linkedPaybackDetails(t){backMap();return backDetails[t.id]||[];}
+function paybackLinkPreview(p,ids){
+  backMap();
+  const selected=[...new Set(ids)].filter(id=>canSplitExpense(S.tx[id]));
+  const previous=selected.map(id=>(backDetails[id]||[]).filter(v=>v.id===p.id).reduce((s,v)=>s+v.amount,0));
+  const remaining=selected.map((id,i)=>Math.max(0,lkrOf(S.tx[id])-(backCache[id]||0)+previous[i]));
+  const total=remaining.reduce((s,v)=>s+v,0),amount=Math.min(Math.max(0,lkrOf(p)),total);
+  return selected.map((id,i)=>({id,allocated:total?amount*remaining[i]/total:0}));
 }
 function stillOwed(t){
-  const inferred=autoEqualPlan(t),paid=backMap()[t.id]||0,group=linkedSplitGroups()[t.id];
-  const manual=!group&&splitPlan(t);
-  return Math.max(0,(inferred?inferred.expected:manual?manual.expected:lkrOf(t))-paid);
+  return !t||t.type!=="out"?0:Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
 }
 function myShare(t){
-  if(!t||t.type!=="out")return 0;
-  const auto=autoEqualPlan(t);if(auto)return auto.own;
-  if(linkedSplitGroups()[t.id])return Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
-  const manual=splitPlan(t);return manual?manual.own:lkrOf(t);
+  // Only the true amount of linked and received money reduces spending.
+  return !t||t.type!=="out"?0:Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
 }
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
@@ -5194,65 +5138,6 @@ function expenseContributors(expenseId){
 }
 // Split preferences are planning information only. Actual spending is reduced
 // by real, linked Paid back transactions, never by an unreceived promise.
-function openSplitSetup(expenseId){
-  const bill=S.tx[expenseId];
-  if(!canSplitExpense(bill))return;
-  let mode=Number(bill.split)>1?"equal":"custom";
-  let count=Math.max(2,Math.min(100,Number(bill.split)||2));
-  const amount=lkrOf(bill);
-  const originalShared=Number(bill.splitBase);
-  const sharedAmount=Number.isFinite(originalShared)&&originalShared>0&&originalShared<=amount?originalShared:amount;
-  const contributors=expenseContributors(expenseId);
-  const paid=backMap()[expenseId]||0;
-  openSheet('<h2>Split the expense</h2>'+
-    '<p class="note">'+esc(bill.merchant)+' · '+rs(amount)+'. Choose how this expense is shared. You can link as many people as needed.</p>'+
-    '<div class="seg" id="splitMode"><button data-m="equal" class="'+(mode==="equal"?'on':'')+'">Equal split</button><button data-m="custom" class="'+(mode==="custom"?'on':'')+'">Custom amounts</button></div>'+
-    '<div id="splitEqual" class="field" style="margin-top:14px">'+
-      '<label class="fl2"><span>Amount to share (Rs)</span><input id="splitBase" class="inp num" type="text" inputmode="decimal" value="'+fmt(sharedAmount,Number(sharedAmount)%1?2:0)+'"></label>'+
-      '<p class="note" style="margin:4px 0 10px">The rest stays entirely yours. The original payment is not changed.</p>'+
-      '<label class="fl2"><span>People sharing this amount (including you)</span><input id="splitCount" class="inp num" type="number" inputmode="numeric" min="2" max="100" step="1" value="'+count+'"></label></div>'+
-    '<div id="splitPreview" style="margin-top:12px"></div>'+
-    '<div class="fromhome" style="margin-top:12px"><span>Already received from others</span><b>'+rs(paid)+'</b></div>'+
-    (contributors.length?contributors.map(p=>'<div class="fromhome"><span>'+esc(p.merchant)+'</span><b>'+rs(lkrOf(p))+'</b></div>').join(""):'')+
-    '<p class="note">An equal split counts only your share as spending immediately. Payments back settle the balance owed and update the receiving wallet; they do not reduce your share twice. Custom contributions continue to use actual linked repayments.</p>'+
-    '<button class="btn full" id="splitSave">Save split</button>'+
-    '<button class="link" id="splitCancel" style="display:block;margin:12px auto 0">Cancel</button>');
-  const paint=()=>{
-    $("splitEqual").hidden=mode!=="equal";
-    $("splitMode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
-    const raw=Number($("splitCount").value);
-    count=Number.isInteger(raw)&&raw>=2&&raw<=100?raw:count;
-    const base=Number(String($("splitBase").value).replace(/,/g,""));
-    const valid=base>0&&base<=amount&&Number.isFinite(base);
-    $("splitPreview").innerHTML=mode==="equal"?
-      (valid?'<div class="fromhome"><span>Shared portion</span><b>'+rs(base)+'</b></div>'+
-      '<div class="fromhome"><span>Each person’s share</span><b>'+rs(base/count)+'</b></div>'+
-      '<div class="fromhome"><span>Expected from your friends</span><b>'+rs(base*(count-1)/count)+'</b></div>'+
-      '<div class="fromhome"><span>Your final share (including any unshared amount)</span><b>'+rs(amount-base+base/count)+'</b></div>'+
-      '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,base*(count-1)/count-paid))+'</b></div>':
-      '<p class="note">Enter an amount greater than zero and no more than '+rs(amount)+'.</p>'):
-      '<div class="fromhome"><span>Your current expense</span><b>'+rs(myShare(bill))+'</b></div>'+
-      '<p class="note">Everyone can contribute a different amount. Add each payback when received.</p>';
-  };
-  $("splitMode").querySelectorAll("button").forEach(b=>b.onclick=()=>{mode=b.dataset.m;paint();});
-  $("splitCount").oninput=paint;
-  $("splitBase").oninput=paint;
-  $("splitCancel").onclick=closeSheet;
-  $("splitSave").onclick=()=>{
-    const o=Object.assign({},bill);
-    if(mode==="equal"){
-      const n=Number($("splitCount").value);
-      if(!Number.isInteger(n)||n<2||n>100)return toast("Enter 2 to 100 people");
-      const base=Number(String($("splitBase").value).replace(/,/g,""));
-      if(!Number.isFinite(base)||base<=0||base>amount)return toast("Enter a valid amount to share");
-      o.split=n;
-      o.splitBase=Math.round(base*100)/100;
-    }else{delete o.split;delete o.splitBase;}
-    put("tx",o);
-    closeSheet();toast(mode==="equal"?"Equal split saved":"Custom contributions selected");render();
-  };
-  paint();
-}
 function openAddContributor(expenseId){
   const bill=S.tx[expenseId];if(!live(bill)||bill.type!=="out"||NOT_SPENDING.has(bill.cat))return;
   // Add a repayment only up to the unsettled amount owed by others.
@@ -5287,28 +5172,23 @@ function openLink(id){
   const sel=new Set(cur);
   const P=lkrOf(p);
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
-  openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. Select one or more cash or card expenses. Equal group repayments are recognised automatically; unequal amounts reduce spending by what was received.</p>'+
+  openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. Select one or more cash or card expenses. Actual repayments are allocated proportionally across their remaining amounts.</p>'+
     (sug.length?'<label class="fl2" style="margin-top:12px"><span>Find an expense (including newly added cash payments)</span><input class="inp" id="lkSearch" type="search" placeholder="Search name, amount or date"></label><div class="list" style="margin-top:12px;max-height:38vh;overflow-y:auto" id="lkList">'+sug.map(row).join("")+'</div><p class="note" id="lkSearchEmpty" hidden>No matching expenses. Try another name or amount.</p><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
       :'<p class="note">No recent expenses found to link. This payment remains unlinked.</p>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
-    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button><button class="link" id="lkSplit" style="display:block;margin:12px auto 0">Optional manual split settings</button>':'')+
+    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button>':'')+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{
     document.querySelectorAll("#lkList .lrow").forEach(b=>{const on=sel.has(b.dataset.id);b.classList.toggle("sel",on);b.querySelector(".tick").textContent=on?"✓":"";});
     const ids=[...sel],one=ids.length===1?S.tx[ids[0]]:null;
     if($("lkSum"))$("lkSum").textContent=ids.length?ids.length+" expense"+(ids.length>1?"s":"")+" · "+rs(ids.reduce((a,k)=>a+lkrOf(S.tx[k]),0)):"Select an expense";
     if($("lkAddPerson"))$("lkAddPerson").hidden=!one;
-    if($("lkSplit"))$("lkSplit").hidden=!one||!canSplitExpense(one);
     if($("lkContributors")){
-      if(!one){$("lkContributors").innerHTML="";return;}
-      const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
-      const paid=others.reduce((a,t)=>a+lkrOf(t),0)+(linkedHere?0:P);
-      const plan=autoEqualPlan(one),effective=plan?plan.own:Math.max(0,lkrOf(one)-paid);
-      $("lkContributors").innerHTML='<div class="split-summary" style="margin-top:12px">'+
-        '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rs(lkrOf(one))+'</b></div>'+
-        '<div><small>Your expense</small><b class="split-accent">'+rs(effective)+'</b></div></div>'+
-        others.map(t=>'<div class="split-person"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
-        (!linkedHere?'<div class="split-person"><span>'+esc(p.merchant)+' · selected</span><b>'+rs(P)+'</b></div>':'')+'</div>';
+      const entries=paybackLinkPreview(p,ids);
+      $("lkContributors").innerHTML=entries.length?'<div class="split-summary" style="margin-top:12px">'+
+        '<div class="split-summary-title">Payback allocation <span>'+esc(p.merchant)+'</span></div>'+
+        entries.map(v=>'<div class="split-person"><span>'+esc(S.tx[v.id].merchant)+'</span><b>'+rsAllocated(v.allocated)+'</b></div>').join("")+
+        '<div class="split-summary-hint">Estimated amount applied to each selected expense. The exact linked amounts appear on the expense after saving.</div></div>':'';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
   };
@@ -5327,13 +5207,6 @@ function openLink(id){
   };
   paint();
   if($("lkSave"))$("lkSave").onclick=()=>{if(!linkSelected())return toast("Select an expense");closeSheet();toast("Payback linked");render();setTimeout(nextLink,450);};
-  if($("lkSplit"))$("lkSplit").onclick=()=>{
-    if(sel.size!==1)return toast("Select one expense");
-    const expenseId=[...sel][0];
-    if(!canSplitExpense(S.tx[expenseId]))return toast("Splitting is not available for bills");
-    if(!cur.includes(expenseId)||cur.length!==1)linkSelected();
-    openSplitSetup(expenseId);
-  };
   if($("lkAddPerson"))$("lkAddPerson").onclick=()=>{
     if(sel.size!==1)return toast("Select one expense");
     const expenseId=[...sel][0];
