@@ -2082,7 +2082,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.89";
+const APP_VERSION = "7.3.90";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4771,52 +4771,57 @@ function tsDraw(stage=4){
    tsText(ctx,pair[1],x+22,y+(sq?64:post?75:92),cellW-44,sq?"900 33px Manrope,Arial":"900 45px Manrope,Arial","#ffffff");
   });
  }
- const greenY=metricTop+(walk?(sq?94:post?116:143):0),greenH=sq?101:post?118:142;
- tsRound(ctx,m,greenY,inner,greenH,24,"#c9f171");
- ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(m+5,greenY+5,inner-10,greenH-10,20);ctx.stroke();
+ // Keep the original Steps and Calories tiles. For Hike/Walk the vertical
+ // walking map sits left of the two green Walking Distance/Time tiles.
+ if(stage===1)return;
+ let nextY;
  if(walk){
-  tsText(ctx,"WALKING DISTANCE",m+24,greenY+(sq?28:post?33:38),inner*.45,"800 20px Manrope,Arial","#315137");
-  tsText(ctx,"WALKING TIME",m+inner*.53,greenY+(sq?28:post?33:38),inner*.42,"800 20px Manrope,Arial","#315137");
-  tsText(ctx,t.dist!=null?fmt(t.dist,1)+" km":"—",m+24,greenY+(sq?76:post?89:106),inner*.43,sq?"900 44px Manrope,Arial":"900 61px Manrope,Arial","#132b25");
-  tsText(ctx,tripClock(t.dur??t.moving),m+inner*.53,greenY+(sq?76:post?89:106),inner*.40,sq?"900 39px Manrope,Arial":"900 54px Manrope,Arial","#132b25");
+  const cellH=sq?80:post?102:125;
+  const mapY=metricTop+cellH+14,mapH=sq?270:post?400:520;
+  const splitGap=14,mapW=Math.round(inner*.55),rightX=m+mapW+splitGap,rightW=inner-mapW-splitGap;
+  tsDrawMapPanel(ctx,t,m,mapY,mapW,mapH);
+  const greenGap=14,greenTileH=(mapH-greenGap)/2;
+  [["WALKING DISTANCE",t.dist!=null?fmt(t.dist,1)+" km":"—"],
+   ["WALKING TIME",tripClock(t.dur??t.moving)]].forEach(([label,value],i)=>{
+   const y=mapY+i*(greenTileH+greenGap);
+   tsRound(ctx,rightX,y,rightW,greenTileH,22,"#c9f171");
+   ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();
+   ctx.roundRect(rightX+5,y+5,rightW-10,greenTileH-10,18);ctx.stroke();
+   tsText(ctx,label,rightX+20,y+(sq?43:post?55:72),rightW-39,sq?"800 16px Manrope,Arial":"800 19px Manrope,Arial","#315137");
+   tsText(ctx,value,rightX+20,y+(sq?90:post?116:145),rightW-39,sq?"900 32px Manrope,Arial":post?"900 39px Manrope,Arial":"900 45px Manrope,Arial","#132b25");
+  });
+  if(stage===2)return;
+  const paceY=mapY+mapH+11,paceGap=14,paceW=(inner-paceGap)/2,paceH=sq?62:post?83:94;
+  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
+   const x=m+i*(paceW+paceGap);
+   tsRound(ctx,x,paceY,paceW,paceH,19,"#193640");
+   tsText(ctx,label,x+18,paceY+(sq?22:post?29:31),paceW-35,"800 18px Manrope,Arial","#9fdbe8");
+   tsText(ctx,value,x+18,paceY+(sq?50:post?64:72),paceW-35,sq?"900 29px Manrope,Arial":post?"900 37px Manrope,Arial":"900 42px Manrope,Arial","#eefbff");
+  });
+  nextY=paceY+paceH+11;
  }else{
+  // Visits keep their existing destination banner and full-width map.
+  const greenY=metricTop,greenH=sq?101:post?118:142;
+  tsRound(ctx,m,greenY,inner,greenH,24,"#c9f171");
+  ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(m+5,greenY+5,inner-10,greenH-10,20);ctx.stroke();
   tsText(ctx,"DESTINATION VISITED",m+24,greenY+(sq?31:post?37:43),inner-48,"800 22px Manrope,Arial","#315137");
   tsText(ctx,t.endName||t.loc||t.name,m+24,greenY+(sq?76:post?90:110),inner-48,sq?"900 42px Manrope,Arial":"900 58px Manrope,Arial","#132b25");
+  const mapY=greenY+greenH+18,mapH=sq?315:post?450:650;
+  tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
+  if(stage===2)return;
+  nextY=mapY+mapH+11;
  }
- if(stage===1)return;
- const mapY=greenY+greenH+18;
- const mapH=sq?(walk?272:315):post?(walk?395:450):(walk?525:650);
- const splitGap=14,mapW=walk?Math.round(inner*.55):inner,sideX=m+mapW+splitGap,sideW=inner-mapW-splitGap;
- tsDrawMapPanel(ctx,t,m,mapY,mapW,mapH);
- if(walk){
-  const tileGap=14,tileH=(mapH-tileGap)/2;
-  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
-   const y=mapY+i*(tileH+tileGap);
-   tsRound(ctx,sideX,y,sideW,tileH,21,"#193640");
-   // Two independent editorial statistic tiles sit beside the vertical walking map.
-   ctx.fillStyle=i?"#9ee8f5":"#c9f171";ctx.fillRect(sideX+21,y+21,34,4);
-   tsText(ctx,label,sideX+21,y+(sq?53:post?68:86),sideW-40,sq?"800 17px Manrope,Arial":"800 20px Manrope,Arial","#9fdbe8");
-   const size=sq?29:post?36:43;
-   tsText(ctx,value,sideX+21,y+(sq?91:post?117:151),sideW-40,"900 "+size+"px Manrope,Arial","#eefbff");
-   if(!sq){
-    tsText(ctx,i?"AVERAGE WALKING SPEED":"TIME PER KILOMETRE",sideX+21,y+tileH-24,sideW-40,"700 16px Manrope,Arial","#789ca8");
-   }
-  });
- }
- if(stage===2)return;
- let nextY=mapY+mapH+11;
  if(tripDriveValid(t)){
   const driveH=sq?51:post?63:74;
   tsRound(ctx,m,nextY,inner,driveH,18,"#20323c");
-  // Small vector car icon stays sharp in every exported image size.
   const ix=m+17,iy=nextY+(driveH-32)/2;
   ctx.save();ctx.strokeStyle="#c9f171";ctx.fillStyle="#c9f171";ctx.lineWidth=3;ctx.lineCap="round";
   ctx.beginPath();ctx.moveTo(ix+5,iy+15);ctx.lineTo(ix+11,iy+8);ctx.lineTo(ix+31,iy+8);ctx.lineTo(ix+38,iy+15);ctx.closePath();ctx.stroke();
   ctx.beginPath();ctx.roundRect(ix+2,iy+15,39,13,5);ctx.stroke();
   for(const cx of [ix+11,ix+32]){ctx.beginPath();ctx.arc(cx,iy+29,4,0,Math.PI*2);ctx.fill();}
   ctx.restore();
-  const home=t.driveHomeName||"Home",start=t.startName||"Walk start";
-  const line=home+" → "+start+"  ·  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60);
+  const home=t.driveHomeName||"Home",from=t.startName||"Walk start";
+  const line=home+" → "+from+"  ·  "+fmt(t.drive.km,1)+" km  ·  "+fmtDur(t.drive.min*60);
   tsText(ctx,line,m+74,nextY+(sq?33:post?40:46),inner-89,sq?"800 23px Manrope,Arial":post?"800 28px Manrope,Arial":"800 31px Manrope,Arial","#f3fbf7");
   nextY+=driveH+10;
  }
@@ -4834,9 +4839,9 @@ async function tsPrepareMaps(t,id){
  const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
  const walking=t.type==="hike"||t.type==="walk";
  const [story,square,portrait]=await Promise.all([
-  tsBuildTileMap(t,walking?528:960,walking?525:650).catch(()=>null),
-  tsBuildTileMap(t,walking?528:960,walking?272:315).catch(()=>null),
-  tsBuildTileMap(t,walking?528:960,walking?395:450).catch(()=>null)
+  tsBuildTileMap(t,walking?528:960,walking?520:650).catch(()=>null),
+  tsBuildTileMap(t,walking?528:960,walking?270:315).catch(()=>null),
+  tsBuildTileMap(t,walking?528:960,walking?400:450).catch(()=>null)
  ]);
  if(!tsCurrent||tsCurrent.id!==id)return;
  t._mapStory=story;t._mapSquare=square;t._mapPortrait=portrait;tsLoadingMaps=false;
