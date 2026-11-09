@@ -2090,7 +2090,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.94";
+const APP_VERSION = "7.3.95";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4458,7 +4458,7 @@ function openRecapForm(id=null,planId=null){
  '<div class="rc-upload-preview" id="rcPhotoPreview"'+(t.photo?'':' hidden')+'><img class="rc-thumb" id="rcPhotoThumb" alt="Cover photo preview" src="'+(t.photo||"")+'"><span class="rc-upload-label" id="rcPhotoLabel">Cover photo saved</span><button type="button" class="rc-remove-image" id="rcRemovePhoto">Remove</button></div>'+
  '<label class="rc-upload"><span>Huawei Health route screenshot · optional</span><input type="file" id="rcRoute" accept="image/*"></label>'+
  '<div class="rc-upload-preview" id="rcRoutePreview"'+(t.routeShot?'':' hidden')+'><img class="rc-thumb" id="rcRouteThumb" alt="Route screenshot preview" src="'+(t.routeShot||"")+'"><span class="rc-upload-label" id="rcRouteLabel">Route screenshot saved</span><button type="button" class="rc-remove-image" id="rcRemoveRoute">Remove</button></div>'+
- '<div class="rc-form-actions"><button class="btn soft" id="rcCancel" type="button">Cancel</button><button class="btn" id="rcSave" type="button" style="background:#8FDDFF;color:#12140D">'+(id?"Save changes & preview":"Save & preview")+'</button></div>');
+ '<div class="rc-form-actions"><button class="btn soft" id="rcCancel" type="button">Cancel</button><button class="btn" id="rcSave" type="button" style="background:#8FDDFF;color:#12140D">'+"Save"+'</button></div>');
  const setType=kind=>{t.type=kind;document.querySelectorAll('#rcTypePicker button').forEach(b=>{const on=b.dataset.type===kind;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});const workout=kind==='hike'||kind==='walk';$("rcWorkoutTitle").hidden=!workout;$("rcWorkoutFields").hidden=!workout;};
  document.querySelectorAll('#rcTypePicker button').forEach(b=>b.onclick=()=>setType(b.dataset.type));
  setType(TYPES[t.type]?t.type:'hike');$("rcCancel").onclick=()=>closeSheet();
@@ -4622,7 +4622,7 @@ function openRecapForm(id=null,planId=null){
    }
    for(const key of Object.values(priorKeys))if(key&&key!==t.photoHQKey&&key!==t.routeShotHQKey)tripMediaAction("delete",key).catch(()=>{});
    closeSheet();renderTravel();openTripStudio(t.id);
-  }catch(e){saveButton.disabled=false;saveButton.textContent=id?"Save changes & preview":"Save & preview";toast("Could not save the trip. Please try again.");}
+  }catch(e){saveButton.disabled=false;saveButton.textContent="Save";toast("Could not save the trip. Please try again.");}
  };
 
 }
@@ -4696,6 +4696,44 @@ function tsLabelTileLoad(z,x,y){
   };next();
  });
 }
+// Add reliable place callouts to the exported map even when transparent map
+// label tiles provide no readable towns at this zoom level.
+function tsMapNameLabels(ctx,t,pts,toXY,w,h){
+ const names=[],insert=(name,p)=>{
+  name=String(name||"").trim();if(!name||!p||!p.every(Number.isFinite))return;
+  if(names.some(n=>n.name.toLowerCase()===name.toLowerCase()))return;
+  names.push({name,p});
+ };
+ if(!pts.length)return;
+ insert(t.startName||"Walk start",pts[0]);
+ if(t._walkLocality)insert(t._walkLocality.name,t._walkLocality.p);
+ insert(t.endName||t.loc||"Walk end",pts[pts.length-1]);
+ const boxes=[];ctx.save();ctx.font="700 16px Arial";ctx.textBaseline="middle";
+ for(const n of names){
+  const q=toXY(n.p),name=n.name.length>22?n.name.slice(0,21)+"…":n.name;
+  const bw=Math.min(w-16,Math.ceil(ctx.measureText(name).width)+22),bh=30;
+  const x=Math.max(8,Math.min(w-bw-8,q[0]-bw/2));
+  let y=Math.max(55,Math.min(h-85,q[1]-43));
+  if(boxes.some(b=>x<b.x+b.w+7&&x+bw>b.x-7&&y<b.y+b.h+7&&y+bh>b.y-7)){y=Math.min(h-85,y+38);}
+  if(boxes.some(b=>x<b.x+b.w+5&&x+bw>b.x-5&&y<b.y+b.h+5&&y+bh>b.y-5))continue;
+  boxes.push({x,y,w:bw,h:bh});
+  ctx.fillStyle="rgba(8,29,38,.9)";ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1;
+  ctx.beginPath();ctx.roundRect(x,y,bw,bh,9);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#fff";ctx.fillText(name,x+11,y+bh/2,bw-18);
+ }
+ ctx.restore();
+}
+async function tsFindWalkLocality(t){
+ const pts=tsRoutePoints(t);if(pts.length<2)return null;
+ const mid=pts[Math.floor(pts.length/2)];
+ try{
+  const url="https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&accept-language=en&lat="+encodeURIComponent(mid[0])+"&lon="+encodeURIComponent(mid[1]);
+  const res=await fetch(url,{headers:{"Accept":"application/json"}});if(!res.ok)return null;
+  const a=(await res.json()).address||{},name=a.village||a.town||a.city||a.hamlet||a.suburb||a.municipality||a.county;
+  if(!name||[t.startName,t.endName].some(v=>String(v||"").toLowerCase()===String(name).toLowerCase()))return null;
+  return {name,p:mid};
+ }catch(e){return null;}
+}
 async function tsBuildTileMap(t,w,h){
  const pts=tsRoutePoints(t);if(!pts.length)return null;
  const all=pts.slice();
@@ -4741,6 +4779,7 @@ async function tsBuildTileMap(t,w,h){
   if(!p)return;const a=toXY(p);ctx.beginPath();ctx.arc(a[0],a[1],12,0,Math.PI*2);
   ctx.fillStyle=i?"#b2ed55":"#087994";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="#fff";ctx.stroke();
  });
+ tsMapNameLabels(ctx,t,pts,toXY,w,h);
  ctx.fillStyle="rgba(255,255,255,.88)";ctx.fillRect(0,h-21,w,21);
  ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Imagery © Esri · Labels © CARTO / OpenStreetMap",8,h-6);
  return c;
@@ -4884,6 +4923,7 @@ async function tsPrepareMaps(t,id){
  tsLoadingMaps=true;
  const note=$("tsMapStatus");if(note)note.textContent="Loading labeled walking map…";
  const walking=t.type==="hike"||t.type==="walk";
+ if(t._walkLocality===undefined){t._walkLocality=await tsFindWalkLocality(t);if(!tsCurrent||tsCurrent.id!==id){tsLoadingMaps=false;return;}}
  const [story,square,portrait]=await Promise.all([
   tsBuildTileMap(t,walking?528:960,walking?520:650).catch(()=>null),
   tsBuildTileMap(t,walking?528:960,walking?270:315).catch(()=>null),
