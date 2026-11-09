@@ -253,7 +253,15 @@ body.in-travel #appView, body.in-travel .tabs, body.in-travel #hubView, body.in-
 .rc-metric-fields .rc-metric-tile{padding:13px 12px 12px;border:1px solid var(--line);background:var(--card2);border-radius:17px;margin:0;min-width:0}
 .rc-metric-fields .rc-metric-tile>span{font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.025em;color:var(--soft);margin-bottom:9px}
 .rc-metric-fields .rc-metric-tile input{min-height:44px;border-radius:11px;font-size:17px;font-weight:800;background:var(--card)}
-.rc-metric-fields .rc-time-tile{grid-column:1/-1}
+.rc-metric-fields .rc-time-tile{grid-column:auto}
+.rc-time-tile .rc-time-parts{gap:4px}
+.rc-time-tile .rc-time-parts input{font-size:14px;min-height:43px;padding:9px 1px!important}
+.rc-time-tile .rc-time-parts span{font-size:10px}
+.rc-pace-parts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rc-pace-parts label{min-width:0}
+.rc-pace-parts label>span{display:block;color:var(--soft);font-size:10px;margin-bottom:5px}
+.rc-pace-parts input{min-width:0;text-align:center!important;padding:10px 4px!important}
+.rc-pace-format{color:var(--soft);font-size:10px;margin-top:7px}
 .rc-time-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .rc-time-parts label{min-width:0}
 .rc-time-parts span{display:block;font-size:11px;color:var(--soft);margin:0 0 5px;text-align:center}
@@ -2082,7 +2090,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.92";
+const APP_VERSION = "7.3.93";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4417,6 +4425,7 @@ function openRecapForm(id=null,planId=null){
  const old=id&&S.trip[id],p=planId&&S.plan[planId];
  const t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),type:p?.type||"hike"},old||{});
  if(p&&!old)Object.assign(t,{loc:p.loc||p.name,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,province:p.province||"",endName:p.name,endLat:p.lat,endLng:p.lng});
+ const existingPace=t.avgPace?tripPace(t).match(/^(\d+)'(\d{2})"/):null;
  const v=k=>t[k]==null?"":String(t[k]),field=(name,k,val,ph)=>'<label class="fl2"><span>'+name+'</span><input class="inp" id="'+k+'" value="'+esc(val)+'" placeholder="'+ph+'"></label>';
  openSheet('<div class="rc-form-top"><div class="rc-kicker">Sappy Travel · Memories</div><h2 style="margin:0 0 5px">'+(id?'Edit your trip':'Create a trip recap')+'</h2><p class="note" style="margin:0">A beautiful story starts with the right details.</p><div class="rc-type-picker" id="rcTypePicker" role="group" aria-label="Trip type">'+Object.keys(TYPES).map(k=>'<button type="button" data-type="'+k+'" class="'+(t.type===k?'on':'')+'" aria-pressed="'+(t.type===k)+'">'+TYPES[k].name+'</button>').join("")+'</div></div>'+
  field("Trip name","rcName",t.name,"Ambuluwawa Adventure")+
@@ -4427,7 +4436,10 @@ function openRecapForm(id=null,planId=null){
  '<label><span>Hours</span><input class="inp" id="rcHours" type="number" inputmode="numeric" min="0" max="999" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)/3600):"")+'" placeholder="02"></label>'+
  '<label><span>Minutes</span><input class="inp" id="rcMins" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor(((t.dur??t.moving)%3600)/60):"")+'" placeholder="35"></label>'+
  '<label><span>Seconds</span><input class="inp" id="rcSecs" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(t.dur!=null||t.moving!=null?Math.floor((t.dur??t.moving)%60):"")+'" placeholder="20"></label></div></div>'+
- '<label class="fl2 rc-metric-tile"><span>Avg pace · min/km</span><input class="inp" id="rcPace" inputmode="text" value="'+esc(t.avgPace?tripPace(t):"")+'" placeholder="16\'32\" /km"></label>'+
+ '<div class="rc-metric-tile rc-pace-tile"><span>Avg pace · /km</span><div class="rc-pace-parts">'+
+ '<label><span>Min</span><input class="inp" id="rcPaceMin" type="number" inputmode="numeric" min="0" max="999" step="1" value="'+(existingPace?existingPace[1]:"")+'" placeholder="16"></label>'+
+ '<label><span>Sec</span><input class="inp" id="rcPaceSec" type="number" inputmode="numeric" min="0" max="59" step="1" value="'+(existingPace?existingPace[2]:"")+'" placeholder="32"></label></div>'+
+ '<div class="rc-pace-format" id="rcPacePreview">Enter min and sec</div></div>'+
  '<label class="fl2 rc-metric-tile"><span>Avg speed · km/h</span><input class="inp" id="rcSpeed" type="number" min="0" step=".01" value="'+esc(t.avgSpeed??"")+'" placeholder="3.33"></label>'+ 
  '<label class="fl2 rc-metric-tile"><span>Avg heart rate · bpm</span><input class="inp" id="rcHeartRate" type="number" inputmode="numeric" min="0" max="250" step="1" value="'+esc(t.avgHeartRate??"")+'" placeholder="145"></label>'+
  '<p class="rc-workout-help">Calculated automatically from walking distance and time. You can edit the values.</p>'+
@@ -4535,10 +4547,19 @@ function openRecapForm(id=null,planId=null){
  const recomputeWorkout=()=>{const d=Number($("rcDist").value),min=readWalkSeconds()/60;
   if(!(d>0&&min>0))return;
   const seconds=Math.round(min*60/d),pace=Math.floor(seconds/60)+"'"+String(seconds%60).padStart(2,"0")+'" /km';
-  if(!$("rcPace").dataset.custom)$("rcPace").value=pace;
+  if(!$("rcPaceMin").dataset.custom&&!$("rcPaceSec").dataset.custom){
+   $("rcPaceMin").value=String(Math.floor(seconds/60));
+   $("rcPaceSec").value=String(seconds%60).padStart(2,"0");
+   updatePacePreview();
+  }
   if(!$("rcSpeed").dataset.custom)$("rcSpeed").value=(d*60/min).toFixed(2);
  };
- $("rcPace").oninput=()=>{$("rcPace").dataset.custom="1";};
+ const updatePacePreview=()=>{
+  const minute=$("rcPaceMin").value.trim(),second=$("rcPaceSec").value.trim();
+  $("rcPacePreview").textContent=minute!==""&&second!==""?minute+"'"+second.padStart(2,"0")+'" /km':"Enter min and sec";
+ };
+ for(const id of ["rcPaceMin","rcPaceSec"])$(id).oninput=()=>{$("rcPaceMin").dataset.custom="1";$("rcPaceSec").dataset.custom="1";updatePacePreview();};
+ updatePacePreview();
  $("rcSpeed").oninput=()=>{$("rcSpeed").dataset.custom="1";};
  $("rcDist").oninput=recomputeWorkout;["rcHours","rcMins","rcSecs"].forEach(k=>$(k).oninput=recomputeWorkout);
  if(!t.avgPace||t.avgSpeed==null)recomputeWorkout();
@@ -4551,8 +4572,9 @@ function openRecapForm(id=null,planId=null){
   if(!["rcHours","rcMins","rcSecs"].every(k=>$(k).value===""||Number.isInteger(Number($(k).value))))return toast("Use whole hours, minutes and seconds");
   if(Number($("rcMins").value)>59||Number($("rcSecs").value)>59||Number($("rcHours").value)>999)return toast("Use valid HH:MM:SS values");
   if(num("rcHeartRate")!=null&&(!Number.isInteger(num("rcHeartRate"))||num("rcHeartRate")>250))return toast("Check average heart rate (bpm)");
-  const paceValue=$("rcPace").value.trim();
-  if(paceValue&&!/^(\d+)\s*[:'′]\s*(\d{1,2})\s*(?:"|″)?\s*(?:\/\s*km)?$/i.test(paceValue))return toast("Use pace like 16'32\" /km");
+  const paceMin=$("rcPaceMin").value.trim(),paceSec=$("rcPaceSec").value.trim();
+  if((paceMin!==""||paceSec!=="")&&(paceMin===""||paceSec===""||!Number.isInteger(+paceMin)||!Number.isInteger(+paceSec)||+paceMin<0||+paceMin>999||+paceSec<0||+paceSec>59))return toast("Enter pace minutes and seconds (00–59)");
+  const paceValue=paceMin!==""&&paceSec!==""?Number(paceMin)+"'"+paceSec.padStart(2,"0")+'" /km':"";
   const saveButton=$("rcSave");saveButton.disabled=true;saveButton.textContent="Saving trip…";
   try{
    const priorKeys={photo:t.photoHQKey||null,routeShot:t.routeShotHQKey||null};
