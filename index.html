@@ -4762,7 +4762,7 @@ async function tsBuildTileMap(t,w,h){
  const pts=tsRoutePoints(t);if(!pts.length)return null;
  // Map framing is based on this format's *actual* canvas dimensions.
  // Reserve edge space for place names and top/bottom map captions.
- const all=pts.slice(),xPad=Math.max(80,Math.min(145,w*.25)),topPad=95,bottomPad=105;
+ const all=pts.slice(),xPad=Math.max(70,Math.min(130,w*.22)),topPad=69,bottomPad=79;
  const availableW=Math.max(80,w-2*xPad),availableH=Math.max(80,h-topPad-bottomPad);
  let z=2;
  for(let trial=16;trial>=2;trial--){
