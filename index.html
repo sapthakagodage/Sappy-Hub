@@ -4706,8 +4706,8 @@ function tsMapNameLabels(ctx,t,pts,toXY,w,h){
  };
  if(!pts.length)return;
  insert(t.startName||"Walk start",pts[0]);
- if(t._walkLocality)insert(t._walkLocality.name,t._walkLocality.p);
  insert(t.endName||t.loc||"Walk end",pts[pts.length-1]);
+ if(t._walkLocality)insert(t._walkLocality.name,t._walkLocality.p);
  const boxes=[];ctx.save();ctx.textBaseline="middle";
  for(const n of names){
   const q=toXY(n.p),bh=33,pad=11,maxTextWidth=Math.max(75,w-38);
@@ -4725,9 +4725,10 @@ function tsMapNameLabels(ctx,t,pts,toXY,w,h){
    if(current)out.push(current);
    lines=out;
   }
-  // On compact maps don't overlay a giant name on top of the route.
-  if(lines.length>2){lines=lines.slice(0,2);const last=lines[1];while(lines[1].length>1&&ctx.measureText(lines[1]+"…").width>maxTextWidth)lines[1]=lines[1].slice(0,-1);lines[1]+="…";}
-  const height=lines.length>1?47:bh;
+  // Keep every word: if a name requires more rows, scale the last row rather
+  // than dropping letters or cutting it off at the card boundary.
+  if(lines.length>3)lines=[lines[0],lines[1],lines.slice(2).join(" ")];
+  const height=lines.length===1?bh:lines.length===2?47:62;
   const textWidth=Math.max(...lines.map(line=>Math.min(maxTextWidth,ctx.measureText(line).width)));
   const bw=Math.min(w-16,Math.ceil(textWidth)+pad*2);
   const x=Math.max(8,Math.min(w-bw-8,q[0]-bw/2));
