@@ -2082,7 +2082,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.88";
+const APP_VERSION = "7.3.89";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4194,7 +4194,7 @@ async function showFromHome(t){
 function tripLoc(t){ return t.loc || t.country || ""; }
 function tripDriveValid(t){return !!(t&&t.drive&&Number.isFinite(+t.drive.km)&&Number.isFinite(+t.drive.min)&&t.driveHomeLat!=null&&t.driveHomeLng!=null&&t.startLat!=null&&t.startLng!=null);}
 function tripClock(sec){if(sec==null||!Number.isFinite(+sec))return "—";const v=Math.max(0,Math.round(+sec));return [Math.floor(v/3600),Math.floor(v%3600/60),v%60].map(x=>String(x).padStart(2,"0")).join(":");}
-function tripPace(t){if(t.avgPace)return t.avgPace;const mins=(t.dur??t.moving)/60,d=+t.dist;if(!(mins>0&&d>0))return "—";const sec=Math.round(mins*60/d);return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")+" /km";}
+function tripPace(t){if(t.avgPace){const value=String(t.avgPace).trim();return /\/\s*km\b/i.test(value)?value:value.replace(/\s*\/\s*$/,"")+" /km";}const mins=(t.dur??t.moving)/60,d=+t.dist;if(!(mins>0&&d>0))return "—";const sec=Math.round(mins*60/d);return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0")+" /km";}
 function tripSpeed(t){if(t.avgSpeed!=null&&Number.isFinite(+t.avgSpeed))return fmt(+t.avgSpeed,2)+" km/h";const mins=(t.dur??t.moving)/60,d=+t.dist;return mins>0&&d>0?fmt(d*60/mins,2)+" km/h":"—";}
 
 function tripTile(t){
@@ -4764,20 +4764,26 @@ function tsDraw(stage=4){
  }
  if(stage===1)return;
  const mapY=greenY+greenH+18;
- const mapH=sq?(walk?176:315):post?(walk?290:450):(walk?395:650);
- tsDrawMapPanel(ctx,t,m,mapY,inner,mapH);
+ const mapH=sq?(walk?272:315):post?(walk?395:450):(walk?525:650);
+ const splitGap=14,mapW=walk?Math.round(inner*.55):inner,sideX=m+mapW+splitGap,sideW=inner-mapW-splitGap;
+ tsDrawMapPanel(ctx,t,m,mapY,mapW,mapH);
+ if(walk){
+  const tileGap=14,tileH=(mapH-tileGap)/2;
+  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
+   const y=mapY+i*(tileH+tileGap);
+   tsRound(ctx,sideX,y,sideW,tileH,21,"#193640");
+   // Two independent editorial statistic tiles sit beside the vertical walking map.
+   ctx.fillStyle=i?"#9ee8f5":"#c9f171";ctx.fillRect(sideX+21,y+21,34,4);
+   tsText(ctx,label,sideX+21,y+(sq?53:post?68:86),sideW-40,sq?"800 17px Manrope,Arial":"800 20px Manrope,Arial","#9fdbe8");
+   const size=sq?29:post?36:43;
+   tsText(ctx,value,sideX+21,y+(sq?91:post?117:151),sideW-40,"900 "+size+"px Manrope,Arial","#eefbff");
+   if(!sq){
+    tsText(ctx,i?"AVERAGE WALKING SPEED":"TIME PER KILOMETRE",sideX+21,y+tileH-24,sideW-40,"700 16px Manrope,Arial","#789ca8");
+   }
+  });
+ }
  if(stage===2)return;
  let nextY=mapY+mapH+11;
- if(walk){
-  const tileGap=14,tileW=(inner-tileGap)/2,tileH=sq?62:post?83:94;
-  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
-   const x=m+i*(tileW+tileGap),y=nextY;
-   tsRound(ctx,x,y,tileW,tileH,19,"#193640");
-   tsText(ctx,label,x+18,y+(sq?22:post?29:31),tileW-32,"800 18px Manrope,Arial","#9fdbe8");
-   tsText(ctx,value,x+18,y+(sq?50:post?64:72),tileW-32,sq?"900 29px Manrope,Arial":post?"900 37px Manrope,Arial":"900 42px Manrope,Arial","#eefbff");
-  });
-  nextY+=tileH+12;
- }
  if(tripDriveValid(t)){
   const driveH=sq?51:post?63:74;
   tsRound(ctx,m,nextY,inner,driveH,18,"#20323c");
@@ -4807,9 +4813,9 @@ async function tsPrepareMaps(t,id){
  const note=$("tsMapStatus");if(note)note.textContent="Loading real map for the recap…";
  const walking=t.type==="hike"||t.type==="walk";
  const [story,square,portrait]=await Promise.all([
-  tsBuildTileMap(t,960,walking?395:650).catch(()=>null),
-  tsBuildTileMap(t,960,walking?176:315).catch(()=>null),
-  tsBuildTileMap(t,960,walking?290:450).catch(()=>null)
+  tsBuildTileMap(t,walking?528:960,walking?525:650).catch(()=>null),
+  tsBuildTileMap(t,walking?528:960,walking?272:315).catch(()=>null),
+  tsBuildTileMap(t,walking?528:960,walking?395:450).catch(()=>null)
  ]);
  if(!tsCurrent||tsCurrent.id!==id)return;
  t._mapStory=story;t._mapSquare=square;t._mapPortrait=portrait;tsLoadingMaps=false;
