@@ -631,6 +631,20 @@ html.sappy-suspended #splash{display:flex!important;opacity:1!important;visibili
 .personal-expense-detail .old-expense{color:var(--faint);font-weight:700;text-decoration:line-through}
 .personal-expense-detail .effective-expense{color:var(--pos);font-size:20px;font-weight:800}
 .personal-expense-detail .personal-expense-note{font-size:12px;color:var(--soft);margin-top:5px}
+.split-summary{background:var(--card);border:1px solid rgba(140,166,177,.2);border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 3px 14px rgba(0,0,0,.04)}
+.split-summary-title{font-size:13px;font-weight:850;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.split-summary-title span{font-size:11px;color:var(--soft);font-weight:650}
+.split-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.split-summary-grid>div{background:var(--bg);border:1px solid rgba(140,166,177,.12);border-radius:12px;padding:12px 10px;min-width:0}
+.split-summary-grid small{display:block;font-size:11px;color:var(--soft);margin-bottom:7px;font-weight:650}
+.split-summary-grid b{font-size:19px;letter-spacing:-.03em;overflow-wrap:anywhere}
+.split-summary-grid .split-accent{color:var(--pos)}
+.split-person-list{margin-top:9px}
+.split-person{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 3px;border-bottom:1px solid rgba(140,166,177,.13);font-size:12px}
+.split-person span{color:var(--soft);overflow-wrap:anywhere}
+.split-person b{font-size:13px;white-space:nowrap}
+.split-person-me{border:0;font-weight:800}
+.split-summary-hint{font-size:11px;color:var(--soft);line-height:1.45;margin-top:6px}
 /* transactions */
 .day{font-size:13px;font-weight:700;color:var(--faint);margin:18px 6px 8px}
 .list{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden;padding:4px 0}
@@ -2081,7 +2095,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.83";
+const APP_VERSION = "7.3.84";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3183,11 +3197,21 @@ function personalExpenseAmountHtml(t, original){
 }
 function personalExpenseDetailHtml(t){
   if(!canSplitExpense(t))return '';
-  const paid=lkrOf(t),effective=myShare(t);
-  if(!(effective<paid-0.005))return '';
-  return '<div class="personal-expense-detail"><div class="personal-expense-title">Amount counted in '+esc(catLabel(pocketCat(t)))+'</div>'+
-    '<div class="personal-expense-values"><span class="old-expense num">'+rs(paid)+'</span><span class="effective-expense num">'+rs(effective)+'</span></div>'+
-    '<div class="personal-expense-note">The full payment remains recorded in your cash or bank wallet.</div></div>';
+  const amount=lkrOf(t),net=myShare(t),group=linkedSplitGroups()[t.id],equal=autoEqualPlan(t),manual=!group&&splitPlan(t);
+  if(!group&&!manual)return '';
+  const people=group?group.people:[];
+  const creditors=people.map(p=>{
+    const share=equal?amount/(people.length+1):group.total>0?p.amount*amount/group.total:0;
+    return '<div class="split-person"><span>'+esc(p.name)+'</span><b>'+rs(share)+'</b></div>';
+  }).join("");
+  return '<section class="split-summary" aria-label="Expense split details">'+
+    '<div class="split-summary-title">Payment breakdown <span>'+(equal?'Equal split · '+(people.length+1)+' people':group?'Linked repayments':'Manual split')+'</span></div>'+
+    '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rs(amount)+'</b></div>'+
+    '<div><small>Your expense</small><b class="split-accent">'+rs(net)+'</b></div></div>'+
+    (creditors?'<div class="split-person-list">'+creditors+'</div>':'')+
+    '<div class="split-person split-person-me"><span>Your portion · '+esc(catLabel(pocketCat(t)))+'</span><b>'+rs(net)+'</b></div>'+
+    (group?'<div class="split-summary-hint">'+(equal?'Equal amounts detected in linked repayments.':'Unequal repayments reduce your expense by the amount actually received.')+'</div>':'')+
+    '</section>';
 }
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
@@ -5105,25 +5129,53 @@ function backMap(){
 function friendsOn(id){const f=new Set();Object.values(S.tx).forEach(p=>{
   if(live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(id))f.add((p.merchant||p.id).toLowerCase());
 });return f.size;}
-// A saved equal split defines the personal expense immediately. Repayments
-// settle the amount owed, but must never reduce the personal share a second time.
-// Unsplit/custom-contribution payments retain their original receipt-based logic.
+// Connected repayment groups: a receipt may be allocated to several bills.
+let sharedGroupVer=-1,sharedGroupCache={};
+function linkedSplitGroups(){
+  if(sharedGroupVer===dataVer)return sharedGroupCache;
+  const payments=Object.values(S.tx).filter(p=>live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).length);
+  const byBill={};
+  payments.forEach(p=>linksOf(p).filter(id=>canSplitExpense(S.tx[id])).forEach(id=>(byBill[id]||(byBill[id]=[])).push(p)));
+  const result={},visited=new Set();
+  Object.keys(byBill).forEach(seed=>{
+    if(visited.has(seed))return;
+    const bills=new Set([seed]),receipts=new Map(),queue=[seed];
+    while(queue.length){const id=queue.pop();if(visited.has(id))continue;visited.add(id);
+      (byBill[id]||[]).forEach(p=>{receipts.set(p.id,p);linksOf(p).filter(k=>canSplitExpense(S.tx[k])).forEach(k=>{if(!bills.has(k)){bills.add(k);queue.push(k);}});});
+    }
+    const expenses=[...bills].map(id=>S.tx[id]).filter(canSplitExpense),refunds=[...receipts.values()];
+    const total=expenses.reduce((v,t)=>v+lkrOf(t),0),byName=new Map();
+    refunds.forEach(p=>{const name=(p.merchant||"").trim()||("Repayment "+p.id),key=name.toLowerCase();
+      const old=byName.get(key)||{name,amount:0};old.amount+=lkrOf(p);byName.set(key,old);
+    });
+    const people=[...byName.values()],n=people.length+1,expected=total/n;
+    const exact=people.length>0&&expected>0&&people.every(v=>Math.abs(v.amount-expected)<=Math.max(2,expected*.005));
+    // Two matching repayments can identify a three-way split even before
+    // every bill in that shared outing has been selected.
+    const interim=expenses.length===1&&people.length>=2&&people.every(v=>v.amount>=expected-2)&&people.every(v=>Math.abs(v.amount-people[0].amount)<=Math.max(2,people[0].amount*.005));
+    const group={expenses,refunds,people,total,n,autoEqual:exact||interim};
+    expenses.forEach(t=>result[t.id]=group);
+  });
+  sharedGroupCache=result;sharedGroupVer=dataVer;return result;
+}
+function autoEqualPlan(t){const g=linkedSplitGroups()[t.id];return g&&g.autoEqual?{group:g,own:lkrOf(t)/g.n,expected:lkrOf(t)*(g.n-1)/g.n}:null;}
 function splitPlan(t){
   if(!canSplitExpense(t))return null;
   const n=Number(t.split),amount=lkrOf(t);
   if(!Number.isInteger(n)||n<2||n>100||!(amount>0))return null;
-  const raw=Number(t.splitBase);
-  const base=Number.isFinite(raw)&&raw>0?Math.min(amount,raw):amount;
+  const raw=Number(t.splitBase),base=Number.isFinite(raw)&&raw>0?Math.min(amount,raw):amount;
   return {people:n,base,own:amount-base+base/n,expected:base*(n-1)/n};
 }
 function stillOwed(t){
-  const plan=splitPlan(t),paid=backMap()[t.id]||0;
-  return Math.max(0,(plan?plan.expected:lkrOf(t))-paid);
+  const inferred=autoEqualPlan(t),paid=backMap()[t.id]||0,group=linkedSplitGroups()[t.id];
+  const manual=!group&&splitPlan(t);
+  return Math.max(0,(inferred?inferred.expected:manual?manual.expected:lkrOf(t))-paid);
 }
 function myShare(t){
   if(!t||t.type!=="out")return 0;
-  const plan=splitPlan(t);
-  return plan?plan.own:Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
+  const auto=autoEqualPlan(t);if(auto)return auto.own;
+  if(linkedSplitGroups()[t.id])return Math.max(0,lkrOf(t)-(backMap()[t.id]||0));
+  const manual=splitPlan(t);return manual?manual.own:lkrOf(t);
 }
 // paybacks not linked to a payment: taken off on the day they arrive
 const isLooseBack=t=>live(t)&&t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length;
@@ -5131,21 +5183,11 @@ function looseBacks(){ return txList().filter(isLooseBack); }
 // likely payments a payback is for: spending before it, within 30 days, bigger than the payback
 function backSuggestions(p){
   const pv=lkrOf(p);
-  // Cash expenses can be entered after a reimbursement was already recorded.
-  // Include every eligible manual cash payment regardless of transaction date;
-  // keep existing date-based suggestions for card/bank expenses.
-  return txList().filter(t=>{
-    if(!canSplitExpense(t))return false;
-    if(t.bank==="Cash")return true;
-    if(t.ts>p.ts+3600e3)return false;
-    const days=(p.ts-t.ts)/864e5;
-    return days<=31&&lkrOf(t)>=pv*0.15;
-  }).map(t=>{
-    const days=Math.abs(p.ts-t.ts)/864e5,linked=(backMap()[t.id]||0)>0,big=lkrOf(t)>=pv*0.95;
-    const sharedCash=t.bank==="Cash"&&Number(t.split)>1;
-    const recentCash=t.bank==="Cash"&&t.ts>p.ts;
-    return {t,score:days+(linked?-1.5:0)+(big?0:2)+(lkrOf(t)>pv*12?6:0)-(sharedCash?5:0)-(recentCash?4:0)};
-  }).sort((a,b)=>a.score-b.score).map(x=>x.t);
+  // Search all historical card and cash expenses, not just a 31-day window.
+  return txList().filter(canSplitExpense).map(t=>{
+    const days=Math.abs(p.ts-t.ts)/864e5,linked=(backMap()[t.id]||0)>0;
+    return {t,score:days+(linked?-2:0)+(Math.abs(lkrOf(t)-pv)<2?-1:0)+(t.bank==="Cash"?-1:0)};
+  }).sort((a,b)=>a.score-b.score).map(v=>v.t);
 }
 function expenseContributors(expenseId){
   return txList().filter(t=>t.type==="in"&&t.cat==="Paid back"&&linksOf(t).includes(expenseId));
@@ -5245,11 +5287,11 @@ function openLink(id){
   const sel=new Set(cur);
   const P=lkrOf(p);
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
-  openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. More than one person can reimburse the same expense, with different amounts.</p>'+
+  openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense this payment belongs to. Select one or more cash or card expenses. Equal group repayments are recognised automatically; unequal amounts reduce spending by what was received.</p>'+
     (sug.length?'<label class="fl2" style="margin-top:12px"><span>Find an expense (including newly added cash payments)</span><input class="inp" id="lkSearch" type="search" placeholder="Search name, amount or date"></label><div class="list" style="margin-top:12px;max-height:38vh;overflow-y:auto" id="lkList">'+sug.map(row).join("")+'</div><p class="note" id="lkSearchEmpty" hidden>No matching expenses. Try another name or amount.</p><div class="fromhome" style="margin-top:12px"><span>Selected</span><b id="lkSum"></b></div><div id="lkContributors"></div>'
       :'<p class="note">No recent expenses found to link. This payment remains unlinked.</p>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
-    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button><button class="link" id="lkSplit" style="display:block;margin:12px auto 0">Equal split or custom amounts</button>':'')+
+    (sug.length?'<button class="btn soft full" id="lkAddPerson" style="margin-top:10px">+ Add another person’s payback</button><button class="link" id="lkSplit" style="display:block;margin:12px auto 0">Optional manual split settings</button>':'')+
     '<button class="link" id="lkCat" style="display:block;margin:14px auto 0">Not a payback? Change category</button>');
   const paint=()=>{
     document.querySelectorAll("#lkList .lrow").forEach(b=>{const on=sel.has(b.dataset.id);b.classList.toggle("sel",on);b.querySelector(".tick").textContent=on?"✓":"";});
@@ -5261,14 +5303,12 @@ function openLink(id){
       if(!one){$("lkContributors").innerHTML="";return;}
       const others=expenseContributors(one.id),linkedHere=cur.includes(one.id);
       const paid=others.reduce((a,t)=>a+lkrOf(t),0)+(linkedHere?0:P);
-      const net=splitPlan(one)?myShare(one):Math.max(0,lkrOf(one)-paid);
-      $("lkContributors").innerHTML='<div class="fromhome" style="margin-top:12px"><span>Expense</span><b>'+rs(lkrOf(one))+'</b></div>'+
-        others.map(t=>'<div class="fromhome"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
-        (!linkedHere?'<div class="fromhome"><span>'+esc(p.merchant)+' (selected)</span><b>'+rs(P)+'</b></div>':'')+
-        (Number(one.split)>1?'<div class="fromhome"><span>Shared portion · '+one.split+' people (including you)</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one)))+'</b></div>'+
-        '<div class="fromhome"><span>Each person’s shared portion</span><b>'+rs(Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))/one.split)+'</b></div>'+
-        '<div class="fromhome"><span>Still to collect (target)</span><b>'+rs(Math.max(0,Math.min(lkrOf(one),Number(one.splitBase)||lkrOf(one))*(one.split-1)/one.split-paid))+'</b></div>':'')+
-        '<div class="fromhome"><span>Your personal expense</span><b>'+rs(net)+'</b></div>';
+      const plan=autoEqualPlan(one),effective=plan?plan.own:Math.max(0,lkrOf(one)-paid);
+      $("lkContributors").innerHTML='<div class="split-summary" style="margin-top:12px">'+
+        '<div class="split-summary-grid"><div><small>Full payment</small><b>'+rs(lkrOf(one))+'</b></div>'+
+        '<div><small>Your expense</small><b class="split-accent">'+rs(effective)+'</b></div></div>'+
+        others.map(t=>'<div class="split-person"><span>'+esc(t.merchant)+(t.id===p.id?' (this payment)':'')+'</span><b>'+rs(lkrOf(t))+'</b></div>').join("")+
+        (!linkedHere?'<div class="split-person"><span>'+esc(p.merchant)+' · selected</span><b>'+rs(P)+'</b></div>':'')+'</div>';
     }
     if($("lkSave"))$("lkSave").textContent=ids.length>1?"Link "+ids.length+" expenses":"Link payback";
   };
@@ -5380,9 +5420,9 @@ function checkActiveAppVersion(){
   checkUpdate("app",APP_VERSION,"version.json");
 }
 checkActiveAppVersion();
-document.addEventListener("visibilitychange",checkActiveAppVersion);
+document.addEventListener("visibilitychange",()=>{checkActiveAppVersion();if(!document.hidden)checkHash();});
 window.addEventListener("focus",checkActiveAppVersion);
-window.addEventListener("pageshow",checkActiveAppVersion);
+window.addEventListener("pageshow",()=>{checkActiveAppVersion();checkHash();});
 /* Keep bottom nav reachable while reading: down hides, up reveals.
    Window scroll is used on both Pocket and Travel screens. */
 (function(){
