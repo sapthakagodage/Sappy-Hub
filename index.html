@@ -4638,6 +4638,21 @@ function tsTileLoad(z,x,y){
   next();
  });
 }
+// Label-only transparent tiles add city, village, road and landmark names over satellite.
+function tsLabelTileLoad(z,x,y){
+ const urls=[
+  "https://a.basemaps.cartocdn.com/light_only_labels/"+z+"/"+x+"/"+y+".png",
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/"+z+"/"+y+"/"+x
+ ];
+ return new Promise(resolve=>{
+  let n=0;const next=()=>{if(n>=urls.length)return resolve(null);
+   const im=new Image();im.crossOrigin="anonymous";let done=false;
+   const timer=setTimeout(()=>finish(false),4500);
+   const finish=ok=>{if(done)return;done=true;clearTimeout(timer);im.onload=null;im.onerror=null;ok?resolve(im):next();};
+   im.onload=()=>finish(true);im.onerror=()=>finish(false);im.src=urls[n++];
+  };next();
+ });
+}
 async function tsBuildTileMap(t,w,h){
  const pts=tsRoutePoints(t);if(!pts.length)return null;
  const all=pts.slice();
@@ -4662,10 +4677,15 @@ async function tsBuildTileMap(t,w,h){
   if(yy<0||yy>=maxIndex)continue;
   jobs.push({x:xx,y:yy,p:tsTileLoad(z,((xx%maxIndex)+maxIndex)%maxIndex,yy)});
  }
- const results=await Promise.all(jobs.map(async j=>({...j,img:await j.p})));
+ const [results,labels]=await Promise.all([
+  Promise.all(jobs.map(async j=>({...j,img:await j.p}))),
+  Promise.all(jobs.map(async j=>({...j,img:await tsLabelTileLoad(z,((j.x%maxIndex)+maxIndex)%maxIndex,j.y)})))
+ ]);
  const loaded=results.filter(v=>v.img);
  if(loaded.length<Math.max(1,Math.ceil(results.length*.75)))return null;
  for(const r of results){if(!r.img)continue;ctx.drawImage(r.img,Math.round(r.x*256-left),Math.round(r.y*256-top),257,257);}
+ // Raster reference overlay remains exportable because tiles are loaded with CORS.
+ for(const r of labels){if(!r.img)continue;ctx.drawImage(r.img,Math.round(r.x*256-left),Math.round(r.y*256-top),257,257);}
  const toXY=p=>{const xy=tsMercator(p[0],p[1],z);return [xy[0]-left,xy[1]-top];};
  if(pts.length>1){
   ctx.beginPath();pts.forEach((p,i)=>{const v=toXY(p);if(!i)ctx.moveTo(v[0],v[1]);else ctx.lineTo(v[0],v[1]);});
@@ -4679,7 +4699,7 @@ async function tsBuildTileMap(t,w,h){
   ctx.fillStyle=i?"#b2ed55":"#087994";ctx.fill();ctx.lineWidth=4;ctx.strokeStyle="#fff";ctx.stroke();
  });
  ctx.fillStyle="rgba(255,255,255,.88)";ctx.fillRect(0,h-21,w,21);
- ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Imagery © Esri / CARTO · OpenStreetMap contributors",8,h-6);
+ ctx.fillStyle="#354e55";ctx.font="600 14px Arial";ctx.fillText("Imagery © Esri · Labels © CARTO / OpenStreetMap",8,h-6);
  return c;
 }
 function tsDrawMapPanel(ctx,t,x,y,w,h){
@@ -4706,7 +4726,7 @@ function tsDrawMapPanel(ctx,t,x,y,w,h){
   }
   tsText(ctx,"Map tiles unavailable",x+20,y+h/2,w-40,"800 22px Manrope,Arial","#315762");
  }
- const label=(prepared&&tsMapMode!=="health")?"SATELLITE WALKING MAP":t._route?"HUAWEI HEALTH WALK ROUTE":"WALKING ROUTE PREVIEW";
+ const label=(prepared&&tsMapMode!=="health")?"WALKING MAP · PLACES & ROUTE":t._route?"HUAWEI HEALTH WALK ROUTE":"WALKING ROUTE PREVIEW";
  ctx.fillStyle="rgba(9,30,41,.88)";ctx.fillRect(x,y,w,51);
  tsText(ctx,label,x+20,y+33,w-40,"800 21px Manrope,Arial","#fff");
  ctx.fillStyle="rgba(9,30,41,.92)";ctx.fillRect(x,y+h-60,w,60);
