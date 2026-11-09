@@ -4803,19 +4803,20 @@ function tsDraw(stage=4,exportScale=1){
   const mapY=metricTop+cellH+14,mapH=sq?270:post?400:520;
   const splitGap=14,mapW=Math.round(inner*.55),rightX=m+mapW+splitGap,rightW=inner-mapW-splitGap;
   tsDrawMapPanel(ctx,t,m,mapY,mapW,mapH);
-  const greenGap=14,greenTileH=(mapH-greenGap)/2;
+  const greenGap=sq?8:10,greenTileH=(mapH-greenGap*2)/3;
   [["WALKING DISTANCE",t.dist!=null?fmt(t.dist,1)+" km":"—"],
-   ["WALKING TIME",tripClock(t.dur??t.moving)]].forEach(([label,value],i)=>{
+   ["WALKING TIME",tripClock(t.dur??t.moving)],
+   ["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
    const y=mapY+i*(greenTileH+greenGap);
-   tsRound(ctx,rightX,y,rightW,greenTileH,22,"#c9f171");
+   tsRound(ctx,rightX,y,rightW,greenTileH,20,"#c9f171");
    ctx.strokeStyle="rgba(22,65,53,.11)";ctx.lineWidth=2;ctx.beginPath();
-   ctx.roundRect(rightX+5,y+5,rightW-10,greenTileH-10,18);ctx.stroke();
-   tsText(ctx,label,rightX+20,y+(sq?43:post?55:72),rightW-39,sq?"800 16px Manrope,Arial":"800 19px Manrope,Arial","#315137");
-   tsText(ctx,value,rightX+20,y+(sq?90:post?116:145),rightW-39,sq?"900 32px Manrope,Arial":post?"900 39px Manrope,Arial":"900 45px Manrope,Arial","#132b25");
+   ctx.roundRect(rightX+5,y+5,rightW-10,greenTileH-10,16);ctx.stroke();
+   tsText(ctx,label,rightX+17,y+(sq?27:post?40:51),rightW-32,sq?"800 15px Manrope,Arial":"800 18px Manrope,Arial","#315137");
+   tsText(ctx,value,rightX+17,y+(sq?64:post?91:115),rightW-32,sq?"900 29px Manrope,Arial":post?"900 36px Manrope,Arial":"900 43px Manrope,Arial","#132b25");
   });
   if(stage===2)return;
   const paceY=mapY+mapH+11,paceGap=14,paceW=(inner-paceGap)/2,paceH=sq?62:post?83:94;
-  [["AVG PACE",tripPace(t)],["AVG SPEED",tripSpeed(t)]].forEach(([label,value],i)=>{
+  [["AVG PACE",tripPace(t)],["AVG HEART RATE",tripHeartRate(t)]].forEach(([label,value],i)=>{
    const x=m+i*(paceW+paceGap);
    tsRound(ctx,x,paceY,paceW,paceH,19,"#193640");
    tsText(ctx,label,x+18,paceY+(sq?22:post?29:31),paceW-35,"800 18px Manrope,Arial","#9fdbe8");
