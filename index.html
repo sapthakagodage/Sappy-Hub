@@ -436,8 +436,8 @@ body[data-tv="map"] #travelView > div[style*="height:120px"]{display:none}
 .tm-place .fm-t{flex:1}.tm-open{color:var(--soft);font-size:21px}
 .fm-export{border:0;background:var(--lime);color:var(--on-lime);padding:9px 12px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
 @media screen {
- body.in-travel[data-tv="map"] #tv-map .mapcard{height:min(54dvh,480px);min-height:300px}
- body.in-travel[data-tv="map"] #tv-map #tMap{min-height:230px}
+ body.in-travel[data-tv="map"] #tv-map .mapcard{height:clamp(470px,66dvh,780px);min-height:470px}
+ body.in-travel[data-tv="map"] #tv-map #tMap{min-height:360px}
 }
 @media print {
  @page{size:A4 landscape;margin:8mm}
@@ -457,7 +457,26 @@ body[data-tv="map"] #travelView > div[style*="height:120px"]{display:none}
  #fullMap .fm-go,.leaflet-control-container{display:none!important}
  #fullMap .leaflet-pane,#fullMap .leaflet-pane *{visibility:visible!important}
 }
- /* name pins with a drop-in animation */
+ 
+/* PNG map atlas: large Sri Lanka map with a numbered two-column place index */
+.travel-map-list .fm-t b{display:block;font-size:15px;line-height:1.3}
+.travel-map-list .fm-t span{display:block;font-size:12px;line-height:1.35;color:var(--soft);margin-top:2px}
+.sappy-png-board{position:fixed;left:-20000px;top:0;width:1400px;box-sizing:border-box;padding:36px;background:#fff;color:#15242c;z-index:-1;font-family:"Manrope",Arial,sans-serif}
+.sappy-png-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:20px}
+.sappy-png-head h2{font-size:44px;letter-spacing:-.035em;line-height:1.08;margin:0;color:#17232c}
+.sappy-png-head p{font-size:18px;font-weight:700;margin:7px 0 0;color:#586975}
+.sappy-png-brand{font-size:21px;font-weight:800;color:#4b616d}
+#sappyPngMap{width:100%;height:1000px;background:#e9eff2;overflow:hidden;border:2px solid #d5e0e5;border-radius:22px}
+.sappy-png-subhead{display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px;font-size:25px;font-weight:800}
+.sappy-png-places{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px}
+.sappy-png-place{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f3f6f7;border:1px solid #e0e7e9;border-radius:13px;min-width:0}
+.sappy-png-place .n{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:50%;color:#131d22;font-size:16px;font-weight:800}
+.sappy-png-place .where{min-width:0;flex:1}
+.sappy-png-place strong{font-size:16px;display:block;line-height:1.3;color:#17232c}
+.sappy-png-place small{display:block;font-size:12px;line-height:1.45;margin-top:3px;color:#55636d}
+.sappy-png-foot{font-size:13px;color:#72808a;margin-top:18px;text-align:right}
+
+/* name pins with a drop-in animation */
 .lpin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;pointer-events:auto}
 .lpin .lname{order:1;background:#12140D;color:#F3F5EE;border:2px solid var(--c);border-radius:999px;padding:4px 10px;font:800 12px/1.2 "Manrope",system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 14px rgba(0,0,0,.35)}
 .lpin .ldot{order:2;width:12px;height:12px;border-radius:50%;background:var(--c);border:2.5px solid #fff;margin-top:3px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
@@ -1951,7 +1970,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
     <div class="mapcard"><div id="tMap"></div>
       <div class="maptools"><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
       <div class="years chips" id="trYears"></div></div>
-    <div class="travel-map-actions"><span id="trMapCount">All visited places</span><button class="btn" id="trExport" type="button">Export map + places</button></div>
+    <div class="travel-map-actions"><span id="trMapCount">All visited places</span><button class="btn" id="trExport" type="button">Export PNG</button></div>
     <div id="trMapList" class="travel-map-list"></div>
     <div id="trProvinceMapInfo" class="tr-province-map-info" hidden></div>
   </section>
@@ -2121,7 +2140,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.97";
+const APP_VERSION = "7.3.98";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4034,7 +4053,7 @@ function openFullMap(){
   if(!window.L) return;
   let el=$("fullMap");
   if(!el){ el=document.createElement("div"); el.id="fullMap"; el.className="fullmap";
-    el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All visited places</b><button class="fm-export" id="fmExport" type="button">Export PDF</button>'+
+    el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All visited places</b><button class="fm-export" id="fmExport" type="button">Export PNG</button>'+
       '</div>'+
       '<div id="fmMap"></div><div class="fm-list" id="fmList"></div>';
     document.body.appendChild(el);
@@ -4078,14 +4097,77 @@ function renderTravelMapList(){
     if(LMAP)LMAP.flyTo([Number(t.lat),Number(t.lng)],Math.max(LMAP.getZoom(),10));
   });
 }
-function exportTravelMap(){
-  if(!FMAP){toast("Open the map before exporting");return;}
-  const previousYear=trYear, previousScope=fScope;
-  trYear="all";fScope="world";paintFull(true);
-  const el=$("fullMap");el.classList.add("exporting");
-  const restore=()=>{el.classList.remove("exporting");trYear=previousYear;fScope=previousScope;paintFull(true);window.removeEventListener("afterprint",restore);};
-  window.addEventListener("afterprint",restore);
-  setTimeout(()=>{FMAP.invalidateSize();paintFull(true);setTimeout(()=>window.print(),650);},250);
+
+function sappyExportPlaces(){
+  // Export every saved Sri Lankan visit, regardless of the current year filter.
+  const inSriLanka=t=>{
+    const lat=Number(t.lat),lng=Number(t.lng);
+    return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=5.75&&lat<=9.95&&lng>=79.45&&lng<=82.2;
+  };
+  return trips().filter(inSriLanka).sort((a,b)=>
+    String(a.date||"").localeCompare(String(b.date||""))||String(a.name||"").localeCompare(String(b.name||"")));
+}
+let sappyPngMap=null,sappyPngMarkers=null,sappyHtmlCanvasPromise=null,sappyExportBusy=false;
+function sappyLoadCanvas(){
+  if(window.html2canvas)return Promise.resolve(window.html2canvas);
+  if(sappyHtmlCanvasPromise)return sappyHtmlCanvasPromise;
+  sappyHtmlCanvasPromise=new Promise((resolve,reject)=>{
+    const sc=document.createElement("script");
+    sc.src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+    sc.onload=()=>window.html2canvas?resolve(window.html2canvas):reject(new Error("PNG library not available"));
+    sc.onerror=()=>reject(new Error("PNG library could not load"));
+    document.head.appendChild(sc);
+  }).catch(e=>{sappyHtmlCanvasPromise=null;throw e;});
+  return sappyHtmlCanvasPromise;
+}
+function sappyExportBoard(){
+  let board=$("sappyPngBoard");
+  if(!board){
+    board=document.createElement("div");board.id="sappyPngBoard";board.className="sappy-png-board";
+    board.innerHTML='<div class="sappy-png-head"><div><h2>Sri Lanka, explored.</h2><p id="sappyPngSummary">My travel map</p></div><div class="sappy-png-brand">Sappy Travel</div></div>'+
+      '<div id="sappyPngMap"></div><div class="sappy-png-subhead"><span>Places I’ve visited</span><span id="sappyPngCount"></span></div>'+
+      '<div class="sappy-png-places" id="sappyPngPlaces"></div><div class="sappy-png-foot">Sappy Travel · My visited places in Sri Lanka</div>';
+    document.body.appendChild(board);
+  }
+  return board;
+}
+async function exportTravelMap(){
+  if(sappyExportBusy)return;
+  const places=sappyExportPlaces();
+  if(!places.length){toast("Add a Sri Lankan location before exporting");return;}
+  if(!window.L){toast("Open the map with internet to export");return;}
+  sappyExportBusy=true;
+  const trigger=$("trExport");if(trigger){trigger.disabled=true;trigger.textContent="Preparing PNG…";}
+  try{
+    const board=sappyExportBoard();
+    $("sappyPngSummary").textContent="All years · "+places.length+" saved location"+(places.length===1?"":"s");
+    $("sappyPngCount").textContent=places.length+" locations";
+    $("sappyPngPlaces").innerHTML=places.map((t,i)=>{
+      const color=(TYPES[t.type]||TYPES.place).c;
+      const date=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):(t.year||"");
+      return '<div class="sappy-png-place"><span class="n" style="background:'+color+'">'+(i+1)+'</span><span class="where"><strong>'+esc(t.name||"Visited place")+'</strong><small>'+esc([date,tripLoc(t)].filter(Boolean).join(" · "))+'</small></span></div>';
+    }).join("");
+    if(!sappyPngMap){
+      sappyPngMap=L.map("sappyPngMap",{zoomControl:false,attributionControl:false,worldCopyJump:false,fadeAnimation:false,zoomAnimation:false});
+      tileLayer().addTo(sappyPngMap);sappyPngMarkers=L.layerGroup().addTo(sappyPngMap);
+    }
+    sappyPngMarkers.clearLayers();
+    places.forEach((t,i)=>L.marker([Number(t.lat),Number(t.lng)],{icon:numIcon(i+1,(TYPES[t.type]||TYPES.place).c,true),zIndexOffset:places.length-i}).addTo(sappyPngMarkers));
+    sappyPngMap.invalidateSize({pan:false});
+    // Fit Sri Lanka itself, not just the clustered visits, so the full island is featured.
+    sappyPngMap.fitBounds(LK,{animate:false,padding:[35,45],maxZoom:9});
+    const html2canvas=await sappyLoadCanvas();
+    await new Promise(resolve=>setTimeout(resolve,1100));
+    sappyPngMap.invalidateSize({pan:false});
+    const canvas=await html2canvas(board,{backgroundColor:"#ffffff",scale:1.5,useCORS:true,allowTaint:false,logging:false,scrollX:0,scrollY:0,windowWidth:1400,windowHeight:Math.ceil(board.scrollHeight)});
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+    if(!blob)throw new Error("Could not create PNG");
+    const url=URL.createObjectURL(blob),link=document.createElement("a");
+    link.href=url;link.download="Sappy-Travel-Sri-Lanka-Map.png";document.body.appendChild(link);
+    link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+    toast("PNG map exported");
+  }catch(e){console.error("Travel PNG export",e);toast("PNG export failed. Check internet and try again.");}
+  finally{sappyExportBusy=false;if(trigger){trigger.disabled=false;trigger.textContent="Export PNG";}}
 }
 function nameIcon(name,color,plan,i){ return L.divIcon({className:"",html:'<div class="lpin'+(plan?' plan':'')+'" style="--c:'+color+';--i:'+(i||0)+'"><span class="ldot"></span><span class="lname">'+esc(name)+'</span></div>',iconSize:[0,0],iconAnchor:[0,0]}); }
 // Province coverage is based on saved Sri Lankan trips only. Boundary geometry
@@ -4168,7 +4250,7 @@ function renderTravelMapMarkers(){
       L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:3,opacity:.85}).addTo(LLAYER).on("click",()=>openTrip(t.id));
     }
     if(Number.isFinite(Number(t.lat))&&Number.isFinite(Number(t.lng))){
-      L.marker([Number(t.lat),Number(t.lng)],{icon:numIcon(nums[t.id]||"•",c,false)})
+      L.marker([Number(t.lat),Number(t.lng)],{icon:numIcon(nums[t.id]||"•",c,true)})
         .addTo(LLAYER).on("click",()=>openTrip(t.id));
     }
   });
@@ -5541,7 +5623,7 @@ function openApp(id){
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
  $("tripAdd").onclick=()=>openRecapForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
-$("trExport").onclick=()=>{openFullMap();setTimeout(exportTravelMap,650);};
+$("trExport").onclick=exportTravelMap;
 $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
