@@ -428,7 +428,36 @@ body.in-fullmap nav#travelTabs.tabs{display:none!important}
 #tv-map .mapcard{margin:0;height:calc(100vh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));height:calc(100dvh - 210px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:380px}
 #tv-map #tMap{flex:1;height:auto!important;cursor:grab}
 body[data-tv="map"] #travelView > div[style*="height:120px"]{display:none}
-/* name pins with a drop-in animation */
+/* Visited map + one-page printable location atlas */
+.travel-map-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 3px;font-size:13px;font-weight:800;color:var(--soft)}
+.travel-map-actions .btn{padding:11px 15px;font-size:12px;white-space:nowrap}
+.travel-map-list{display:grid;gap:7px;margin:10px 0 20px}
+.tm-place{width:100%;display:flex;align-items:center;gap:12px;padding:11px 12px;text-align:left;border:0;border-radius:14px;background:var(--card);color:var(--ink)}
+.tm-place .fm-t{flex:1}.tm-open{color:var(--soft);font-size:21px}
+.fm-export{border:0;background:var(--lime);color:var(--on-lime);padding:9px 12px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+@media screen {
+ body.in-travel[data-tv="map"] #tv-map .mapcard{height:min(54dvh,480px);min-height:300px}
+ body.in-travel[data-tv="map"] #tv-map #tMap{min-height:230px}
+}
+@media print {
+ @page{size:A4 landscape;margin:8mm}
+ html,body{height:auto!important;background:white!important;color:#152027!important}
+ body *{visibility:hidden!important}
+ #fullMap,#fullMap *{visibility:visible!important}
+ #fullMap{display:block!important;position:static!important;inset:auto!important;overflow:visible!important;width:100%!important;height:auto!important;padding:0!important;background:white!important;color:#152027!important;animation:none!important}
+ #fullMap .fm-top{padding:0 0 8px!important}
+ #fullMap .fm-top b{color:#152027!important}
+ #fullMap #fmClose,#fullMap #fmExport{display:none!important}
+ #fullMap #fmMap{height:118mm!important;min-height:118mm!important;width:100%!important;overflow:hidden!important;border:1px solid #d4d9dc!important}
+ #fullMap .fm-list{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 8px;overflow:visible!important;padding:8px 0 0!important;border:0!important;max-height:none!important}
+ #fullMap .fm-row{padding:2px 4px!important;gap:6px!important;break-inside:avoid;font-size:9px!important}
+ #fullMap .fm-n{width:17px!important;height:17px!important;font-size:10px!important}
+ #fullMap .fm-t b{font-size:10px!important;color:#152027!important}
+ #fullMap .fm-t span{font-size:8px!important;color:#5a656c!important}
+ #fullMap .fm-go,.leaflet-control-container{display:none!important}
+ #fullMap .leaflet-pane,#fullMap .leaflet-pane *{visibility:visible!important}
+}
+ /* name pins with a drop-in animation */
 .lpin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;pointer-events:auto}
 .lpin .lname{order:1;background:#12140D;color:#F3F5EE;border:2px solid var(--c);border-radius:999px;padding:4px 10px;font:800 12px/1.2 "Manrope",system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 14px rgba(0,0,0,.35)}
 .lpin .ldot{order:2;width:12px;height:12px;border-radius:50%;background:var(--c);border:2.5px solid #fff;margin-top:3px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
@@ -1922,6 +1951,8 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
     <div class="mapcard"><div id="tMap"></div>
       <div class="maptools"><button class="mbtn" id="trMe" aria-label="My location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button></div>
       <div class="years chips" id="trYears"></div></div>
+    <div class="travel-map-actions"><span id="trMapCount">All visited places</span><button class="btn" id="trExport" type="button">Export map + places</button></div>
+    <div id="trMapList" class="travel-map-list"></div>
     <div id="trProvinceMapInfo" class="tr-province-map-info" hidden></div>
   </section>
   <section id="tv-plans" hidden>
@@ -2090,7 +2121,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.96";
+const APP_VERSION = "7.3.97";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4003,13 +4034,14 @@ function openFullMap(){
   if(!window.L) return;
   let el=$("fullMap");
   if(!el){ el=document.createElement("div"); el.id="fullMap"; el.className="fullmap";
-    el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All places</b>'+
+    el.innerHTML='<div class="fm-top"><button class="hub backbtn" id="fmClose" aria-label="Close">‹</button><b>All visited places</b><button class="fm-export" id="fmExport" type="button">Export PDF</button>'+
       '</div>'+
       '<div id="fmMap"></div><div class="fm-list" id="fmList"></div>';
     document.body.appendChild(el);
     $("fmClose").onclick=closeFullMap;
+    $("fmExport").onclick=exportTravelMap;
   }
-  fScope="lk"; el.classList.add("on"); document.body.classList.add("in-fullmap");
+  fScope="world"; el.classList.add("on"); document.body.classList.add("in-fullmap");
   setTimeout(()=>{ if(!FMAP){ FMAP=L.map("fmMap",{zoomControl:true,attributionControl:true,worldCopyJump:true}); tileLayer().addTo(FMAP); FLAYER=L.layerGroup().addTo(FMAP); }
     FMAP.invalidateSize(); paintFull(true); },60);
 }
@@ -4032,6 +4064,29 @@ function focusRow(id,fromList){ document.querySelectorAll(".fm-row").forEach(r=>
   const r=document.querySelector('.fm-row[data-id="'+id+'"]'); if(r&&!fromList) r.scrollIntoView({behavior:"smooth",block:"nearest"});
   const m=fMarkers[id]; if(m){ const el=m.getElement(); if(el){ el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } } }
 
+function renderTravelMapList(){
+  const host=$("trMapList"); if(!host)return;
+  const list=mapList();
+  $("trMapCount").textContent=list.length+" visited place"+(list.length===1?"":"s")+" · "+(trYear==="all"?"All years":trYear);
+  host.innerHTML=list.length?list.map((t,i)=>{
+    const T=TYPES[t.type]||TYPES.place;
+    const when=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):t.year||"";
+    return '<button class="tm-place" type="button" data-id="'+esc(t.id)+'"><span class="fm-n" style="background:'+T.c+'">'+(i+1)+'</span><span class="fm-t"><b>'+esc(t.name)+'</b><span>'+esc([when,tripLoc(t)].filter(Boolean).join(" · "))+'</span></span><span class="tm-open">›</span></button>';
+  }).join(""):'<div class="empty">No visited places yet.</div>';
+  host.querySelectorAll(".tm-place").forEach(btn=>btn.onclick=()=>{
+    const t=S.trip[btn.dataset.id]; if(!t)return;
+    if(LMAP)LMAP.flyTo([Number(t.lat),Number(t.lng)],Math.max(LMAP.getZoom(),10));
+  });
+}
+function exportTravelMap(){
+  if(!FMAP){toast("Open the map before exporting");return;}
+  const previousYear=trYear, previousScope=fScope;
+  trYear="all";fScope="world";paintFull(true);
+  const el=$("fullMap");el.classList.add("exporting");
+  const restore=()=>{el.classList.remove("exporting");trYear=previousYear;fScope=previousScope;paintFull(true);window.removeEventListener("afterprint",restore);};
+  window.addEventListener("afterprint",restore);
+  setTimeout(()=>{FMAP.invalidateSize();paintFull(true);setTimeout(()=>window.print(),650);},250);
+}
 function nameIcon(name,color,plan,i){ return L.divIcon({className:"",html:'<div class="lpin'+(plan?' plan':'')+'" style="--c:'+color+';--i:'+(i||0)+'"><span class="ldot"></span><span class="lname">'+esc(name)+'</span></div>',iconSize:[0,0],iconAnchor:[0,0]}); }
 // Province coverage is based on saved Sri Lankan trips only. Boundary geometry
 // is sourced from Sri Lanka NSDI; geoBoundaries is a fallback if unavailable.
@@ -4105,6 +4160,7 @@ function fitWholeSriLanka(){
 function renderTravelMapMarkers(){
   if(!LMAP||!LLAYER)return;
   LLAYER.clearLayers();
+  const nums={};mapList().forEach((t,i)=>nums[t.id]=i+1);
   const selectedTrips=trips().filter(t=>trYear==="all"||tYear(t)===+trYear);
   selectedTrips.forEach(t=>{
     const c=(TYPES[t.type]||TYPES.place).c;
@@ -4112,7 +4168,7 @@ function renderTravelMapMarkers(){
       L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:3,opacity:.85}).addTo(LLAYER).on("click",()=>openTrip(t.id));
     }
     if(Number.isFinite(Number(t.lat))&&Number.isFinite(Number(t.lng))){
-      L.marker([Number(t.lat),Number(t.lng)],{icon:nameIcon(t.name,c,false,-1)})
+      L.marker([Number(t.lat),Number(t.lng)],{icon:numIcon(nums[t.id]||"•",c,false)})
         .addTo(LLAYER).on("click",()=>openTrip(t.id));
     }
   });
@@ -4122,7 +4178,7 @@ function renderTravelMapMarkers(){
         .addTo(LLAYER).on("click",()=>openPlan(p.id));
     }
   });
-
+  renderTravelMapList();
 }
 async function renderProvinceMap(){
   if(!LMAP||trView!=="map")return;
@@ -4167,8 +4223,9 @@ function drawMap(fit,animate){
   mapList().forEach((t,i)=>num[t.id]=i+1);
   list.forEach(t=>{ const c=(TYPES[t.type]||TYPES.place).c;
     if(t.track&&t.track.length>1){ const line=L.polyline(t.track.map(p=>[p[0],p[1]]),{color:c,weight:4,opacity:.9}).addTo(LLAYER); line.on("click",()=>openTrip(t.id)); }
-    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:nameIcon(t.name,c,false,animate?b.length:-1)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
-  plans().forEach((p,i)=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:nameIcon(p.name,"#BBA6FF",true,animate?b.length+i:-1)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
+    if(isFinite(t.lat)){ L.marker([t.lat,t.lng],{icon:numIcon(num[t.id]||"•",c,false)}).addTo(LLAYER).on("click",()=>openTrip(t.id)); b.push([t.lat,t.lng]); } });
+  plans().forEach((p,i)=>{ if(isFinite(p.lat)) L.marker([p.lat,p.lng],{icon:pinIcon("#BBA6FF",true)}).addTo(LLAYER).on("click",()=>openPlan(p.id)); });
+  renderTravelMapList();
   if(fit!==false)fitWholeSriLanka();
 }
 function locateMe(center){
@@ -5124,6 +5181,7 @@ function renderTravel(){
   $("travelSummaryYear").onchange=e=>{trYear=e.target.value;renderTravel();};
   $("trYears").innerHTML=['all'].concat(yrs).map(y=>'<button class="chip'+(String(trYear)===String(y)?' on':'')+'" data-y="'+y+'">'+(y==="all"?"All years":y)+'</button>').join("");
   $("trYears").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{trYear=b.dataset.y;renderTravel();selectedMapProvince="";renderProvinceMap();});
+  renderTravelMapList();
   $("trProvinceAlert").hidden=missing.length===0;
   if(missing.length){
     $("trProvinceAlert").innerHTML='<button type="button" class="tr-province-alert-button" id="trProvinceFix"><span class="tr-province-alert-icon">!</span><span class="tr-province-alert-text"><strong>'+missing.length+' '+(missing.length===1?'trip needs':'trips need')+' a province</strong><small>Complete the location to update your Sri Lanka coverage.</small></span><span class="tr-province-alert-arrow">›</span></button>';
@@ -5483,6 +5541,7 @@ function openApp(id){
 document.querySelectorAll("#travelTabs [data-tv]").forEach(b=>b.onclick=()=>travelGo(b.dataset.tv));
  $("tripAdd").onclick=()=>openRecapForm();
 $("trMe").onclick=()=>locateMe(true); $("seedBtn").onclick=seedPlaces;
+$("trExport").onclick=()=>{openFullMap();setTimeout(exportTravelMap,650);};
 $("pasteOpen").onclick=openPaste;
 let setFrom="hub";
 function openSettings(){
