@@ -2161,7 +2161,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.99";
+const APP_VERSION = "7.3.100";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4484,9 +4484,14 @@ function compressPhoto(file,routeScreenshot=false,compact=false){
 const tbMoney=c=>"Rs "+fmt(Math.abs(c)/100,2);
 const tbCents=v=>Math.round(Number(String(v).replace(/,/g,""))*100);
 function tbData(t){const b=t.budget||{};return {people:Array.isArray(b.people)?b.people:[],expenses:Array.isArray(b.expenses)?b.expenses:[],payments:Array.isArray(b.payments)?b.payments:[]};}
+function tbRecord(id){
+ const trip=S.trip[id];if(live(trip))return {kind:"trip",item:trip};
+ const plan=S.plan[id];if(live(plan))return {kind:"plan",item:plan};
+ return null;
+}
 function tbSave(id,b){
- const t=S.trip[id];if(!t||!live(t))return false;
- return put("trip",Object.assign({},t,{budget:b}));
+ const record=tbRecord(id);if(!record)return false;
+ return put(record.kind,Object.assign({},record.item,{budget:b}));
 }
 function tbTotals(b){
  const balances=Object.fromEntries(b.people.map(p=>[p.id,0])),spent=Object.fromEntries(b.people.map(p=>[p.id,0]));
@@ -4525,7 +4530,8 @@ function tripBudgetTeaser(t){
 }
 function tbPerson(b,id){return b.people.find(p=>p.id===id)?.name||"Unknown";}
 function openTripBudget(id){
- const t=S.trip[id];if(!t||!live(t))return;
+ const record=tbRecord(id);if(!record)return;
+ const t=record.item;
  const b=tbData(t),x=tbTotals(b);
  openSheet('<div class="rc-kicker">Sappy Travel · Private</div><h2 style="margin:4px 0 4px">Trip budget</h2><p class="note" style="margin:0 0 14px">'+esc(t.name)+' · Not included in trip images or recaps</p>'+
  '<div class="tb-head"><small>TOTAL GROUP SPENDING</small><strong class="num">'+tbMoney(x.total)+'</strong><span>'+b.people.length+' travellers · '+b.expenses.length+' expenses</span></div>'+
@@ -4537,7 +4543,7 @@ function openTripBudget(id){
  (!b.people.length?'<p class="tb-hint">Add travellers to start.</p>':!b.expenses.length?'<p class="tb-hint">Add expenses to calculate who owes whom.</p>':x.transfers.length?x.transfers.map((p,i)=>'<div class="tb-transfer"><div class="tb-transfer-line">'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</div><small>'+tbMoney(p.amount)+' to transfer</small><button class="btn soft" data-settle="'+i+'">Mark as paid</button></div>').join(""):'<p class="tb-hint">✓ Everyone is settled up.</p>')+
  (b.payments.length?'<div class="tb-hint" style="margin-top:14px">Recorded payments</div>'+b.payments.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</b><small>'+tbMoney(p.amount)+' transferred</small></div><button class="tb-edit" data-undo="'+esc(p.id)+'">Undo</button></div>').join(""):'')+
  '</div><button class="btn full soft" id="tbBack">← Back to trip</button>');
- $("tbBack").onclick=()=>openTrip(id);
+ $("tbBack").onclick=()=>record.kind==="plan"?openPlan(id):openTrip(id);
  $("tbAddPerson").onclick=()=>tbEditPerson(id);
  $("tbAddExpense").onclick=()=>{if(!b.people.length)return toast("Add travellers first");tbEditExpense(id);};
  $("sheetBody").querySelectorAll("[data-person]").forEach(el=>el.onclick=()=>tbEditPerson(id,el.dataset.person));
@@ -4555,7 +4561,8 @@ function openTripBudget(id){
  });
 }
 function tbEditPerson(id,pid){
- const b=tbData(S.trip[id]),p=b.people.find(x=>x.id===pid);
+ const record=tbRecord(id);if(!record)return;
+ const b=tbData(record.item),p=b.people.find(x=>x.id===pid);
  openSheet('<div class="rc-kicker">Trip budget · Travellers</div><h2>'+(p?'Edit traveller':'Add traveller')+'</h2>'+
  '<label class="fl2"><span>Name</span><input class="inp" id="tbName" maxlength="70" value="'+esc(p?.name||"")+'" placeholder="e.g. Kasun"></label>'+
  '<div class="btns"><button class="btn" style="flex:1" id="tbPersonSave">Save</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
@@ -4574,7 +4581,8 @@ function tbEditPerson(id,pid){
  };
 }
 function tbEditExpense(id,eid){
- const b=tbData(S.trip[id]),e=b.expenses.find(x=>x.id===eid),selected=new Set(e?.for||b.people.map(p=>p.id));
+ const record=tbRecord(id);if(!record)return;
+ const b=tbData(record.item),e=b.expenses.find(x=>x.id===eid),selected=new Set(e?.for||b.people.map(p=>p.id));
  const opt=(chosen)=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===chosen?' selected':'')+'>'+esc(p.name)+'</option>').join("");
  openSheet('<div class="rc-kicker">Trip budget · Expenses</div><h2>'+(e?'Edit expense':'Add expense')+'</h2>'+
  '<label class="fl2"><span>What was it for?</span><input class="inp" id="tbExpenseTitle" maxlength="90" placeholder="Fuel, dinner, tickets…" value="'+esc(e?.title||"")+'"></label>'+
@@ -4711,7 +4719,7 @@ function openAddTrip(){openRecapForm();}
 function openRecapForm(id=null,planId=null){
  const old=id&&S.trip[id],p=planId&&S.plan[planId];
  const t=Object.assign({id:"t"+uid(),name:p?.name||"",date:p?.date||ymd(Date.now()),type:p?.type||"hike"},old||{});
- if(p&&!old)Object.assign(t,{loc:p.loc||p.name,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,province:p.province||"",endName:p.name,endLat:p.lat,endLng:p.lng});
+ if(p&&!old)Object.assign(t,{loc:p.loc||p.name,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,province:p.province||"",endName:p.name,endLat:p.lat,endLng:p.lng,budget:p.budget||undefined});
  const existingPace=t.avgPace?tripPace(t).match(/^(\d+)'(\d{2})"/):null;
  const v=k=>t[k]==null?"":String(t[k]),field=(name,k,val,ph)=>'<label class="fl2"><span>'+name+'</span><input class="inp" id="'+k+'" value="'+esc(val)+'" placeholder="'+ph+'"></label>';
  openSheet('<div class="rc-form-top"><div class="rc-kicker">Sappy Travel · Memories</div><h2 style="margin:0 0 5px">'+(id?'Edit your trip':'Create a trip recap')+'</h2><p class="note" style="margin:0">A beautiful story starts with the right details.</p><div class="rc-type-picker" id="rcTypePicker" role="group" aria-label="Trip type">'+Object.keys(TYPES).map(k=>'<button type="button" data-type="'+k+'" class="'+(t.type===k?'on':'')+'" aria-pressed="'+(t.type===k)+'">'+TYPES[k].name+'</button>').join("")+'</div></div>'+
@@ -4908,7 +4916,8 @@ function openRecapForm(id=null,planId=null){
     throw new Error("Trip could not be saved");
    }
    for(const key of Object.values(priorKeys))if(key&&key!==t.photoHQKey&&key!==t.routeShotHQKey)tripMediaAction("delete",key).catch(()=>{});
-   closeSheet();renderTravel();openTripStudio(t.id);
+   if(p&&live(S.plan[p.id])){if(!remove("plan",p.id))toast("Trip saved. Planned visit may still need removing.");}
+   renderPlans();closeSheet();renderTravel();openTripStudio(t.id);
   }catch(e){saveButton.disabled=false;saveButton.textContent="Save";toast("Could not save the trip. Please try again.");}
  };
 
@@ -5488,17 +5497,23 @@ function openPlan(id){
     '<div><span>Trip type</span><b>'+TYPES[k].name+'</b></div>'+
     '<div><span>Driving distance</span><b class="num">'+(p.drive?fmt(p.drive.km,p.drive.km<100?1:0)+' km':(p.straight?fmt(p.straight)+' km direct':'—'))+'</b></div><div><span>Driving time</span><b class="num">'+(p.drive?fmtDur(p.drive.min*60):'—')+'</b></div></div>'+
     (!home?'<button class="btn soft full" id="plHome" style="margin-bottom:10px">Set my current location as Home</button>':'')+
+    '<button type="button" class="tb-entry" id="plBudget"><span><b>Split trip budget</b><small>'+tripBudgetTeaser(p)+'</small></span><span class="chev">›</span></button>'+
     '<button class="btn full" id="plRecap" style="background:#8FDDFF;color:#12140D;margin-bottom:10px">✦ Make trip recap</button>'+
     '<div class="btns"><button class="btn soft" id="plEdit" style="flex:1">Edit plan</button><button class="btn soft" id="plDone">Completed ✓</button><button class="btn warn" id="plDel">Delete</button></div>');
   miniMap($("tdMap"),{type:k,lat:p.lat,lng:p.lng});
   if($("plHome")) $("plHome").onclick=()=>navigator.geolocation.getCurrentPosition(async pos=>{ S.travelHome={lat:pos.coords.latitude,lng:pos.coords.longitude}; persist(); put("cfg",{id:"travel",home:S.travelHome});
       for(const q of plans()){ const h=[S.travelHome.lat,S.travelHome.lng]; const n=Object.assign({},q,{straight:Math.round(hav(h,[q.lat,q.lng]))}); try{ n.drive=await driveRoute(h,[q.lat,q.lng]); n.driveFrom=h.join(","); }catch(e){} put("plan",n); }
       toast("Home set"); openPlan(id); renderPlans(); },()=>toast("Allow location for this app first"));
+  $("plBudget").onclick=()=>openTripBudget(p.id);
   $("plRecap").onclick=()=>openRecapForm(null,p.id);
   $("plEdit").onclick=()=>openPlanForm(p.id);
-  $("plDone").onclick=()=>{ remove("plan",p.id); const date=p.date&&daysTo(p.date)<=0?p.date:ymd(Date.now());
-    put("trip",{id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,drive:p.drive,driveFrom:p.driveFrom});
-    closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast("Moved to your trips. Add a photo there."); };
+  $("plDone").onclick=()=>{
+    const date=p.date&&daysTo(p.date)<=0?p.date:ymd(Date.now());
+    const t={id:"t"+uid(),name:p.name,date,year:+date.slice(0,4),type:k,lat:p.lat,lng:p.lng,cc:p.cc,country:p.country,loc:p.loc,drive:p.drive,driveFrom:p.driveFrom,planId:p.id};
+    if(p.budget)t.budget=p.budget;
+    if(!put("trip",t))return;
+    if(!remove("plan",p.id)){toast("Trip created. Check planned visits before adding another.");return;}
+    closeSheet(); renderPlans(); renderTravel(); drawMap(false); toast("Moved to your trips, including budget."); };
   $("plDel").onclick=()=>{ if(!confirm("Delete this planned visit?")) return; remove("plan",p.id); closeSheet(); renderPlans(); renderTravel(); drawMap(false); };
 }
 
