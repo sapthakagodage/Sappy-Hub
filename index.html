@@ -1927,6 +1927,27 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 
 /* Optional, compact shared-expense action for Cash Wallet transactions. */
 
+
+/* Travel budget — independent of trip recap and exported image */
+.tb-entry{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card2);padding:15px 16px;margin:12px 0 14px}
+.tb-entry b,.tb-entry small{display:block}.tb-entry b{font-size:15px;font-weight:800}.tb-entry small{font-size:12px;color:var(--soft);margin-top:3px}.tb-entry .chev{font-size:25px;color:var(--lime)}
+.tb-head{padding:18px;background:var(--lime);color:var(--on-lime);border-radius:var(--r-lg);margin-bottom:12px}
+.tb-head small{font-size:12px;font-weight:800;letter-spacing:.04em;opacity:.7}.tb-head strong{display:block;font-size:30px;letter-spacing:-.04em;margin:5px 0}.tb-head span{font-size:13px;font-weight:700;opacity:.75}
+.tb-section{background:var(--card);padding:16px;border-radius:var(--r-lg);margin:10px 0}
+.tb-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.tb-title h3{margin:0;font-size:16px}.tb-hint{color:var(--soft);font-size:12px;margin:7px 0}
+.tb-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.tb-item:first-of-type{border-top:0}.tb-item .tb-main{min-width:0;flex:1}.tb-item b{display:block;font-weight:800;font-size:14px;overflow-wrap:anywhere}.tb-item small{display:block;color:var(--soft);font-size:12px;margin-top:2px}
+.tb-item button.tb-edit{border:0;background:var(--card2);border-radius:11px;padding:8px 10px;font-size:12px;font-weight:800}
+.tb-chip{display:inline-block;background:var(--card2);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;margin:3px 4px 3px 0}
+.tb-balance{font-size:13px;font-weight:800;white-space:nowrap}.tb-balance.pos{color:var(--pos)}.tb-balance.neg{color:var(--neg)}
+.tb-transfer{border-top:1px solid var(--line);padding:12px 0}.tb-transfer:first-of-type{border-top:0}.tb-transfer-line{font-size:14px;font-weight:800;overflow-wrap:anywhere}.tb-transfer small{display:block;color:var(--soft);font-size:12px;margin-top:3px}
+.tb-transfer .btn{margin-top:9px;font-size:12px;padding:9px 12px}
+.tb-picks{display:flex;flex-wrap:wrap;gap:7px;margin:5px 0 12px}
+.tb-picks label{display:flex;align-items:center;gap:6px;background:var(--card2);border-radius:999px;padding:9px 11px;font-size:12px;font-weight:800}
+.tb-picks input{accent-color:var(--lime)}
+.tb-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
 </style>
 </head>
 <body class="in-hub">
@@ -2140,7 +2161,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.98";
+const APP_VERSION = "7.3.99";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4458,6 +4479,131 @@ function compressPhoto(file,routeScreenshot=false,compact=false){
   fr.readAsDataURL(file);
  }).finally(busyEnd);
 }
+
+/* =============== Trip budgets (optional; stored with each trip for normal sync) =============== */
+const tbMoney=c=>"Rs "+fmt(Math.abs(c)/100,2);
+const tbCents=v=>Math.round(Number(String(v).replace(/,/g,""))*100);
+function tbData(t){const b=t.budget||{};return {people:Array.isArray(b.people)?b.people:[],expenses:Array.isArray(b.expenses)?b.expenses:[],payments:Array.isArray(b.payments)?b.payments:[]};}
+function tbSave(id,b){
+ const t=S.trip[id];if(!t||!live(t))return false;
+ return put("trip",Object.assign({},t,{budget:b}));
+}
+function tbTotals(b){
+ const balances=Object.fromEntries(b.people.map(p=>[p.id,0])),spent=Object.fromEntries(b.people.map(p=>[p.id,0]));
+ let total=0;
+ for(const e of b.expenses){
+  if(!balances.hasOwnProperty(e.payer)||!Number.isSafeInteger(e.amount)||e.amount<=0)continue;
+  const ids=(e.for||[]).filter(id=>balances.hasOwnProperty(id));
+  if(!ids.length)continue;
+  total+=e.amount;balances[e.payer]+=e.amount;
+  // Equal shares in cents; distribute remainder deterministically.
+  const per=Math.floor(e.amount/ids.length),extra=e.amount%ids.length;
+  ids.forEach((id,i)=>{const share=per+(i<extra?1:0);balances[id]-=share;spent[id]+=share;});
+ }
+ // Recorded transfers reverse outstanding debts without altering original expenses.
+ for(const p of b.payments){
+  if(balances.hasOwnProperty(p.from)&&balances.hasOwnProperty(p.to)&&Number.isSafeInteger(p.amount)&&p.amount>0){
+   balances[p.from]+=p.amount;balances[p.to]-=p.amount;
+  }
+ }
+ const creditors=[],debtors=[];
+ for(const [id,amount] of Object.entries(balances)){if(amount>0)creditors.push({id,amount});else if(amount<0)debtors.push({id,amount:-amount});}
+ creditors.sort((a,b)=>b.amount-a.amount);debtors.sort((a,b)=>b.amount-a.amount);
+ const transfers=[];let i=0,j=0;
+ while(i<debtors.length&&j<creditors.length){
+  const amount=Math.min(debtors[i].amount,creditors[j].amount);
+  if(amount>0)transfers.push({from:debtors[i].id,to:creditors[j].id,amount});
+  debtors[i].amount-=amount;creditors[j].amount-=amount;
+  if(!debtors[i].amount)i++;
+  if(!creditors[j].amount)j++;
+ }
+ return {total,balances,spent,transfers};
+}
+function tripBudgetTeaser(t){
+ const b=tbData(t);if(!t.budget)return "Optional · track costs and settle up";
+ const x=tbTotals(b);return b.people.length+" travellers · "+tbMoney(x.total)+" spent · "+x.transfers.length+" to settle";
+}
+function tbPerson(b,id){return b.people.find(p=>p.id===id)?.name||"Unknown";}
+function openTripBudget(id){
+ const t=S.trip[id];if(!t||!live(t))return;
+ const b=tbData(t),x=tbTotals(b);
+ openSheet('<div class="rc-kicker">Sappy Travel · Private</div><h2 style="margin:4px 0 4px">Trip budget</h2><p class="note" style="margin:0 0 14px">'+esc(t.name)+' · Not included in trip images or recaps</p>'+
+ '<div class="tb-head"><small>TOTAL GROUP SPENDING</small><strong class="num">'+tbMoney(x.total)+'</strong><span>'+b.people.length+' travellers · '+b.expenses.length+' expenses</span></div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Travellers</h3><button class="btn soft" id="tbAddPerson">＋ Add</button></div>'+
+ (b.people.length?b.people.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(p.name)+'</b><small>Share: '+tbMoney(x.spent[p.id]||0)+'</small></div><span class="tb-balance '+(x.balances[p.id]>0?'pos':x.balances[p.id]<0?'neg':'')+'">'+(x.balances[p.id]>0?'+':x.balances[p.id]<0?'−':'')+tbMoney(x.balances[p.id]||0)+'</span><button class="tb-edit" data-person="'+esc(p.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Add everyone joining this trip first.</p>')+'</div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Expenses</h3><button class="btn soft" id="tbAddExpense">＋ Add</button></div>'+
+ (b.expenses.length?b.expenses.map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPerson(b,e.payer))+' paid · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Settlement</h3></div>'+
+ (!b.people.length?'<p class="tb-hint">Add travellers to start.</p>':!b.expenses.length?'<p class="tb-hint">Add expenses to calculate who owes whom.</p>':x.transfers.length?x.transfers.map((p,i)=>'<div class="tb-transfer"><div class="tb-transfer-line">'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</div><small>'+tbMoney(p.amount)+' to transfer</small><button class="btn soft" data-settle="'+i+'">Mark as paid</button></div>').join(""):'<p class="tb-hint">✓ Everyone is settled up.</p>')+
+ (b.payments.length?'<div class="tb-hint" style="margin-top:14px">Recorded payments</div>'+b.payments.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</b><small>'+tbMoney(p.amount)+' transferred</small></div><button class="tb-edit" data-undo="'+esc(p.id)+'">Undo</button></div>').join(""):'')+
+ '</div><button class="btn full soft" id="tbBack">← Back to trip</button>');
+ $("tbBack").onclick=()=>openTrip(id);
+ $("tbAddPerson").onclick=()=>tbEditPerson(id);
+ $("tbAddExpense").onclick=()=>{if(!b.people.length)return toast("Add travellers first");tbEditExpense(id);};
+ $("sheetBody").querySelectorAll("[data-person]").forEach(el=>el.onclick=()=>tbEditPerson(id,el.dataset.person));
+ $("sheetBody").querySelectorAll("[data-expense]").forEach(el=>el.onclick=()=>tbEditExpense(id,el.dataset.expense));
+ $("sheetBody").querySelectorAll("[data-settle]").forEach(el=>el.onclick=()=>{
+  const p=x.transfers[Number(el.dataset.settle)];if(!p)return;
+  if(!confirm("Record "+tbMoney(p.amount)+" from "+tbPerson(b,p.from)+" to "+tbPerson(b,p.to)+" as paid?"))return;
+  b.payments.push({id:"bp"+uid(),from:p.from,to:p.to,amount:p.amount});
+  if(tbSave(id,b))openTripBudget(id);
+ });
+ $("sheetBody").querySelectorAll("[data-undo]").forEach(el=>el.onclick=()=>{
+  if(!confirm("Undo this recorded payment?"))return;
+  b.payments=b.payments.filter(p=>p.id!==el.dataset.undo);
+  if(tbSave(id,b))openTripBudget(id);
+ });
+}
+function tbEditPerson(id,pid){
+ const b=tbData(S.trip[id]),p=b.people.find(x=>x.id===pid);
+ openSheet('<div class="rc-kicker">Trip budget · Travellers</div><h2>'+(p?'Edit traveller':'Add traveller')+'</h2>'+
+ '<label class="fl2"><span>Name</span><input class="inp" id="tbName" maxlength="70" value="'+esc(p?.name||"")+'" placeholder="e.g. Kasun"></label>'+
+ '<div class="btns"><button class="btn" style="flex:1" id="tbPersonSave">Save</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
+ (p?'<button class="btn warn full" id="tbPersonDelete" style="margin-top:10px">Remove traveller</button>':''));
+ $("tbCancel").onclick=()=>openTripBudget(id);
+ $("tbPersonSave").onclick=()=>{
+  const name=$("tbName").value.trim();if(!name)return toast("Enter a name");
+  if(b.people.some(x=>x.id!==pid&&x.name.toLocaleLowerCase()===name.toLocaleLowerCase()))return toast("Name already added");
+  if(p)p.name=name;else b.people.push({id:"bp"+uid(),name});
+  if(tbSave(id,b))openTripBudget(id);
+ };
+ if(p)$("tbPersonDelete").onclick=()=>{
+  if(b.expenses.some(e=>e.payer===pid||(e.for||[]).includes(pid))||b.payments.some(e=>e.from===pid||e.to===pid))return toast("Remove this person's expenses and payments first");
+  if(!confirm("Remove "+p.name+"?"))return;
+  b.people=b.people.filter(x=>x.id!==pid);if(tbSave(id,b))openTripBudget(id);
+ };
+}
+function tbEditExpense(id,eid){
+ const b=tbData(S.trip[id]),e=b.expenses.find(x=>x.id===eid),selected=new Set(e?.for||b.people.map(p=>p.id));
+ const opt=(chosen)=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===chosen?' selected':'')+'>'+esc(p.name)+'</option>').join("");
+ openSheet('<div class="rc-kicker">Trip budget · Expenses</div><h2>'+(e?'Edit expense':'Add expense')+'</h2>'+
+ '<label class="fl2"><span>What was it for?</span><input class="inp" id="tbExpenseTitle" maxlength="90" placeholder="Fuel, dinner, tickets…" value="'+esc(e?.title||"")+'"></label>'+
+ '<div class="tb-row"><label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="tbExpenseAmount" inputmode="decimal" placeholder="3,500" value="'+(e?e.amount/100:"")+'"></label>'+
+ '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'</select></label></div>'+
+ '<div class="tb-title"><h3>Split equally between</h3><button class="btn soft" id="tbAll">All</button></div>'+
+ '<div class="tb-picks">'+b.people.map(p=>'<label><input type="checkbox" data-share="'+esc(p.id)+'"'+(selected.has(p.id)?' checked':'')+'>'+esc(p.name)+'</label>').join("")+'</div>'+
+ '<p class="tb-hint">Only selected travellers share this expense, even if someone else paid.</p>'+
+ '<div class="btns"><button class="btn" style="flex:1" id="tbExpenseSave">Save expense</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
+ (e?'<button class="btn warn full" id="tbExpenseDelete" style="margin-top:10px">Delete expense</button>':''));
+ $("tbCancel").onclick=()=>openTripBudget(id);
+ $("tbAll").onclick=()=>document.querySelectorAll("#sheetBody [data-share]").forEach(ch=>ch.checked=true);
+ $("tbExpenseSave").onclick=()=>{
+  const title=$("tbExpenseTitle").value.trim(),amount=tbCents($("tbExpenseAmount").value),payer=$("tbPayer").value;
+  const members=[...document.querySelectorAll("#sheetBody [data-share]:checked")].map(ch=>ch.dataset.share);
+  if(!title)return toast("Enter an expense name");
+  if(!Number.isSafeInteger(amount)||amount<=0)return toast("Enter a valid amount");
+  if(!members.length)return toast("Select someone to share this expense");
+  if(e)Object.assign(e,{title,amount,payer,for:members});
+  else b.expenses.push({id:"be"+uid(),title,amount,payer,for:members});
+  if(tbSave(id,b))openTripBudget(id);
+ };
+ if(e)$("tbExpenseDelete").onclick=()=>{
+  if(!confirm("Delete this expense?"))return;
+  b.expenses=b.expenses.filter(x=>x.id!==eid);
+  if(tbSave(id,b))openTripBudget(id);
+ };
+}
+
 function openTrip(id){
   const t=S.trip[id]; if(!t) return; const T=TYPES[t.type]||TYPES.place;
   const when=t.date?new Date(fromYmd(t.date)).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"long",year:"numeric"}):(t.year||"Date not set");
@@ -4477,9 +4623,11 @@ function openTrip(id){
     ((t.type==='hike'||t.type==='walk')?'<div><span>Steps</span><b class="num">'+(t.steps==null?'—':fmt(t.steps))+'</b></div>'+
     '<div><span>Calories</span><b class="num">'+(t.calories==null?'—':fmt(t.calories)+' kcal')+'</b></div>':'')+'</div>'+
     '<div id="tHome" class="fromhome" hidden></div>'+
+    '<button type="button" class="tb-entry" id="tBudget"><span><b>Split trip budget</b><small>'+tripBudgetTeaser(t)+'</small></span><span class="chev">›</span></button>'+
     '<div class="btns" style="margin-top:16px;margin-bottom:10px"><button class="btn soft" id="tEdit" style="flex:1">Edit trip</button><button class="btn warn" id="tDel">Delete trip</button></div>'+
     '<button class="btn full travel-recap-action" id="tStudio">Create trip recap</button>');
   miniMap($("tdMap"),t);
+  $("tBudget").onclick=()=>openTripBudget(t.id);
   $("tStudio").onclick=()=>openTripStudio(t.id);
   $("tEdit").onclick=()=>openRecapForm(t.id);
   $("tDel").onclick=()=>{ if(!confirm("Delete this trip?")) return;
