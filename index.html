@@ -2201,7 +2201,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.102";
+const APP_VERSION = "7.3.103";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3498,6 +3498,11 @@ function openSheet(html){
   }
   setTimeout(()=>{ if(motionId===sheetMotionId)fmtAmountsIn(body); },0);
 }
+function sheetReturnTo(action){
+  // A child editor should dismiss to its parent drawer, not the travel list.
+  $("sx").onclick=action;
+  $("scrim").onclick=action;
+}
 function closeSheet(){
   ++sheetMotionId; // Cancel any opening frames that have not painted yet.
   setTimeout(rescueSb,350);
@@ -4623,6 +4628,7 @@ function tbEditPerson(id,pid){
  '<label class="fl2"><span>Name</span><input class="inp" id="tbName" maxlength="70" value="'+esc(p?.name||"")+'" placeholder="e.g. Kasun"></label>'+
  '<div class="btns"><button class="btn" style="flex:1" id="tbPersonSave">Save</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
  (p?'<button class="btn warn full" id="tbPersonDelete" style="margin-top:10px">Remove traveller</button>':''));
+ sheetReturnTo(()=>openTripBudget(id));
  $("tbCancel").onclick=()=>openTripBudget(id);
  $("tbPersonSave").onclick=()=>{
   const name=$("tbName").value.trim();if(!name)return toast("Enter a name");
@@ -4651,6 +4657,7 @@ function tbEditExpense(id,eid){
  '<p class="tb-hint">Only selected travellers share this expense, even if someone else paid.</p>'+
  '<div class="tb-form-actions"><button class="btn" id="tbExpenseSave">Save expense</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
  (e?'<button class="btn warn full" id="tbExpenseDelete" style="margin-top:10px">Delete expense</button>':''));
+ sheetReturnTo(()=>openTripBudget(id));
  $("tbCancel").onclick=()=>openTripBudget(id);
  const panel=$("tbContributorPanel"),rows=$("tbContributorRows");
  const draft=(e?.contributions?.length?e.contributions:[{person:e?.payer||b.people[0].id,amount:e?.amount||0}]).map(c=>({person:c.person,amount:c.amount}));
@@ -4849,7 +4856,10 @@ function openRecapForm(id=null,planId=null){
  '<div class="rc-form-actions"><button class="btn soft" id="rcCancel" type="button">Cancel</button><button class="btn" id="rcSave" type="button" style="background:#8FDDFF;color:#12140D">'+"Save"+'</button></div>');
  const setType=kind=>{t.type=kind;document.querySelectorAll('#rcTypePicker button').forEach(b=>{const on=b.dataset.type===kind;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on));});const workout=kind==='hike'||kind==='walk';$("rcWorkoutTitle").hidden=!workout;$("rcWorkoutFields").hidden=!workout;};
  document.querySelectorAll('#rcTypePicker button').forEach(b=>b.onclick=()=>setType(b.dataset.type));
- setType(TYPES[t.type]?t.type:'hike');$("rcCancel").onclick=()=>closeSheet();
+ setType(TYPES[t.type]?t.type:'hike');
+ const returnFromRecap=()=>id?openTrip(id):planId?openPlan(planId):closeSheet();
+ if(id||planId)sheetReturnTo(returnFromRecap);
+ $("rcCancel").onclick=returnFromRecap;
  const imageEdits={photo:{removed:false,url:null},routeShot:{removed:false,url:null}};
  const bindPhotoControls=(key,inputId,previewId,thumbId,labelId,removeId)=>{
   const input=$(inputId),preview=$(previewId),thumb=$(thumbId),label=$(labelId),remove=$(removeId),edit=imageEdits[key];
@@ -5567,7 +5577,8 @@ function openPlanForm(id){
     '<label class="fl2 travel-type-field"><span>Trip type</span>'+typeSelect(p.type)+'</label>'+
     '<div class="rc-form-actions"><button class="btn soft" id="fCancel" type="button">Cancel</button><button class="btn" id="fSave" type="button" style="background:#8FDDFF;color:#12140D">Save plan</button></div>');
   placeSearch(p,"fName");
-  $("fCancel").onclick=()=>closeSheet();
+  if(id)sheetReturnTo(()=>openPlan(id));
+  $("fCancel").onclick=()=>id?openPlan(id):closeSheet();
   $("fSave").onclick=async()=>{
     const name=$("fName").value.trim();if(!name)return toast("Add a trip name");
     if(p.lat==null)return toast("Search and select a destination");
