@@ -2201,7 +2201,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.103";
+const APP_VERSION = "7.3.104";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4585,14 +4585,14 @@ function openTripBudget(id){
  openSheet('<div class="rc-kicker">Sappy Travel · Private</div><h2 style="margin:4px 0 4px">Trip budget</h2><p class="note" style="margin:0 0 14px">'+esc(t.name)+' · Not included in trip images or recaps</p>'+
  '<div class="tb-quick"><button type="button" class="btn" id="tbQuickExpense">＋ Add expense</button><button type="button" class="btn soft" id="tbQuickPerson">＋ Add person</button></div>'+
  '<div class="tb-head"><small>TOTAL GROUP SPENDING</small><strong class="num">'+tbMoney(x.total)+'</strong><span>'+b.people.length+' travellers · '+b.expenses.length+' expenses</span></div>'+
- '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3></div>'+
- '<div class="tb-roster '+(b.people.length>5?'tb-collapsed':'')+'" id="tbRoster">'+
- (b.people.length?b.people.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(p.name)+'</b><small>Share: '+tbMoney(x.spent[p.id]||0)+'</small></div><span class="tb-balance '+(x.balances[p.id]>0?'pos':x.balances[p.id]<0?'neg':'')+'">'+(x.balances[p.id]>0?'+':x.balances[p.id]<0?'−':'')+tbMoney(x.balances[p.id]||0)+'</span><button class="tb-edit" data-person="'+esc(p.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Add everyone joining this trip first.</p>')+'</div>'+
- (b.people.length>5?'<button type="button" class="tb-expand" id="tbExpandPeople" aria-expanded="false">Show all '+b.people.length+' travellers ↓</button>':'')+'</div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Expenses <small class="tb-count">'+b.expenses.length+'</small></h3></div>'+
  '<div class="tb-expense-list '+(b.expenses.length>6?'tb-collapsed':'')+'" id="tbExpenseList">'+
  (b.expenses.length?b.expenses.slice().reverse().map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPayersLabel(b,e))+' · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
  (b.expenses.length>6?'<button type="button" class="tb-expand" id="tbExpandExpenses" aria-expanded="false">Show all '+b.expenses.length+' expenses ↓</button>':'')+'</div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3></div>'+
+ '<div class="tb-roster '+(b.people.length>5?'tb-collapsed':'')+'" id="tbRoster">'+
+ (b.people.length?b.people.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(p.name)+'</b><small>Share: '+tbMoney(x.spent[p.id]||0)+'</small></div><span class="tb-balance '+(x.balances[p.id]>0?'pos':x.balances[p.id]<0?'neg':'')+'">'+(x.balances[p.id]>0?'+':x.balances[p.id]<0?'−':'')+tbMoney(x.balances[p.id]||0)+'</span><button class="tb-edit" data-person="'+esc(p.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Add everyone joining this trip first.</p>')+'</div>'+
+ (b.people.length>5?'<button type="button" class="tb-expand" id="tbExpandPeople" aria-expanded="false">Show all '+b.people.length+' travellers ↓</button>':'')+'</div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Settlement</h3></div>'+
  (!b.people.length?'<p class="tb-hint">Add travellers to start.</p>':!b.expenses.length?'<p class="tb-hint">Add expenses to calculate who owes whom.</p>':x.transfers.length?x.transfers.map((p,i)=>'<div class="tb-transfer"><div class="tb-transfer-line">'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</div><small>'+tbMoney(p.amount)+' to transfer</small><button class="btn soft" data-settle="'+i+'">Mark as paid</button></div>').join(""):'<p class="tb-hint">✓ Everyone is settled up.</p>')+
  (b.payments.length?'<div class="tb-hint" style="margin-top:14px">Recorded payments</div>'+b.payments.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</b><small>'+tbMoney(p.amount)+' transferred</small></div><button class="tb-edit" data-undo="'+esc(p.id)+'">Undo</button></div>').join(""):'')+
