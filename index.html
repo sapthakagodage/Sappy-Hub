@@ -1948,6 +1948,46 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .tb-picks input{accent-color:var(--lime)}
 .tb-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 
+
+/* Hub — matching lightweight Pocket & Travel feature cards */
+#hFeat{display:grid;gap:12px}
+#hFeat .h-feat{margin:0;min-height:0;padding:17px 19px 18px;border-radius:26px;appearance:none}
+#hFeat .h-feat+.h-feat{margin-top:0}
+#hFeat .h-feat .row1 .ico{width:43px;height:43px;border-radius:14px}
+#hFeat .h-feat .go{width:39px;height:39px}
+#hFeat .h-feat .nm{font-size:22px;margin:11px 0 1px}
+#hFeat .h-feat .tg{font-size:12px}
+#hFeat .h-feat-travel{color:#101d23}
+#hFeat .h-feat-travel .go{background:#101d23;color:#8FDDFF}
+#hFeat .h-feat-travel .ico{background:rgba(16,29,35,.1)}
+#hFeat .h-stats.h-single{display:block;margin-top:11px}
+#hFeat .h-stats.h-single>div{padding:11px 14px;border-radius:15px}
+#hFeat .h-stats.h-single b{font-size:21px;letter-spacing:-.025em;overflow-wrap:anywhere;white-space:normal}
+#hFeat .h-feat-travel .h-stats>div{background:#10222b}
+#hFeat .h-next-feature .h-visit-name{color:#fff;line-height:1.27}
+#hFeat .h-next-feature small{display:block;color:#a7d7ed;font-size:12px;font-weight:700;margin-top:4px;line-height:1.35}
+#hGrid:not(:has(.h-tile:nth-child(2))){grid-template-columns:1fr}
+#hGrid:not(:has(.h-tile:nth-child(2))) .h-tile{height:auto;min-height:95px;gap:12px;grid-template-columns:46px 1fr;align-items:center}
+#hGrid:not(:has(.h-tile:nth-child(2))) .h-tile .h-badge{right:12px;top:12px}
+#hFeat .h-feat:focus-visible,.tb-expand:focus-visible,.tb-quick .btn:focus-visible{outline:3px solid var(--violet);outline-offset:3px}
+/* Trip budget — the common actions stay visible before any long roster. */
+.tb-quick{display:grid;grid-template-columns:1.15fr 1fr;gap:8px;margin:13px 0}
+.tb-quick .btn{min-width:0;white-space:nowrap;padding:13px 8px;font-size:13px;min-height:46px}
+.tb-count{display:inline-flex;font-size:11px;font-weight:800;background:var(--card2);color:var(--soft);padding:4px 7px;border-radius:999px;vertical-align:middle;margin-left:4px}
+.tb-roster.tb-collapsed>.tb-item:nth-of-type(n+6),.tb-expense-list.tb-collapsed>.tb-item:nth-of-type(n+7){display:none}
+.tb-expand{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:12px;width:100%;min-height:42px;text-align:center;font-size:13px;font-weight:800;margin-top:10px}
+.tb-item{min-height:49px}
+.tb-item .tb-edit{flex:none;min-height:38px}
+.tb-item .tb-balance{flex:none}
+.tb-select-actions{display:flex;gap:5px}
+.tb-select-actions .btn{padding:8px 12px;font-size:12px;min-height:38px}
+.tb-picks label[hidden]{display:none}
+.tb-form-actions{position:sticky;bottom:-1px;z-index:3;display:flex;gap:8px;padding:12px 2px 8px;margin-top:16px;background:var(--card);border-top:1px solid var(--line)}
+.tb-form-actions .btn{min-height:48px;white-space:nowrap}
+.tb-form-actions .btn:first-child{flex:1}
+.tb-form-actions .btn:last-child{flex:none}
+@media(max-width:380px){.tb-row{grid-template-columns:1fr}.tb-quick .btn{font-size:12px}.tb-item .tb-balance{font-size:12px}}
+
 </style>
 </head>
 <body class="in-hub">
@@ -2161,7 +2201,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.100";
+const APP_VERSION = "7.3.101";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4534,18 +4574,29 @@ function openTripBudget(id){
  const t=record.item;
  const b=tbData(t),x=tbTotals(b);
  openSheet('<div class="rc-kicker">Sappy Travel · Private</div><h2 style="margin:4px 0 4px">Trip budget</h2><p class="note" style="margin:0 0 14px">'+esc(t.name)+' · Not included in trip images or recaps</p>'+
+ '<div class="tb-quick"><button type="button" class="btn" id="tbQuickExpense">＋ Add expense</button><button type="button" class="btn soft" id="tbQuickPerson">＋ Add person</button></div>'+
  '<div class="tb-head"><small>TOTAL GROUP SPENDING</small><strong class="num">'+tbMoney(x.total)+'</strong><span>'+b.people.length+' travellers · '+b.expenses.length+' expenses</span></div>'+
- '<div class="tb-section"><div class="tb-title"><h3>Travellers</h3><button class="btn soft" id="tbAddPerson">＋ Add</button></div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3><button class="btn soft" id="tbAddPerson">＋ Add</button></div>'+
+ '<div class="tb-roster '+(b.people.length>5?'tb-collapsed':'')+'" id="tbRoster">'+
  (b.people.length?b.people.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(p.name)+'</b><small>Share: '+tbMoney(x.spent[p.id]||0)+'</small></div><span class="tb-balance '+(x.balances[p.id]>0?'pos':x.balances[p.id]<0?'neg':'')+'">'+(x.balances[p.id]>0?'+':x.balances[p.id]<0?'−':'')+tbMoney(x.balances[p.id]||0)+'</span><button class="tb-edit" data-person="'+esc(p.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Add everyone joining this trip first.</p>')+'</div>'+
- '<div class="tb-section"><div class="tb-title"><h3>Expenses</h3><button class="btn soft" id="tbAddExpense">＋ Add</button></div>'+
- (b.expenses.length?b.expenses.map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPerson(b,e.payer))+' paid · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
+ (b.people.length>5?'<button type="button" class="tb-expand" id="tbExpandPeople" aria-expanded="false">Show all '+b.people.length+' travellers ↓</button>':'')+'</div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Expenses <small class="tb-count">'+b.expenses.length+'</small></h3><button class="btn soft" id="tbAddExpense">＋ Add</button></div>'+
+ '<div class="tb-expense-list '+(b.expenses.length>6?'tb-collapsed':'')+'" id="tbExpenseList">'+
+ (b.expenses.length?b.expenses.slice().reverse().map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPerson(b,e.payer))+' paid · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
+ (b.expenses.length>6?'<button type="button" class="tb-expand" id="tbExpandExpenses" aria-expanded="false">Show all '+b.expenses.length+' expenses ↓</button>':'')+'</div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Settlement</h3></div>'+
  (!b.people.length?'<p class="tb-hint">Add travellers to start.</p>':!b.expenses.length?'<p class="tb-hint">Add expenses to calculate who owes whom.</p>':x.transfers.length?x.transfers.map((p,i)=>'<div class="tb-transfer"><div class="tb-transfer-line">'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</div><small>'+tbMoney(p.amount)+' to transfer</small><button class="btn soft" data-settle="'+i+'">Mark as paid</button></div>').join(""):'<p class="tb-hint">✓ Everyone is settled up.</p>')+
  (b.payments.length?'<div class="tb-hint" style="margin-top:14px">Recorded payments</div>'+b.payments.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</b><small>'+tbMoney(p.amount)+' transferred</small></div><button class="tb-edit" data-undo="'+esc(p.id)+'">Undo</button></div>').join(""):'')+
  '</div><button class="btn full soft" id="tbBack">← Back to trip</button>');
  $("tbBack").onclick=()=>record.kind==="plan"?openPlan(id):openTrip(id);
  $("tbAddPerson").onclick=()=>tbEditPerson(id);
+ $("tbQuickPerson").onclick=$("tbAddPerson").onclick;
  $("tbAddExpense").onclick=()=>{if(!b.people.length)return toast("Add travellers first");tbEditExpense(id);};
+ $("tbQuickExpense").onclick=$("tbAddExpense").onclick;
+ [["tbExpandPeople","tbRoster","travellers"],["tbExpandExpenses","tbExpenseList","expenses"]].forEach(([buttonId,listId,label])=>{
+   const btn=$(buttonId),list=$(listId);if(!btn||!list)return;
+   btn.onclick=()=>{const collapsed=list.classList.toggle("tb-collapsed");btn.setAttribute("aria-expanded",String(!collapsed));btn.textContent=(collapsed?"Show all ":"Show fewer ")+(label==="travellers"?b.people.length:b.expenses.length)+" "+label+(collapsed?" ↓":" ↑");};
+ });
  $("sheetBody").querySelectorAll("[data-person]").forEach(el=>el.onclick=()=>tbEditPerson(id,el.dataset.person));
  $("sheetBody").querySelectorAll("[data-expense]").forEach(el=>el.onclick=()=>tbEditExpense(id,el.dataset.expense));
  $("sheetBody").querySelectorAll("[data-settle]").forEach(el=>el.onclick=()=>{
@@ -4588,13 +4639,22 @@ function tbEditExpense(id,eid){
  '<label class="fl2"><span>What was it for?</span><input class="inp" id="tbExpenseTitle" maxlength="90" placeholder="Fuel, dinner, tickets…" value="'+esc(e?.title||"")+'"></label>'+
  '<div class="tb-row"><label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="tbExpenseAmount" inputmode="decimal" placeholder="3,500" value="'+(e?e.amount/100:"")+'"></label>'+
  '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'</select></label></div>'+
- '<div class="tb-title"><h3>Split equally between</h3><button class="btn soft" id="tbAll">All</button></div>'+
+ '<div class="tb-title"><h3>Split between <small class="tb-count" id="tbSelectedCount"></small></h3><div class="tb-select-actions"><button type="button" class="btn soft" id="tbAll">All</button><button type="button" class="btn soft" id="tbNone">None</button></div></div>'+
+ (b.people.length>6?'<label class="fl2"><span>Find a traveller</span><input class="inp" id="tbFindPerson" placeholder="Search names…" autocomplete="off"></label>':'')+
  '<div class="tb-picks">'+b.people.map(p=>'<label><input type="checkbox" data-share="'+esc(p.id)+'"'+(selected.has(p.id)?' checked':'')+'>'+esc(p.name)+'</label>').join("")+'</div>'+
  '<p class="tb-hint">Only selected travellers share this expense, even if someone else paid.</p>'+
- '<div class="btns"><button class="btn" style="flex:1" id="tbExpenseSave">Save expense</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
+ '<div class="tb-form-actions"><button class="btn" id="tbExpenseSave">Save expense</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
  (e?'<button class="btn warn full" id="tbExpenseDelete" style="margin-top:10px">Delete expense</button>':''));
  $("tbCancel").onclick=()=>openTripBudget(id);
- $("tbAll").onclick=()=>document.querySelectorAll("#sheetBody [data-share]").forEach(ch=>ch.checked=true);
+ const tbShares=[...document.querySelectorAll("#sheetBody [data-share]")];
+ const tbCount=()=>{$("tbSelectedCount").textContent=tbShares.filter(ch=>ch.checked).length+" / "+b.people.length;};
+ $("tbAll").onclick=()=>{tbShares.forEach(ch=>ch.checked=true);tbCount();};
+ $("tbNone").onclick=()=>{tbShares.forEach(ch=>ch.checked=false);tbCount();};
+ tbShares.forEach(ch=>ch.onchange=tbCount);tbCount();
+ if($("tbFindPerson"))$("tbFindPerson").oninput=()=>{
+   const term=$("tbFindPerson").value.trim().toLocaleLowerCase();
+   tbShares.forEach(ch=>{ch.closest("label").hidden=!!term&&!tbPerson(b,ch.dataset.share).toLocaleLowerCase().includes(term);});
+ };
  $("tbExpenseSave").onclick=()=>{
   const title=$("tbExpenseTitle").value.trim(),amount=tbCents($("tbExpenseAmount").value),payer=$("tbPayer").value;
   const members=[...document.querySelectorAll("#sheetBody [data-share]:checked")].map(ch=>ch.dataset.share);
@@ -5472,7 +5532,7 @@ function openPlanForm(id){
     '<label class="fl2"><span>Trip name</span><input class="inp" id="fName" value="'+esc(p.name||"")+'" placeholder="e.g. Knuckles mountain hike"></label>'+
     '<label class="fl2 travel-date-field"><span>Planned date</span><input class="inp" type="date" id="fDate" value="'+esc(p.date||"")+'"></label>'+
     '<label class="fl2 travel-type-field"><span>Trip type</span>'+typeSelect(p.type)+'</label>'+
-    '<div class="rc-form-actions"><button class="btn soft" id="fCancel" type="button">Cancel</button><button class="btn" id="fSave" type="button" style="background:#8FDDFF;color:#12140D">Save planned visit</button></div>');
+    '<div class="rc-form-actions"><button class="btn soft" id="fCancel" type="button">Cancel</button><button class="btn" id="fSave" type="button" style="background:#8FDDFF;color:#12140D">Save plan</button></div>');
   placeSearch(p,"fName");
   $("fCancel").onclick=()=>closeSheet();
   $("fSave").onclick=async()=>{
@@ -5760,20 +5820,24 @@ function renderHub(){
   $("hHello").textContent = (h<12?"Good morning":h<17?"Good afternoon":"Good evening")+", Sapthaka";
   $("hDate").textContent = new Date().toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
   $("hVer").textContent = APP_VERSION;
-  const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total, bals=balances().filter(b=>b.cur==="LKR"), bal=bals.reduce((a,b)=>a+b.balance,0);
-  const feats=APPS.filter(a=>a.id==="pocket"), feat=feats[0], rest=APPS.filter(a=>a.id!=="pocket");
-  const featCard=a=>{ let stats="";
-    if(a.id==="pocket"){ const ac=mainAccounts().filter(x=>x.bank!=="Cash"); const tiles=['<div style="grid-column:1/-1"><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div>'].concat(ac.map(x=>'<div><span>'+esc(x.bank)+(x.acct?' ••'+esc(x.acct):'')+'</span><b class="num">'+(x.unset?'—':rs(x.balance))+'</b></div>'));
-      stats='<div class="h-stats" style="grid-template-columns:repeat('+(ac.length>1?2:1)+',1fr)">'+tiles.join("")+'</div>'; }
-    if(a.id==="travel"){ const tr=trips(), nx=plans().find(p=>p.date&&daysTo(p.date)>=0), yr=new Date().getFullYear();
-      stats='<div class="h-stats" style="grid-template-columns:1fr 1fr"><div><span>Places visited</span><b class="num">'+tr.length+'</b></div><div><span>This year</span><b class="num">'+tr.filter(t=>tYear(t)===yr).length+'</b></div>'+
-        '<div style="grid-column:1/-1"><span>Next visit</span><b>'+(nx?esc(nx.name)+' · '+whenWords(daysTo(nx.date)):'Nothing planned yet')+'</b></div></div>'; }
-    return '<div class="h-feat" role="button" tabindex="0" data-app="'+a.id+'" style="background:'+a.color+'"><div class="row1"><span class="ico">'+hsvg(a.icon)+'</span><span class="go" aria-hidden="true">›</span></div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+stats+'</div>'; };
-  $("hFeat").innerHTML = feats.map(featCard).join("");
-  $("hGrid").innerHTML = rest.map(a=>{ let extra="";
-    if(a.id==="travel"){ const nx=plans().find(p=>p.date&&daysTo(p.date)>=0);
-      extra='<div class="h-next"><span>Next visit</span><b>'+(nx?esc(nx.name):'Nothing planned')+'</b>'+(nx?'<i>'+esc(niceDate(nx.date))+' · '+whenWords(daysTo(nx.date))+'</i>':'')+'</div>'; }
-    return '<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+extra+'</div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>'; }).join("");
+  const now=new Date(), sp=monthSpend(now.getFullYear(),now.getMonth()).total;
+  const featured=APPS.filter(a=>a.id==="pocket"||a.id==="travel");
+  const rest=APPS.filter(a=>a.id!=="pocket"&&a.id!=="travel");
+  const featCard=a=>{
+    let stats="";
+    if(a.id==="pocket"){
+      stats='<div class="h-stats h-single"><div><span>Spent this month</span><b class="num">'+rs(sp)+'</b></div></div>';
+    }
+    if(a.id==="travel"){
+      const upcoming=plans().filter(p=>p.date&&daysTo(p.date)>=0).sort((x,y)=>x.date.localeCompare(y.date));
+      const nx=upcoming[0];
+      const when=nx?niceDate(nx.date)+" · "+whenWords(daysTo(nx.date)):"Add a planned visit to see it here";
+      stats='<div class="h-stats h-single"><div class="h-next-feature"><span>NEXT VISIT</span><b class="h-visit-name">'+(nx?esc(nx.name):'Nothing planned yet')+'</b><small>'+esc(when)+'</small></div></div>';
+    }
+    return '<button type="button" class="h-feat h-feat-'+a.id+'" data-app="'+a.id+'" style="background:'+a.color+'"><div class="row1"><span class="ico">'+hsvg(a.icon)+'</span><span class="go" aria-hidden="true">›</span></div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div>'+stats+'</button>';
+  };
+  $("hFeat").innerHTML=featured.map(featCard).join("");
+  $("hGrid").innerHTML=rest.map(a=>'<button class="h-tile'+(a.ready?'':' soon')+'" data-app="'+a.id+'"'+(a.ready?'':' aria-disabled="true"')+'><span class="ico" style="background:'+a.color+'">'+hsvg(a.icon)+'</span><div><div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></div>'+(a.ready?'':'<span class="h-badge">Coming soon</span>')+'</button>').join("");
   document.querySelectorAll("[data-app]").forEach(b=>b.onclick=()=>{ const a=APPS.find(x=>x.id===b.dataset.app); if(a&&a.ready) openApp(a.id); else toast("Coming soon"); });
 }
 function showHub(){ rememberScreen(); if(sheetOpen) closeSheet(); document.body.classList.remove("in-travel","in-set","in-noti"); document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); enterScreen(); }
