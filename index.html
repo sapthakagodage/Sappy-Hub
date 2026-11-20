@@ -1988,7 +1988,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 .tb-form-actions .btn:last-child{flex:none}
 @media(max-width:380px){.tb-row{grid-template-columns:1fr}.tb-quick .btn{font-size:12px}.tb-item .tb-balance{font-size:12px}}
 
-</style>
+.tb-entry{background:var(--lime);border:0;color:var(--on-lime);min-height:66px;box-shadow:0 7px 22px #9ac34b22;transition:transform .18s ease}.tb-entry b{font-size:16px}.tb-entry small{color:var(--on-lime);opacity:.75}.tb-entry .chev{color:var(--on-lime)}.tb-entry:active{transform:scale(.98)}.tb-contributor{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr) 34px;gap:7px;align-items:end;margin:8px 0}.tb-contributor .fl2{margin:0}.tb-contributor .inp{min-width:0;padding:10px 7px;min-height:46px}.tb-contributor button{height:46px;border:0;border-radius:11px;background:var(--card2);color:var(--neg);font-size:20px}.tb-contributor-summary{font-size:12px;font-weight:750;color:var(--soft);margin:8px 0 12px}.tb-contributor-summary.is-invalid{color:var(--neg)}</style>
 </head>
 <body class="in-hub">
 <div id="splash" role="status" aria-label="Loading Sappy Hub">
@@ -2201,7 +2201,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.101";
+const APP_VERSION = "7.3.102";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3472,6 +3472,7 @@ function openSheet(html){
   body.classList.remove("sheet-content-in");
   body.innerHTML='<button class="sx" id="sx" aria-label="Close">✕</button>'+html;
   $("sx").onclick=closeSheet;
+  scrim.onclick=closeSheet;
   panel.scrollTop=0;
   if(!wasOpen){
     lockY=window.scrollY;
@@ -3506,8 +3507,7 @@ function closeSheet(){
 document.addEventListener("focusin",e=>{ if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) document.body.classList.add("typing"); });
 document.addEventListener("focusout",()=>setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||"")) document.body.classList.remove("typing"); },50));
 $("scrim").onclick=closeSheet;
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){const x=$("sx");if(sheetOpen&&x)x.click();else closeSheet();} });
 
 function catPicker(list, cur){ return '<div class="pick" id="pk">'+list.map(c=>'<button type="button" data-c="'+esc(c)+'" class="'+(c===cur?'on':'')+'"><em style="background:'+CATS[c].c+'">'+icon(c,20)+'</em>'+esc(c)+'</button>').join("")+'</div>'; }
 function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").forEach(b=>b.onclick=()=>{ pk.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); onPick(b.dataset.c); }); }
@@ -4537,10 +4537,13 @@ function tbTotals(b){
  const balances=Object.fromEntries(b.people.map(p=>[p.id,0])),spent=Object.fromEntries(b.people.map(p=>[p.id,0]));
  let total=0;
  for(const e of b.expenses){
-  if(!balances.hasOwnProperty(e.payer)||!Number.isSafeInteger(e.amount)||e.amount<=0)continue;
-  const ids=(e.for||[]).filter(id=>balances.hasOwnProperty(id));
+  if(!Number.isSafeInteger(e.amount)||e.amount<=0)continue;
+  const ids=(e.for||[]).filter(id=>Object.prototype.hasOwnProperty.call(balances,id));
   if(!ids.length)continue;
-  total+=e.amount;balances[e.payer]+=e.amount;
+  const contributions=Array.isArray(e.contributions)&&e.contributions.length?e.contributions:[{person:e.payer,amount:e.amount}];
+  if(contributions.some(c=>!Object.prototype.hasOwnProperty.call(balances,c.person)||!Number.isSafeInteger(c.amount)||c.amount<=0))continue;
+  if(new Set(contributions.map(c=>c.person)).size!==contributions.length||contributions.reduce((n,c)=>n+c.amount,0)!==e.amount)continue;
+  total+=e.amount;contributions.forEach(c=>balances[c.person]+=c.amount);
   // Equal shares in cents; distribute remainder deterministically.
   const per=Math.floor(e.amount/ids.length),extra=e.amount%ids.length;
   ids.forEach((id,i)=>{const share=per+(i<extra?1:0);balances[id]-=share;spent[id]+=share;});
@@ -4569,6 +4572,7 @@ function tripBudgetTeaser(t){
  const x=tbTotals(b);return b.people.length+" travellers · "+tbMoney(x.total)+" spent · "+x.transfers.length+" to settle";
 }
 function tbPerson(b,id){return b.people.find(p=>p.id===id)?.name||"Unknown";}
+function tbPayersLabel(b,e){return Array.isArray(e.contributions)&&e.contributions.length?e.contributions.map(c=>tbPerson(b,c.person)).join(", ")+" paid":tbPerson(b,e.payer)+" paid";}
 function openTripBudget(id){
  const record=tbRecord(id);if(!record)return;
  const t=record.item;
@@ -4576,23 +4580,24 @@ function openTripBudget(id){
  openSheet('<div class="rc-kicker">Sappy Travel · Private</div><h2 style="margin:4px 0 4px">Trip budget</h2><p class="note" style="margin:0 0 14px">'+esc(t.name)+' · Not included in trip images or recaps</p>'+
  '<div class="tb-quick"><button type="button" class="btn" id="tbQuickExpense">＋ Add expense</button><button type="button" class="btn soft" id="tbQuickPerson">＋ Add person</button></div>'+
  '<div class="tb-head"><small>TOTAL GROUP SPENDING</small><strong class="num">'+tbMoney(x.total)+'</strong><span>'+b.people.length+' travellers · '+b.expenses.length+' expenses</span></div>'+
- '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3><button class="btn soft" id="tbAddPerson">＋ Add</button></div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3></div>'+
  '<div class="tb-roster '+(b.people.length>5?'tb-collapsed':'')+'" id="tbRoster">'+
  (b.people.length?b.people.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(p.name)+'</b><small>Share: '+tbMoney(x.spent[p.id]||0)+'</small></div><span class="tb-balance '+(x.balances[p.id]>0?'pos':x.balances[p.id]<0?'neg':'')+'">'+(x.balances[p.id]>0?'+':x.balances[p.id]<0?'−':'')+tbMoney(x.balances[p.id]||0)+'</span><button class="tb-edit" data-person="'+esc(p.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Add everyone joining this trip first.</p>')+'</div>'+
  (b.people.length>5?'<button type="button" class="tb-expand" id="tbExpandPeople" aria-expanded="false">Show all '+b.people.length+' travellers ↓</button>':'')+'</div>'+
- '<div class="tb-section"><div class="tb-title"><h3>Expenses <small class="tb-count">'+b.expenses.length+'</small></h3><button class="btn soft" id="tbAddExpense">＋ Add</button></div>'+
+ '<div class="tb-section"><div class="tb-title"><h3>Expenses <small class="tb-count">'+b.expenses.length+'</small></h3></div>'+
  '<div class="tb-expense-list '+(b.expenses.length>6?'tb-collapsed':'')+'" id="tbExpenseList">'+
- (b.expenses.length?b.expenses.slice().reverse().map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPerson(b,e.payer))+' paid · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
+ (b.expenses.length?b.expenses.slice().reverse().map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPayersLabel(b,e))+' · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
  (b.expenses.length>6?'<button type="button" class="tb-expand" id="tbExpandExpenses" aria-expanded="false">Show all '+b.expenses.length+' expenses ↓</button>':'')+'</div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Settlement</h3></div>'+
  (!b.people.length?'<p class="tb-hint">Add travellers to start.</p>':!b.expenses.length?'<p class="tb-hint">Add expenses to calculate who owes whom.</p>':x.transfers.length?x.transfers.map((p,i)=>'<div class="tb-transfer"><div class="tb-transfer-line">'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</div><small>'+tbMoney(p.amount)+' to transfer</small><button class="btn soft" data-settle="'+i+'">Mark as paid</button></div>').join(""):'<p class="tb-hint">✓ Everyone is settled up.</p>')+
  (b.payments.length?'<div class="tb-hint" style="margin-top:14px">Recorded payments</div>'+b.payments.map(p=>'<div class="tb-item"><div class="tb-main"><b>'+esc(tbPerson(b,p.from))+' → '+esc(tbPerson(b,p.to))+'</b><small>'+tbMoney(p.amount)+' transferred</small></div><button class="tb-edit" data-undo="'+esc(p.id)+'">Undo</button></div>').join(""):'')+
  '</div><button class="btn full soft" id="tbBack">← Back to trip</button>');
- $("tbBack").onclick=()=>record.kind==="plan"?openPlan(id):openTrip(id);
- $("tbAddPerson").onclick=()=>tbEditPerson(id);
- $("tbQuickPerson").onclick=$("tbAddPerson").onclick;
- $("tbAddExpense").onclick=()=>{if(!b.people.length)return toast("Add travellers first");tbEditExpense(id);};
- $("tbQuickExpense").onclick=$("tbAddExpense").onclick;
+ const tbReturn=()=>record.kind==="plan"?openPlan(id):openTrip(id);
+ $("tbBack").onclick=tbReturn;
+ $("sx").onclick=tbReturn;
+ $("scrim").onclick=tbReturn;
+ $("tbQuickPerson").onclick=()=>tbEditPerson(id);
+ $("tbQuickExpense").onclick=()=>{if(!b.people.length)return toast("Add travellers first");tbEditExpense(id);};
  [["tbExpandPeople","tbRoster","travellers"],["tbExpandExpenses","tbExpenseList","expenses"]].forEach(([buttonId,listId,label])=>{
    const btn=$(buttonId),list=$(listId);if(!btn||!list)return;
    btn.onclick=()=>{const collapsed=list.classList.toggle("tb-collapsed");btn.setAttribute("aria-expanded",String(!collapsed));btn.textContent=(collapsed?"Show all ":"Show fewer ")+(label==="travellers"?b.people.length:b.expenses.length)+" "+label+(collapsed?" ↓":" ↑");};
@@ -4638,7 +4643,8 @@ function tbEditExpense(id,eid){
  openSheet('<div class="rc-kicker">Trip budget · Expenses</div><h2>'+(e?'Edit expense':'Add expense')+'</h2>'+
  '<label class="fl2"><span>What was it for?</span><input class="inp" id="tbExpenseTitle" maxlength="90" placeholder="Fuel, dinner, tickets…" value="'+esc(e?.title||"")+'"></label>'+
  '<div class="tb-row"><label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="tbExpenseAmount" inputmode="decimal" placeholder="3,500" value="'+(e?e.amount/100:"")+'"></label>'+
- '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'</select></label></div>'+
+ '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'<option value="multiple"'+(e?.contributions?.length>1?' selected':'')+'>Multiple people</option></select></label></div>'+
+ '<div id="tbContributorPanel" hidden><p class="tb-hint">Enter how much each person contributed. Payments are netted before settlement.</p><div id="tbContributorRows"></div><button type="button" class="btn soft full" id="tbContributorAdd">＋ Add contributor</button><div class="tb-contributor-summary" id="tbContributorTotal"></div></div>'+
  '<div class="tb-title"><h3>Split between <small class="tb-count" id="tbSelectedCount"></small></h3><div class="tb-select-actions"><button type="button" class="btn soft" id="tbAll">All</button><button type="button" class="btn soft" id="tbNone">None</button></div></div>'+
  (b.people.length>6?'<label class="fl2"><span>Find a traveller</span><input class="inp" id="tbFindPerson" placeholder="Search names…" autocomplete="off"></label>':'')+
  '<div class="tb-picks">'+b.people.map(p=>'<label><input type="checkbox" data-share="'+esc(p.id)+'"'+(selected.has(p.id)?' checked':'')+'>'+esc(p.name)+'</label>').join("")+'</div>'+
@@ -4646,6 +4652,25 @@ function tbEditExpense(id,eid){
  '<div class="tb-form-actions"><button class="btn" id="tbExpenseSave">Save expense</button><button class="btn soft" id="tbCancel">Cancel</button></div>'+
  (e?'<button class="btn warn full" id="tbExpenseDelete" style="margin-top:10px">Delete expense</button>':''));
  $("tbCancel").onclick=()=>openTripBudget(id);
+ const panel=$("tbContributorPanel"),rows=$("tbContributorRows");
+ const draft=(e?.contributions?.length?e.contributions:[{person:e?.payer||b.people[0].id,amount:e?.amount||0}]).map(c=>({person:c.person,amount:c.amount}));
+ const options=id=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===id?' selected':'')+'>'+esc(p.name)+'</option>').join("");
+ const summary=()=>{
+  const due=tbCents($("tbExpenseAmount").value),paid=draft.reduce((sum,c)=>sum+(Number.isSafeInteger(c.amount)?c.amount:0),0);
+  $("tbContributorTotal").textContent="Contributed "+tbMoney(paid)+" / "+(due>0?tbMoney(due):"Enter total above");
+  $("tbContributorTotal").classList.toggle("is-invalid",due>0&&due!==paid);
+ };
+ const redraw=()=>{
+  rows.innerHTML=draft.map((c,i)=>'<div class="tb-contributor"><label class="fl2"><span>Contributor</span><select class="inp" data-contributor="'+i+'">'+options(c.person)+'</select></label><label class="fl2"><span>Paid (Rs)</span><input class="inp" inputmode="decimal" data-amount="'+i+'" value="'+(c.amount?c.amount/100:"")+'" placeholder="0"></label><button type="button" data-remove-contributor="'+i+'" aria-label="Remove contributor"'+(draft.length===1?' disabled':'')+'>×</button></div>').join("");
+  rows.querySelectorAll("[data-contributor]").forEach(el=>el.onchange=()=>{draft[+el.dataset.contributor].person=el.value;});
+  rows.querySelectorAll("[data-amount]").forEach(el=>el.oninput=()=>{draft[+el.dataset.amount].amount=tbCents(el.value);summary();});
+  rows.querySelectorAll("[data-remove-contributor]").forEach(el=>el.onclick=()=>{draft.splice(+el.dataset.removeContributor,1);redraw();});
+  summary();
+ };
+ $("tbContributorAdd").onclick=()=>{const available=b.people.find(p=>!draft.some(c=>c.person===p.id));if(!available)return toast("All travellers already contributing");draft.push({person:available.id,amount:0});redraw();};
+ $("tbPayer").onchange=()=>{panel.hidden=$("tbPayer").value!=="multiple";if(!panel.hidden){if(draft.length===1&&b.people.length>1&&!e?.contributions){const next=b.people.find(p=>p.id!==draft[0].person);if(next)draft.push({person:next.id,amount:0});}redraw();}};
+ $("tbExpenseAmount").addEventListener("input",summary);
+ $("tbPayer").onchange();
  const tbShares=[...document.querySelectorAll("#sheetBody [data-share]")];
  const tbCount=()=>{$("tbSelectedCount").textContent=tbShares.filter(ch=>ch.checked).length+" / "+b.people.length;};
  $("tbAll").onclick=()=>{tbShares.forEach(ch=>ch.checked=true);tbCount();};
@@ -4657,12 +4682,20 @@ function tbEditExpense(id,eid){
  };
  $("tbExpenseSave").onclick=()=>{
   const title=$("tbExpenseTitle").value.trim(),amount=tbCents($("tbExpenseAmount").value),payer=$("tbPayer").value;
+  const isMulti=payer==="multiple",contributions=isMulti?draft.map(c=>({person:c.person,amount:c.amount})):[];
   const members=[...document.querySelectorAll("#sheetBody [data-share]:checked")].map(ch=>ch.dataset.share);
   if(!title)return toast("Enter an expense name");
   if(!Number.isSafeInteger(amount)||amount<=0)return toast("Enter a valid amount");
   if(!members.length)return toast("Select someone to share this expense");
-  if(e)Object.assign(e,{title,amount,payer,for:members});
-  else b.expenses.push({id:"be"+uid(),title,amount,payer,for:members});
+  if(isMulti){
+   if(contributions.length<2||contributions.some(c=>!Number.isSafeInteger(c.amount)||c.amount<=0))return toast("Enter each person's contribution");
+   if(new Set(contributions.map(c=>c.person)).size!==contributions.length)return toast("Choose each contributor once");
+   if(contributions.reduce((n,c)=>n+c.amount,0)!==amount)return toast("Contributions must equal the expense");
+  }
+  const data={title,amount,payer:isMulti?contributions[0].person:payer,for:members};
+  if(isMulti)data.contributions=contributions;
+  if(e){Object.assign(e,data);if(!isMulti)delete e.contributions;}
+  else b.expenses.push(Object.assign({id:"be"+uid()},data));
   if(tbSave(id,b))openTripBudget(id);
  };
  if(e)$("tbExpenseDelete").onclick=()=>{
