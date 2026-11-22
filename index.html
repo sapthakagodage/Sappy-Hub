@@ -2211,7 +2211,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.105";
+const APP_VERSION = "7.3.106";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4624,11 +4624,8 @@ async function exportTripBudgetPng(id){
    return out.length?out:["—"];
   };
   const currency=c=>"Rs "+Number(c/100).toLocaleString("en-LK",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const paid=Object.fromEntries(b.people.map(p=>[p.id,0]));
-  // Accumulate payments made towards actual costs. Repayments remain a separate section.
   const expenses=b.expenses.map((e,i)=>{
    const pieces=(e.contributions?.length?e.contributions:[{person:e.payer,amount:e.amount}]);
-   pieces.forEach(c=>{if(Object.prototype.hasOwnProperty.call(paid,c.person))paid[c.person]+=c.amount;});
    const people=(e.for||[]).map(pid=>tbPerson(b,pid));
    const payerDetails=pieces.map(c=>tbPerson(b,c.person)+" "+currency(c.amount)).join("  ·  ");
    const splitDetails=people.length===b.people.length?"All "+people.length+" travellers":people.join(", ");
@@ -4636,11 +4633,6 @@ async function exportTripBudgetPng(id){
    const payerLines=lines("Paid: "+payerDetails,19,CONTENT-48,600);
    const splitLines=lines("Split between: "+splitDetails,19,CONTENT-48,600);
    return {type:"expense",amount:e.amount,titleLines,payerLines,splitLines,h:28+titleLines.length*34+payerLines.length*27+splitLines.length*27+32};
-  });
-  const people=b.people.map((p,i)=>{
-   const paidAmount=paid[p.id]||0,share=result.spent[p.id]||0,net=result.balances[p.id]||0;
-   const nameLines=lines(p.name,23,475,800);
-   return {type:"person",nameLines,index:i+1,paidAmount,share,net,h:Math.max(101,35+nameLines.length*29+43)};
   });
   const settlements=result.transfers.map(p=>({
     type:"settlement",from:tbPerson(b,p.from),to:tbPerson(b,p.to),amount:p.amount,
@@ -4652,7 +4644,6 @@ async function exportTripBudgetPng(id){
   })).map(p=>({...p,h:26+p.rows.length*28+21}));
   const groups=[
     {label:"EXPENSE BREAKDOWN",items:expenses},
-    {label:"PER-PERSON SUMMARY",items:people},
     {label:"WHO NEEDS TO PAY WHOM",items:settlements}
   ];
   if(previous.length)groups.push({label:"ALREADY SETTLED",items:previous});
@@ -4718,14 +4709,6 @@ async function exportTripBudgetPng(id){
       text(currency(block.amount),RIGHT-23,rowY+45,25,colour.ink,800,"right");
       const payerY=drawLines(block.payerLines,M+23,titleY+4,19,27,colour.muted,600);
       drawLines(block.splitLines,M+23,payerY+2,19,27,colour.muted,600);
-    }else if(block.type==="person"){
-      round(M+18,rowY+20,48,48,15,colour.blue);
-      text(String(block.index),M+42,rowY+52,18,colour.dark,800,"center");
-      drawLines(block.nameLines,M+82,rowY+42,23,29,colour.ink,800);
-      text("Paid "+currency(block.paidAmount)+"   ·   Share "+currency(block.share),M+82,rowY+block.h-30,17,colour.muted,600);
-      const status=block.net>0?"GETS BACK":block.net<0?"OWES":"SETTLED";
-      text(status,RIGHT-22,rowY+38,14,block.net>0?colour.green:block.net<0?colour.orange:colour.muted,800,"right");
-      text(block.net===0?"Rs 0.00":currency(Math.abs(block.net)),RIGHT-22,rowY+70,24,colour.ink,800,"right");
     }else if(block.type==="settlement"||block.type==="payment"){
       const arrowEnd=drawLines(block.rows,M+23,rowY+42,block.type==="payment"?21:23,block.type==="payment"?28:31,colour.ink,800);
       text(currency(block.amount),RIGHT-23,rowY+43,24,block.type==="payment"?colour.muted:colour.green,800,"right");
