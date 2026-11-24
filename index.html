@@ -4854,7 +4854,7 @@ async function exportTripBudgetPdf(id){
  const button=$("tbExportPdf");
  if(button){button.disabled=true;button.querySelector("b").textContent="Creating PDF…";}
  try{
-  const totals=tbTotals(b),W=1240,H=1754,L=74,R=W-74,T=315,B=1650;
+  const totals=tbTotals(b),W=1240,H=1754,L=74,R=W-74,T=425,B=1650;
   const paper="#F2F6F8",dark="#10222B",ink="#14242E",muted="#58707F",blue="#8FDDFF",green="#167C5A";
   const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvas unavailable");
