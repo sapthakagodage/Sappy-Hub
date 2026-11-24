@@ -2211,7 +2211,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.106";
+const APP_VERSION = "7.3.107";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2396,6 +2396,9 @@ function deletePayment(id){
 function rateFor(cur){ return cur==="LKR" ? 1 : (S.rate[cur] || 0); }
 const PARSER_VERSION = 19;
 const HOTLINES = {"0112462462":"HNB","0112353353":"ComBank"};
+// The one HNB current account is ending 19 (0180***3219).
+// Never make a second HNB balance tile for another masked/blank SMS suffix.
+const HNB_MAIN_ACCOUNT_LAST2="19";
 const TXN_WORDS = /(debited|credited|deposited|withdrawn|withdrawal|\bbal\b|balance|reason\s*:)/i;
 function looksOtp(s){ return /(\botp\b|one[- ]?time (?:pass|code|pin)|verification code|passcode)/i.test(s) && !TXN_WORDS.test(s); }
 
@@ -2544,8 +2547,12 @@ function parseSms(raw){
     else if(combankCard&&/has been authori[sz]ed on your (?:debit|credit) card/i.test(s)) bank="ComBank";
   }
   if(!bank && acct && S.bankByAcct && S.bankByAcct[acct]) bank=S.bankByAcct[acct];
-  if(!bank) bank=/\b(?:avl|available)\s*bal/i.test(s)?"HNB":"Bank";
+  if(!bank) bank="Bank"; // A balance label alone does not identify an HNB account.
   else if(acct && S.bankByAcct) S.bankByAcct[acct]=S.bankByAcct[acct]||bank;
+  // HNB's masked-account formats can expose different digit fragments.
+  // Normalise ordinary HNB LKR transactions to the confirmed account.
+  // Fixed-deposit account references remain separate.
+  if(bank==="HNB"&&cur==="LKR"&&!isFd)acct=HNB_MAIN_ACCOUNT_LAST2;
 
   const COMPANY=/\b(pty|ltd|lt|pvt|plc|limited|inc|llc|technolog|solutions|services|holdings|company|corp|bank|group|enterprises|trading|international|lanka|institute|university|insurance|assurance|finance|leasing|gov|ministry|dept|salary|sal|refund|reversal|interest|dividend|cashback)\b/i;
   const nm=merchant.trim(), wc=nm.split(/\s+/).length;
@@ -3156,7 +3163,8 @@ function renderHome(){
   $("legend").querySelectorAll(".pb").forEach(b=>b.onclick=()=>{ if(b.dataset.c==="Other"){ const u=unsorted(); if(u.length) return openSort(u[0].id); } openCat(b.dataset.c); });
 
 }
-function accKey(t){ return t.bank+"|"+(t.acct||""); }
+function accKey(t){return t.bank+"|"+(t.bank==="HNB"?(t.cur==="LKR"||!t.cur?HNB_MAIN_ACCOUNT_LAST2:(t.acct||"")):(t.acct||""));}
+function displayAccountId(bank,acct,cur){return bank==="HNB"&&(!cur||cur==="LKR")?HNB_MAIN_ACCOUNT_LAST2:(acct||"");}
 /* Cash moves from a bank to your pocket on withdrawal; spending happens
    later when a manual entry is paid from Cash. Never debit a bank twice. */
 const isCashWithdrawal=t=>live(t)&&t.type==="out"&&t.cat==="Cash"&&t.bank!=="Cash";
@@ -3217,17 +3225,35 @@ function trackedBalance(key){
 }
 function fdAccounts(){ const a=new Set(); txList().forEach(t=>{ if(t.cat==="Fixed deposit"){ const m=(t.merchant||"").match(/••\s?(\d{2})/); if(m) a.add(m[1]); } }); return a; }
 function balances(){
-  const map={}, fdA=fdAccounts();
-  txList().forEach(t=>{ if(t.balance==null || (t.acct && fdA.has(t.acct))) return; const k=t.bank+"|"+(t.acct||"")+"|"+(t.cur||"LKR"); if(!map[k]||t.ts>map[k].ts) map[k]=t; });
-  const out=Object.values(map).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur||"LKR",balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur||"LKR")}));
-  Object.keys(S.tracked||{}).forEach(k=>{ if(k==="Cash|")return; const r=trackedBalance(k); if(!r) return; const [bank,acct]=k.split("|");
-    out.push({bank,acct,cur:"LKR",balance:r.bal,ts:r.last,lkr:r.bal,tracked:true,key:k}); });
+  const snapshots={},fdA=fdAccounts();
+  txList().forEach(t=>{
+    if(t.balance==null||(t.acct&&fdA.has(t.acct)))return;
+    const currency=t.cur||"LKR",acct=displayAccountId(t.bank,t.acct,currency);
+    const key=t.bank+"|"+acct+"|"+currency;
+    // One HNB LKR snapshot, chosen by transaction timestamp, no matter
+    // how an older alert represented the masked account identifier.
+    if(!snapshots[key]||t.ts>snapshots[key].ts||(t.ts===snapshots[key].ts&&(t.u||0)>(snapshots[key].u||0)))
+      snapshots[key]=Object.assign({},t,{acct,cur:currency});
+  });
+  const out=Object.values(snapshots).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur,balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur)}));
+  const trackedKeys=new Set();
+  Object.keys(S.tracked||{}).forEach(k=>{
+    if(k==="Cash|")return;
+    const [bank,rawAcct]=k.split("|"),acct=displayAccountId(bank,rawAcct,"LKR"),canonical=bank+"|"+acct;
+    // A real bank balance always wins over an estimated manually tracked
+    // account for the same identity. Prevent remote sync reviving old tiles.
+    if(trackedKeys.has(canonical)||snapshots[canonical+"|LKR"])return;
+    const r=trackedBalance(k);if(!r)return;
+    trackedKeys.add(canonical);
+    out.push({bank,acct,cur:"LKR",balance:r.bal,ts:r.last,lkr:r.bal,tracked:true,key:k});
+  });
   return out.sort((a,b)=>b.lkr-a.lkr);
 }
 function mainAccounts(){
   const b=balances().filter(x=>x.cur==="LKR").sort((a,c)=>(a.tracked?1:0)-(c.tracked?1:0)||c.lkr-a.lkr);
-  const u=untrackedAccounts().filter(a=>a.bank!=="Cash").map(a=>({bank:a.bank,acct:a.acct,key:a.key,unset:true}));
-  return b.concat(u);
+  const existing=new Set(b.map(a=>a.bank+"|"+displayAccountId(a.bank,a.acct,"LKR")));
+  const extra=untrackedAccounts().filter(a=>a.bank!=="Cash"&&!existing.has(a.bank+"|"+displayAccountId(a.bank,a.acct,"LKR")));
+  return b.concat(extra.map(a=>({bank:a.bank,acct:a.acct,key:a.key,unset:true})));
 }
 function accTile(a){
   const nm=esc(a.bank)+(a.acct?' ••'+esc(a.acct):'');
@@ -3237,10 +3263,20 @@ function accTile(a){
 }
 /* card-only accounts (no "Bal" in their SMS) that are not tracked yet */
 function untrackedAccounts(){
-  const withBal=new Set(), seen={};
-  txList().forEach(t=>{ if(t.src!=="sms"||!t.bank||t.bank==="Bank") return; const k=accKey(t); if(t.balance!=null) withBal.add(k); else seen[k]=t; });
+  const withBalance=new Set(),seen={};
+  txList().forEach(t=>{
+    if(t.src!=="sms"||!t.bank||t.bank==="Bank")return;
+    const key=accKey(t);
+    if(t.balance!=null)withBalance.add(key);
+    else seen[key]=t;
+  });
   const fdA=fdAccounts();
-  return Object.keys(seen).filter(k=>!fdA.has(k.split("|")[1]) && !withBal.has(k) && !(S.tracked&&S.tracked[k]&&!S.tracked[k].del)).map(k=>({key:k,bank:seen[k].bank,acct:seen[k].acct}));
+  return Object.keys(seen).filter(key=>{
+    if(fdA.has(key.split("|")[1])||withBalance.has(key))return false;
+    const [bank,acct]=key.split("|");
+    if(bank==="HNB"&&txList().some(t=>t.bank==="HNB"&&(t.cur||"LKR")==="LKR"&&t.balance!=null))return false;
+    return !Object.keys(S.tracked||{}).some(k=>!S.tracked[k].del&&k.split("|")[0]===bank&&displayAccountId(bank,k.split("|")[1],"LKR")===acct);
+  }).map(key=>({key,bank:seen[key].bank,acct:displayAccountId(seen[key].bank,seen[key].acct,seen[key].cur)}));
 }
 function saveAccounts(){ persist(); put("cfg",{id:"accounts",tracked:Object.assign({},S.tracked),topupRules:Object.assign({},S.topupRules)}); }
 function openSetBal(key){
@@ -3262,7 +3298,9 @@ function openAddAcc(){
   $("aaSave").onclick=()=>{
     const bank=$("aaBank").value, no=String($("aaNo").value).replace(/\D/g,"").slice(-2), v=parseFloat(String($("aaBal").value).replace(/,/g,""));
     if(!(v>=0)) return toast("Enter the balance");
-    const key=bank+"|"+no; S.tracked[key]={amount:v,at:Date.now()}; if(no) S.bankByAcct[no]=S.bankByAcct[no]||bank;
+    const actualNo=bank==="HNB"?HNB_MAIN_ACCOUNT_LAST2:no;
+    if(bank==="HNB"&&balances().some(a=>a.bank==="HNB"&&!a.tracked)){toast("HNB is already linked through SMS");return;}
+    const key=bank+"|"+actualNo; S.tracked[key]={amount:v,at:Date.now()}; if(actualNo) S.bankByAcct[actualNo]=S.bankByAcct[actualNo]||bank;
     saveAccounts(); saveRules(); closeSheet(); render(); toast(bank+(no?" ••"+no:"")+" added");
   };
 }
@@ -3543,7 +3581,11 @@ function openCat(c){
   el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
 }
 
-function sideAccounts(){ return Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key)); }
+function sideAccounts(){
+  const keys=Object.keys(S.tracked||{}).filter(k=>!S.tracked[k].del).concat(untrackedAccounts().map(a=>a.key));
+  const seen=new Set();
+  return keys.filter(k=>{const [bank,acct]=k.split("|"),canonical=bank+"|"+displayAccountId(bank,acct,"LKR");if(seen.has(canonical))return false;seen.add(canonical);return true;});
+}
 function openTx(id,edit){
   if(!edit && isUnsorted(S.tx[id]) && S.tx[id].bank!=="Cash"){ openSort(id); return; }
   const t=S.tx[id]; if(!t) return; let cat=pocketCat(t);
