@@ -2211,7 +2211,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.108";
+const APP_VERSION = "7.3.109";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2868,17 +2868,16 @@ function renderSms(){
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
 // Spending cycles run 22nd–21st; AUD income on the 20th–21st funds the next cycle.
 // The displayed month names the month when the cycle ends.
-const SALARY_CYCLE_DAY=22;
+// Calendar-month reporting: salaries remain credited on their actual receipt dates.
 function pocketMonthNow(){
-  const d=new Date();
-  return new Date(d.getFullYear(),d.getMonth()+(d.getDate()>=SALARY_CYCLE_DAY?1:0),1);
+  const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);
 }
 function pocketBounds(y=month.getFullYear(),m=month.getMonth()){
-  return [new Date(y,m-1,SALARY_CYCLE_DAY),new Date(y,m,SALARY_CYCLE_DAY)];
+  return [new Date(y,m,1),new Date(y,m+1,1)];
 }
 function pocketPeriodLabel(){
   const [a,b]=pocketBounds(),fmtDay=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
-  return fmtDay(a)+" – "+fmtDay(b);
+  return fmtDay(a)+" – "+fmtDay(new Date(b.getFullYear(),b.getMonth(),0));
 }
 function pocketDayIndex(t){const [a,b]=pocketBounds();const d=new Date(t.ts);if(d<a||d>=b)return -1;return Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-a)/86400000);}
 month=pocketMonthNow();
@@ -2903,8 +2902,8 @@ function render(){
 // Monthly salary allocation: LKR from the 22nd, AUD from the 20th.
 // The raw SMS transaction date never changes; only its dashboard assignment.
 function incomeCycleDate(t){
-  const d=new Date(t.ts),fromDay=t.cur==="AUD"?20:SALARY_CYCLE_DAY;
-  return new Date(d.getFullYear(),d.getMonth()+(d.getDate()>=fromDay?1:0),1);
+  // AUD and LKR salaries count in the calendar month actually received.
+  const d=new Date(t.ts);return new Date(d.getFullYear(),d.getMonth(),1);
 }
 function valuationLkr(t){
   if((t.cur||"LKR")==="LKR")return lkrOf(t);
@@ -2961,14 +2960,14 @@ function openPocketInsights(){
       S.rate.source==="HNB"?"HNB rate last set "+esc(S.rate.date||""):"Estimated rate · awaiting refresh";
     openSheet('<div class="ins-dashboard ins-simple"><div class="ins-eyebrow">Sappy Pocket · Insights</div>'+
       '<h2 class="ins-title">Income, expenses & savings</h2>'+
-      '<p class="ins-intro">Salary spending cycle 22nd–21st</p>'+
+      '<p class="ins-intro">Calendar month · 1st to last day</p>'+
       '<div class="ins-range"><button type="button" data-range="6" class="'+(range===6?'on':'')+'">6 months</button>'+
       '<button type="button" data-range="12" class="'+(range===12?'on':'')+'">12 months</button></div>'+
       '<div class="ins-chart-shell"><div class="ins-chart-head"><b>Monthly comparison</b>'+
       '<div class="ins-chart-legend"><span><i class="ins-kpi-dot ins-income"></i>Income</span>'+
       '<span><i class="ins-kpi-dot ins-expense"></i>Expenses</span></div></div>'+
       '<div class="ins-chart-area"><div class="ins-axis">'+axis+'</div><div class="ins-plot">'+chart+'</div></div></div>'+
-      '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · Salary remaining</div>'+
+      '<div class="ins-feature"><div class="ins-feature-label">'+esc(m.longLabel)+' · Monthly net</div>'+
       '<div class="ins-feature-amount num'+(m.saved<0?' negative':'')+'">'+money(m.saved)+'</div>'+
       '<div class="ins-progress"><div style="width:'+pct+'%"></div></div>'+
       '<div class="ins-feature-note">'+date(from)+' – '+date(new Date(to.getTime()-86400000))+
@@ -2981,7 +2980,7 @@ function openPocketInsights(){
       '<div class="ins-ledger-headings ins-ledger-four"><span>Month</span><span>Income</span><span>Spent</span><span>Saved</span></div>'+
       '<div class="ins-ledger ins-ledger-four-rows">'+rows+'</div>'+
       '<div class="ins-fx-compact"><span>AUD → LKR</span><b>1 AUD ≈ '+money(fx)+'</b></div>'+
-      '<p class="ins-method-note">'+fxNote+'. Saved = income − expenses. Fixed deposits and transfers are not included. AUD income received from the 20th and LKR salary from the 22nd count toward the next salary month. Older unrecorded savings do not affect these figures.</p></div>');
+      '<p class="ins-method-note">'+fxNote+'. Saved = income − expenses. Fixed deposits and transfers are not included. AUD and LKR salary count in the calendar month received, even when paid on the 23rd–25th. Older unrecorded savings do not affect these figures.</p></div>');
     document.querySelectorAll(".ins-range button").forEach(b=>b.onclick=()=>{range=Number(b.dataset.range);draw();});
     // Open at the rightmost (current) month. Both 6M and 12M remain scrollable left.
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -3119,7 +3118,7 @@ function renderHome(){
   const out=mt.filter(t=>t.type==="out"&&!NOT_SPENDING.has(t.cat));
   const inc=pocketIncome(month.getFullYear(),month.getMonth());
   const back=mt.filter(isLooseBack).reduce((s,t)=>s+lkrOf(t),0);
-  const spent=out.reduce((s,t)=>s+myShare(t),0);
+  const spent=monthSpend(month.getFullYear(),month.getMonth()).total;
   const net=spent;
 
   const left=inc-spent;
@@ -3131,7 +3130,7 @@ function renderHome(){
   const pm=new Date(month.getFullYear(),month.getMonth()-1,1), pv=monthSpend(pm.getFullYear(),pm.getMonth()).total;
 
   // lime hero: spent on top, balance + came in below
-  $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"})+" cycle";
+  $("spLabel").textContent="Spent in "+month.toLocaleDateString("en-GB",{month:"long"})+" ("+month.getFullYear()+")";
   $("cVal").textContent=fmt(Math.round(net)); $("cVal").dataset.count=Math.round(net);
   $("cSub").textContent=out.length?out.length+" payments · "+rs(net/days)+" a day":"No spending yet";
   let badge=""; if(net&&pv){ const d=Math.round((net-pv)/pv*100); badge=(d>0?"↑ ":"↓ ")+Math.abs(d)+"% vs "+pm.toLocaleDateString("en-GB",{month:"short"}); }
@@ -4526,13 +4525,52 @@ async function tripMediaPrepare(t,kind,file){
  try{await tripMediaAction("put",key,file);saved=true;}
  catch(e){console.warn("Full-resolution media unavailable, using compressed backup",e);}
  try{
-  const fallback=await compressPhoto(file,kind==="routeShot",saved);
+  const fallback=await compressPhoto(file,kind==="routeShot",true);
   return {fallback,key:saved?key:null};
  }catch(e){
   if(saved)try{await tripMediaAction("delete",key);}catch(_){}
   throw e;
  }
 }
+
+async function tripMediaFreeSpace(exceptId){
+ // Reduce old embedded travel pictures only after securely copying them into media storage.
+ // If storage or decoding fails, keep the original untouched.
+ let migrated=0;
+ for(const trip of Object.values(S.trip)){
+  if(!live(trip)||trip.id===exceptId)continue;
+  for(const kind of ["photo","routeShot"]){
+   const src=trip[kind];
+   if(typeof src!=="string"||!src.startsWith("data:image/")||src.length<150000)continue;
+   let newKey=null;
+   try{
+    const response=await fetch(src),original=await response.blob();
+    newKey=trip[kind+"HQKey"]||trip.id+":"+kind+":migration-"+uid();
+    await tripMediaAction("put",newKey,original);
+    const small=await new Promise((resolve,reject)=>{
+     const img=new Image();
+     img.onerror=()=>reject(new Error("Image decoding failed"));
+     img.onload=()=>{
+      try{
+       const scale=Math.min(1,500/Math.max(img.width,img.height));
+       const c=document.createElement("canvas");
+       c.width=Math.max(1,Math.round(img.width*scale));c.height=Math.max(1,Math.round(img.height*scale));
+       c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+       resolve(c.toDataURL("image/jpeg",.65));c.width=1;c.height=1;
+      }catch(e){reject(e);}
+     };img.src=src;
+    });
+    if(small.length>=src.length)continue;
+    const prev=trip[kind],prevKey=trip[kind+"HQKey"];
+    trip[kind]=small;trip[kind+"HQKey"]=newKey;
+    if(!persist()){trip[kind]=prev;trip[kind+"HQKey"]=prevKey;return migrated;}
+    migrated++;
+   }catch(e){console.warn("Could not migrate trip photo",e);}
+  }
+ }
+ return migrated;
+}
+
 async function tripMediaImage(t,kind){
  const key=t[kind+"HQKey"];
  if(key){
@@ -4559,8 +4597,8 @@ function compressPhoto(file,routeScreenshot=false,compact=false){
    const im=new Image();im.onerror=()=>reject(new Error("Could not open the image"));
    im.onload=()=>{
     try{
-     const limit=compact?1200:(routeScreenshot?1800:1920);
-     const byteLimit=compact?360000:(routeScreenshot?950000:1150000);
+     const limit=compact?560:(routeScreenshot?1800:1920);
+     const byteLimit=compact?75000:(routeScreenshot?950000:1150000);
      let scale=Math.min(1,limit/Math.max(im.width,im.height));
      let best="";
      for(let pass=0;pass<5;pass++){
@@ -4568,7 +4606,7 @@ function compressPhoto(file,routeScreenshot=false,compact=false){
       c.width=Math.max(1,Math.round(im.width*scale));c.height=Math.max(1,Math.round(im.height*scale));
       const g=c.getContext("2d");g.imageSmoothingEnabled=true;g.imageSmoothingQuality="high";
       g.drawImage(im,0,0,c.width,c.height);
-      for(const quality of (compact?[0.86,0.80,0.74]:[0.92,0.88,0.82])){
+      for(const quality of (compact?[0.76,0.68,0.58]:[0.92,0.88,0.82])){
        const data=c.toDataURL("image/jpeg",quality);
        best=data;if(data.length*0.75<=byteLimit){resolve(data);return;}
       }
@@ -5232,13 +5270,14 @@ function openRecapForm(id=null,planId=null){
     persist();put("cfg",{id:"travel",home:S.travelHome});
    }
    if(!put("trip",t)){
-    for(const key of freshKeys)tripMediaAction("delete",key).catch(()=>{});
-    throw new Error("Trip could not be saved");
+    // Recover localStorage capacity taken by older embedded photos, then retry once.
+    await tripMediaFreeSpace(t.id);
+    if(!put("trip",t))throw new Error("Trip record exceeds available device storage");
    }
    for(const key of Object.values(priorKeys))if(key&&key!==t.photoHQKey&&key!==t.routeShotHQKey)tripMediaAction("delete",key).catch(()=>{});
    if(p&&live(S.plan[p.id])){if(!remove("plan",p.id))toast("Trip saved. Planned visit may still need removing.");}
    renderPlans();closeSheet();renderTravel();openTripStudio(t.id);
-  }catch(e){saveButton.disabled=false;saveButton.textContent="Save";toast("Could not save the trip. Please try again.");}
+  }catch(e){console.error("Trip save failed",e);saveButton.disabled=false;saveButton.textContent="Save";toast(e&&/storage|quota|space/i.test(e.message||"")?"Storage is full. Free device space or export a backup, then retry.":"Could not save the trip. Check the photo and try again.");}
  };
 
 }
