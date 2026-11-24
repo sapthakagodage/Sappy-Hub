@@ -2875,9 +2875,7 @@ function renderSms(){
   $("skipRow").hidden=true;
 }
 const txList = () => Object.values(S.tx).filter(live).sort((a,b)=>b.ts-a.ts||(b.u||0)-(a.u||0));
-// Spending cycles run 22nd–21st; AUD income on the 20th–21st funds the next cycle.
-// The displayed month names the month when the cycle ends.
-// Calendar-month reporting: salaries remain credited on their actual receipt dates.
+// Pocket summaries use calendar-month boundaries. Salary credits retain their real receipt dates.
 function pocketMonthNow(){
   const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1);
 }
@@ -2908,8 +2906,7 @@ function render(){
 
 
 /* ---------- Quick insights (footer chart) ---------- */
-// Monthly salary allocation: LKR from the 22nd, AUD from the 20th.
-// The raw SMS transaction date never changes; only its dashboard assignment.
+// Monthly income belongs to the calendar month when the payment was received.
 function incomeCycleDate(t){
   // AUD and LKR salaries count in the calendar month actually received.
   const d=new Date(t.ts);return new Date(d.getFullYear(),d.getMonth(),1);
