@@ -2220,7 +2220,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.109";
+const APP_VERSION = "7.3.110";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4851,7 +4851,7 @@ async function exportTripBudgetPdf(id){
  const button=$("tbExportPdf");
  if(button){button.disabled=true;button.querySelector("b").textContent="Creating PDF…";}
  try{
-  const totals=tbTotals(b),W=1240,H=1754,L=74,R=W-74,T=425,B=1650;
+  const totals=tbTotals(b),W=1240,H=1754,L=74,R=W-74,FIRST_TOP=471,NEXT_TOP=92,B=1650;
   const paper="#F2F6F8",dark="#10222B",ink="#14242E",muted="#58707F",blue="#8FDDFF",green="#167C5A";
   const canvas=document.createElement("canvas");canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Canvas unavailable");
@@ -4878,28 +4878,29 @@ async function exportTripBudgetPdf(id){
    const contributed=e.contributions?.length?e.contributions:[{person:e.payer,amount:e.amount}];
    const payerText=contributed.map(p=>tbPerson(b,p.person)+" ("+currency(p.amount)+")").join(", ");
    const shares=(e.for||[]).map(id=>tbPerson(b,id)).join(", ")||"None";
-   const title=wrap((i+1)+". "+(e.title||"Expense"),32,700,800);
+   const title=wrap((i+1)+". "+(e.title||"Expense"),32,720,800);
    const paid=wrap("Paid by: "+payerText,27,1030,650);
    const split=wrap("Shared by: "+shares,27,1030,650);
-   return {kind:"expense",title,paid,split,amount:e.amount,h:38+title.length*43+paid.length*37+split.length*37+27};
+   return {kind:"expense",title,paid,split,amount:e.amount,h:42+title.length*43+paid.length*37+split.length*37+32};
   })},{name:"FINAL SETTLEMENT",items:totals.transfers.length?totals.transfers.map(p=>({
    kind:"transfer",label:wrap(tbPerson(b,p.from)+"  →  "+tbPerson(b,p.to),31,735,800),amount:p.amount
   })).map(p=>({...p,h:48+p.label.length*44+30})):[{kind:"allsettled",h:105}]}];
   if(b.payments.length)sections.push({name:"ALREADY PAID",items:b.payments.map(p=>({
    kind:"paid",label:wrap(tbPerson(b,p.from)+"  →  "+tbPerson(b,p.to),28,750,750),amount:p.amount
   })).map(p=>({...p,h:47+p.label.length*40+25}))});
-  const pages=[[]];let y=T;let sectionName="";
-  const nextPage=()=>{pages.push([]);y=T;sectionName="";};
+  const pages=[[]];let y=FIRST_TOP,sectionName="";
+  const nextPage=()=>{pages.push([]);y=NEXT_TOP;};
+  // Render a heading only once per section: continuation pages resume with the next expense.
   for(const section of sections){
+   sectionName="";
    for(const item of section.items){
     if(sectionName!==section.name){
      if(y+64+item.h>B&&pages.at(-1).length)nextPage();
-     pages.at(-1).push({kind:"section",label:section.name,h:64});y+=64;sectionName=section.name;
+     pages.at(-1).push({kind:"section",label:section.name,h:64});
+     y+=64;sectionName=section.name;
     }
-    if(y+item.h>B&&pages.at(-1).length){
-     nextPage();pages.at(-1).push({kind:"section",label:section.name+" · CONTINUED",h:64});y+=64;sectionName=section.name;
-    }
-    if(y+item.h>B)throw new Error("A budget item is too long for an A4 page");
+    if(y+item.h>B&&pages.at(-1).length)nextPage();
+    if(y+item.h>B)throw new Error("An expense is too long to fit on one A4 page");
     pages.at(-1).push(item);y+=item.h;
    }
   }
@@ -4921,28 +4922,36 @@ async function exportTripBudgetPdf(id){
   const jpegPages=[];
   for(let pageIndex=0;pageIndex<pages.length;pageIndex++){
    ctx.fillStyle=paper;ctx.fillRect(0,0,W,H);
-   rect(28,24,W-56,248,dark,24);
-   rect(L,49,200,39,blue,18);
-   draw("SAPPY TRAVEL",L+100,76,17,dark,800,"center");
-   draw("TRIP BUDGET",L,125,22,blue,800);
-   drawLines(longTitle,L,171,43,47,"#FFFFFF",800);
-   draw(tripDate+(record.kind==="plan"?" · Planned visit":""),L,255,23,"#B9D5E2",600);
-   rect(L,286,R-L,112,"#FFFFFF",18);
-   draw("TOTAL GROUP SPENDING",L+24,325,20,muted,800);
-   draw(currency(totals.total),L+24,370,35,ink,800);
-   draw(b.expenses.length+" expenses  ·  "+b.people.length+" travellers",R-24,366,19,muted,750,"right");
-   // Section content starts below the summary on each A4 page.
-   let rowY=425;
+   if(pageIndex===0){
+    // One full cover/header only; the following pages begin directly with remaining expenses.
+    rect(28,24,W-56,248,dark,25);
+    rect(L,48,206,42,blue,19);
+    draw("SAPPY TRAVEL",L+103,78,18,dark,800,"center");
+    draw("TRIP BUDGET STATEMENT",L,127,24,blue,800);
+    drawLines(longTitle,L,176,43,47,"#FFFFFF",800);
+    draw(tripDate+(record.kind==="plan"?" · Planned visit":""),L,256,22,"#B9D5E2",650);
+    // The total is the visual anchor, not a small line between headers.
+    rect(L,293,R-L,146,blue,23);
+    draw("TOTAL TRIP EXPENSES",L+28,335,23,dark,800);
+    draw(currency(totals.total),L+28,405,56,dark,800);
+    draw(b.expenses.length+" expenses  ·  "+b.people.length+" travellers",R-26,403,20,dark,750,"right");
+   }else{
+    // No repeated trip title, total, or section header on continuation pages.
+    rect(L,49,R-L,2,"#DDE8ED");
+   }
+   let rowY=pageIndex===0?FIRST_TOP:NEXT_TOP;
    for(const block of pages[pageIndex]){
     if(block.kind==="section"){
-     draw(block.label,L+5,rowY+40,22,muted,800);rowY+=block.h;continue;
+     draw(block.label,L+5,rowY+42,23,dark,800);
+     if(block.label==="FINAL SETTLEMENT")draw("Total to transfer: "+currency(totals.transfers.reduce((sum,p)=>sum+p.amount,0)),R-5,rowY+42,21,green,800,"right");
+     rowY+=block.h;continue;
     }
     rect(L,rowY,R-L,block.h-12,"#FFFFFF",16);
     if(block.kind==="expense"){
-     const endTitle=drawLines(block.title,L+24,rowY+46,32,43,ink,800);
-     draw(currency(block.amount),R-22,rowY+47,28,ink,800,"right");
-     const endPaid=drawLines(block.paid,L+24,endTitle+6,27,37,muted,650);
-     drawLines(block.split,L+24,endPaid+4,27,37,muted,650);
+     const endTitle=drawLines(block.title,L+24,rowY+48,32,43,ink,800);
+     draw(currency(block.amount),R-22,rowY+48,28,ink,800,"right");
+     const endPaid=drawLines(block.paid,L+24,endTitle+9,27,37,muted,650);
+     drawLines(block.split,L+24,endPaid+8,27,37,muted,650);
     }else if(block.kind==="transfer"||block.kind==="paid"){
      drawLines(block.label,L+23,rowY+45,block.kind==="transfer"?31:28,block.kind==="transfer"?44:40,ink,800);
      draw(currency(block.amount),R-24,rowY+47,30,block.kind==="transfer"?green:muted,800,"right");
@@ -4951,7 +4960,8 @@ async function exportTripBudgetPdf(id){
     }
     rowY+=block.h;
    }
-   draw("SAPPY TRAVEL  ·  GROUP EXPENSES",L,H-58,18,muted,800);
+   rect(L,H-99,R-L,2,"#DDE8ED");
+   draw("SAPPY TRAVEL  ·  TRIP BUDGET STATEMENT",L,H-58,18,muted,800);
    draw("Page "+(pageIndex+1)+" of "+pages.length,R,H-58,18,muted,750,"right");
    const jpeg=canvas.toDataURL("image/jpeg",.90);
    if(!jpeg.startsWith("data:image/jpeg;base64,"))throw new Error("PDF page image unavailable");
