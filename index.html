@@ -2211,7 +2211,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.107";
+const APP_VERSION = "7.3.108";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3232,12 +3232,18 @@ function balances(){
     const key=t.bank+"|"+acct+"|"+currency;
     // One HNB LKR snapshot, chosen by transaction timestamp, no matter
     // how an older alert represented the masked account identifier.
-    if(!snapshots[key]||t.ts>snapshots[key].ts||(t.ts===snapshots[key].ts&&(t.u||0)>(snapshots[key].u||0)))
-      snapshots[key]=Object.assign({},t,{acct,cur:currency});
+    const confirmed=t.bank==="HNB"&&currency==="LKR"&&t.acct===HNB_MAIN_ACCOUNT_LAST2;
+    const current=snapshots[key],currentConfirmed=!!current?.confirmed;
+    // Only HNB alerts actually carrying the confirmed suffix may replace an
+    // existing confirmed-suffix snapshot. Legacy blank/wrong-suffix alerts
+    // cannot take over the correct bank balance after sync.
+    if(!current||(confirmed&&!currentConfirmed)||
+       (confirmed===currentConfirmed&&(t.ts>current.ts||(t.ts===current.ts&&(t.u||0)>(current.u||0)))))
+      snapshots[key]=Object.assign({},t,{acct,cur:currency,confirmed});
   });
   const out=Object.values(snapshots).map(t=>({bank:t.bank,acct:t.acct,cur:t.cur,balance:t.balance,ts:t.ts,lkr:t.balance*rateFor(t.cur)}));
   const trackedKeys=new Set();
-  Object.keys(S.tracked||{}).forEach(k=>{
+  Object.keys(S.tracked||{}).sort((x,y)=>(x==="HNB|19"?-1:y==="HNB|19"?1:0)).forEach(k=>{
     if(k==="Cash|")return;
     const [bank,rawAcct]=k.split("|"),acct=displayAccountId(bank,rawAcct,"LKR"),canonical=bank+"|"+acct;
     // A real bank balance always wins over an estimated manually tracked
