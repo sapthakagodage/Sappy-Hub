@@ -2020,12 +2020,8 @@ body.in-travel .sheet.trip-full{
 }
 body.in-travel .sheet.trip-full .grab{display:none}
 body.in-travel .sheet.trip-full #sheetBody{max-width:780px;margin:0 auto;padding-bottom:24px}
-body.in-travel .sheet.trip-full .sx{
- position:sticky;float:none;top:0;width:auto;min-width:110px;height:44px;
- padding:0 15px;margin:0 0 17px -3px;display:inline-flex;align-items:center;gap:9px;
- border:1px solid var(--line);border-radius:14px;background:var(--card2);
- color:var(--ink);font-size:14px;font-weight:800;z-index:8;
-}
+body.in-travel .sheet.trip-full .sx{display:none}
+body.in-travel .sheet.trip-full{will-change:transform;box-shadow:-16px 0 40px rgba(0,0,0,.13)}
 body.in-travel .sheet.trip-full .tdmap{min-height:225px}
 body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 
@@ -2248,7 +2244,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.114";
+const APP_VERSION = "7.3.115";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3552,6 +3548,8 @@ function openSheet(html){
   rescueSb();
   const body=$("sheetBody"),panel=$("sheet"),scrim=$("scrim");
   panel.classList.remove("trip-full");
+  panel.style.removeProperty("transform");
+  panel.style.removeProperty("transition");
   const wasOpen=sheetOpen, motionId=++sheetMotionId;
   const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // Prepare the closed position and force it into layout before opening.
@@ -3589,29 +3587,65 @@ function openSheet(html){
 
 function showTripFullPage(){
  const panel=$("sheet"),back=$("sx");
+ panel.style.removeProperty("transform");
+ panel.style.removeProperty("transition");
  panel.classList.add("trip-full");
- back.textContent="← Back to trips";
- back.setAttribute("aria-label","Back to travel");
+ // Keep a hidden accessible escape target without taking up screen space.
+ back.setAttribute("aria-label","Close trip details");
  back.onclick=closeSheet;
  $("scrim").onclick=closeSheet;
 }
-// Optional swipe-back from the left edge; leave scrolling, the map, and forms alone.
+// Interactive iOS-style back swipe: only from the left edge, with horizontal
+// movement following the finger. Vertical scrolling and the trip map are unaffected.
 (function(){
- const panel=$("sheet");let start=null;
+ const panel=$("sheet");let start=null,closing=false;
+ const clear=()=>{
+  panel.style.removeProperty("transition");
+  panel.style.removeProperty("transform");
+  start=null;closing=false;
+ };
  panel.addEventListener("touchstart",event=>{
   start=null;
-  if(!panel.classList.contains("trip-full")||event.touches.length!==1)return;
+  if(closing||!panel.classList.contains("trip-full")||event.touches.length!==1)return;
   const t=event.touches[0],rect=panel.getBoundingClientRect();
-  if(t.clientX-rect.left>46||event.target.closest("button,input,select,textarea,a,.tdmap"))return;
-  start={x:t.clientX,y:t.clientY};
+  if(t.clientX-rect.left>48||event.target.closest("button,input,select,textarea,a,.tdmap"))return;
+  start={x:t.clientX,y:t.clientY,drag:false};
  },{passive:true});
+ panel.addEventListener("touchmove",event=>{
+  if(!start||!panel.classList.contains("trip-full")||event.touches.length!==1)return;
+  const t=event.touches[0],dx=t.clientX-start.x,dy=t.clientY-start.y;
+  if(!start.drag){
+   if(Math.abs(dy)>Math.abs(dx)||dx<9)return;
+   start.drag=true;
+  }
+  if(dx<=0)return;
+  if(event.cancelable)event.preventDefault();
+  panel.style.transition="none";
+  panel.style.transform="translate3d("+Math.min(dx,panel.clientWidth)+"px,0,0)";
+ },{passive:false});
  panel.addEventListener("touchend",event=>{
   if(!start||!panel.classList.contains("trip-full")||!event.changedTouches.length)return;
   const t=event.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y;
-  start=null;
-  if(dx>85&&Math.abs(dx)>Math.abs(dy)*1.35){const back=$("sx");if(back)back.click();}
+  const dragged=start.drag;start=null;
+  if(!dragged)return;
+  const reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  panel.style.transition=reduce?"none":"transform .23s cubic-bezier(.2,.78,.3,1)";
+  if(dx>90&&Math.abs(dx)>Math.abs(dy)*1.15){
+   closing=true;
+   panel.style.transform="translate3d(100%,0,0)";
+   setTimeout(()=>{closeSheet();clear();},reduce?0:235);
+  }else{
+   panel.style.transform="translate3d(0,0,0)";
+   setTimeout(()=>{if(!closing)clear();},reduce?0:235);
+  }
  },{passive:true});
- panel.addEventListener("touchcancel",()=>{start=null;},{passive:true});
+ panel.addEventListener("touchcancel",()=>{
+  if(!start)return;
+  start=null;
+  panel.style.transition="transform .2s ease-out";
+  panel.style.transform="translate3d(0,0,0)";
+  setTimeout(()=>{if(!closing)clear();},210);
+ },{passive:true});
 })();
 
 function sheetReturnTo(action){
