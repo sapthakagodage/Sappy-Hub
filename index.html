@@ -2057,6 +2057,16 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 .pocket-real-preview{padding:11px 13px;margin:2px 0 12px;background:var(--card);border-radius:12px;font-size:12px;font-weight:800;color:var(--pos)}
 .pocket-received-card .field{margin:12px 0}
 .pocket-received-card .field input{width:100%;min-width:0}
+
+/* One wallet/card payment can be allocated across distinct spending categories. */
+.pocket-multi-toggle{display:block;width:100%;border:1px solid var(--line);background:var(--card2);border-radius:13px;margin:10px 0;padding:12px;font-weight:800;color:var(--ink)}
+.pocket-multi-toggle.on{border-color:#8FDDFF;background:rgba(143,221,255,.15)}
+.pocket-multi-panel{margin:8px 0 15px;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--card2)}
+.pocket-multi-panel .note{margin:0 0 12px;font-size:12px}
+.pocket-multi-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,150px);gap:12px;align-items:center;margin:8px 0;font-size:13px;font-weight:750}
+.pocket-multi-line input{text-align:right;width:100%;min-width:0}
+.pocket-multi-total{font-size:12px;font-weight:800;text-align:right;margin-top:12px;color:var(--pos)}
+.pocket-multi-total.is-invalid{color:#cb543e}
 </style>
 </head>
 <body class="in-hub">
@@ -2270,7 +2280,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.117";
+const APP_VERSION = "7.3.118";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3047,13 +3057,103 @@ function openPocketInsights(){
   draw();
 }
 /* ---------- home ---------- */
+
+/* One payment, multiple category allocations: never duplicate the bank/cash debit.
+   Values are in the transaction's original currency, and sum to that debit. */
+function pocketCategoryShares(t){
+ const value=myShare(t);
+ if(!t||!Array.isArray(t.catSplits)||t.catSplits.length<2||!Number.isFinite(+t.amount)||+t.amount<=0)
+  return [{cat:pocketCat(t),amount:value}];
+ const rows=t.catSplits.filter(x=>x&&PICK.includes(x.cat)&&Number.isFinite(+x.amount)&&+x.amount>=0);
+ if(rows.length!==t.catSplits.length||new Set(rows.map(x=>x.cat)).size!==rows.length||
+    Math.abs(rows.reduce((n,x)=>n+Number(x.amount),0)-Number(t.amount))>.011)
+  return [{cat:pocketCat(t),amount:value}];
+ let remaining=value;
+ return rows.map((x,i)=>{
+  const amount=i===rows.length-1?remaining:Math.min(remaining,Math.round(value*(+x.amount/+t.amount)*100)/100);
+  remaining-=amount;return {cat:x.cat,amount};
+ });
+}
+function pocketCategoryNames(t){
+ return Array.isArray(t.catSplits)&&t.catSplits.length>1?t.catSplits.map(x=>x.cat).join(" + "):catLabel(pocketCat(t));
+}
+function categorySplitWidget(){
+ return '<button type="button" class="pocket-multi-toggle" id="mcToggle" aria-pressed="false">＋ Use multiple categories</button>'+
+  '<div class="pocket-multi-panel" id="mcPanel" hidden><p class="note">Tap categories above to select them. Amounts are split equally by default; you can adjust each one.</p>'+
+  '<div id="mcRows"></div><div class="pocket-multi-total" id="mcTotal"></div></div>';
+}
+function wireCategorySplit(onSingle,initial,amountGetter){
+ const selected=new Map();
+ if(Array.isArray(initial))initial.forEach(x=>{if(PICK.includes(x.cat))selected.set(x.cat,Math.round(Number(x.amount)*100)/100)});
+ let multi=selected.size>1,manual=multi;
+ const total=()=>Math.round((Number(amountGetter())||0)*100)/100;
+ const equalize=()=>{
+  const count=selected.size;if(!count)return;
+  const cents=Math.round(total()*100),each=Math.floor(cents/count),rem=cents-each*count;
+  [...selected.keys()].forEach((k,i)=>selected.set(k,(each+(i<rem?1:0))/100));
+ };
+ const refresh=()=>{
+  const b=$("mcToggle"),panel=$("mcPanel"),rows=$("mcRows");
+  b.textContent=multi?"✓ Multiple categories selected":"＋ Use multiple categories";
+  b.setAttribute("aria-pressed",String(multi));b.classList.toggle("on",multi);
+  panel.hidden=!multi;
+  $("pk").querySelectorAll("button").forEach(el=>{
+   const cat=el.dataset.c;
+   el.classList.toggle("on",multi?selected.has(cat):cat===selectedSingle);
+  });
+  if(!multi)return;
+  rows.innerHTML=[...selected].map(([cat,amount])=>'<label class="pocket-multi-line"><span>'+esc(cat)+'</span>'+
+   '<input class="inp num" type="text" inputmode="decimal" data-split-cat="'+esc(cat)+'" value="'+esc(fmt(amount,amount%1?2:0))+'" placeholder="0"></label>').join("");
+  rows.querySelectorAll("[data-split-cat]").forEach(input=>input.addEventListener("input",()=>{
+   selected.set(input.dataset.splitCat,Number(input.value.replace(/,/g,""))||0);manual=true;summary();
+  }));
+  summary();
+ };
+ const summary=()=>{
+  const sum=[...selected.values()].reduce((n,v)=>n+(Number(v)||0),0),due=total(),el=$("mcTotal");
+  el.textContent=selected.size+" categories · "+rs(sum)+" allocated of "+rs(due);
+  el.classList.toggle("is-invalid",selected.size<2||Math.abs(sum-due)>.011);
+ };
+ let selectedSingle=$("pk").querySelector("button.on")?.dataset.c||"";
+ const picker=$("pk");
+ picker.querySelectorAll("button").forEach(el=>el.onclick=()=>{
+  const cat=el.dataset.c;
+  if(!multi){selectedSingle=cat;onSingle(cat);}
+  else if(PICK.includes(cat)){
+   if(selected.has(cat))selected.delete(cat);else selected.set(cat,0);
+   manual=false;equalize();
+  }
+  refresh();
+ });
+ $("mcToggle").onclick=()=>{
+  multi=!multi;
+  if(multi){if(!selected.size&&PICK.includes(selectedSingle))selected.set(selectedSingle,0);manual=false;equalize();}
+  else{selectedSingle=[...selected.keys()][0]||selectedSingle;onSingle(selectedSingle);}
+  refresh();
+ };
+ const refreshAmount=()=>{if(multi&&!manual){equalize();refresh();}else if(multi)summary();};
+ refresh();
+ return {
+  get:()=>{
+   if(!multi)return {cat:selectedSingle||null,catSplits:null};
+   const amount=total(),entries=[...selected].map(([cat,n])=>({cat,amount:Math.round(Number(n)*100)/100}));
+   if(entries.length<2||entries.some(x=>!(x.amount>0))||
+      Math.abs(entries.reduce((sum,x)=>sum+x.amount,0)-amount)>.011)return null;
+   return {cat:entries[0].cat,catSplits:entries};
+  },refreshAmount,chooseSingle:cat=>{
+    multi=false;selectedSingle=cat;onSingle(cat);refresh();
+  }
+ };
+}
+
 function monthSpend(y,m){
   let total=0; const by={};
   let back=0;
   const [start,end]=pocketBounds(y,m);
   Object.values(S.tx).forEach(t=>{ if(!live(t)||t.ts<start.getTime()||t.ts>=end.getTime()) return;
     if(isLooseBack(t)){ back+=lkrOf(t); return; }   // waits until linked to a payment
-    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=myShare(t); total+=v; by[pocketCat(t)]=(by[pocketCat(t)]||0)+v; });
+    if(t.type!=="out"||NOT_SPENDING.has(t.cat)) return; const v=myShare(t);total+=v;
+    pocketCategoryShares(t).forEach(a=>{by[a.cat]=(by[a.cat]||0)+a.amount;}); });
   return {total,gross:total,back,by};
 }
 function lastMonths(n){ const out=[]; for(let i=n-1;i>=0;i--){ const d=new Date(month.getFullYear(),month.getMonth()-i,1); out.push(d);} return out; }
@@ -3071,7 +3171,9 @@ function openSort(id){
     '<div class="btns"><button class="btn" id="sSave" style="flex:1">Save</button><button class="btn soft" id="sLater">Later</button></div>'+
     '<button type="button" class="btn warn" id="sDelete" style="width:100%;margin-top:10px;text-align:center">Delete payment</button>');
   const updateGym=t.type==="in"?()=>{}:wireGymPicker(t,()=>cat);
-  wirePicker(c=>{cat=c;updateGym();});
+  const categoryCtrl=t.type==="out"?wireCategorySplit(c=>{cat=c;updateGym();},t.catSplits,()=>t.bank==="Cash"?Number(String($("tamount").value).replace(/,/g,""))||0:t.amount):null;
+  if(!categoryCtrl)wirePicker(c=>{cat=c;updateGym();});
+  if(categoryCtrl&&$("tamount"))$("tamount").addEventListener("input",categoryCtrl.refreshAmount);
   $("sSave").onclick=()=>{ if(!cat) return toast("Pick a category");
     const saved=Object.assign({},t,{cat,catSet:true});
     if(t.type==="out")applyGymFields(saved,cat);
@@ -3178,7 +3280,7 @@ function renderHome(){
   const net=spent;
 
   const left=inc-spent;
-  const by={}; out.forEach(t=>by[pocketCat(t)]=(by[pocketCat(t)]||0)+myShare(t));
+  const by={}; out.forEach(t=>pocketCategoryShares(t).forEach(a=>by[a.cat]=(by[a.cat]||0)+a.amount));
   const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]);
   const mName=month.toLocaleDateString("en-GB",{month:"long"});
   const now=new Date(), [periodStart,periodEnd]=pocketBounds(), isCur=now>=periodStart&&now<periodEnd;
@@ -3482,7 +3584,7 @@ function personalExpenseDetailHtml(t){
 function txHtml(t){
   const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
   const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
-  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(catLabel(pocketCat(t))))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt">'+personalExpenseAmountHtml(t,main)+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
+  return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(pocketCategoryNames(t)))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt">'+personalExpenseAmountHtml(t,main)+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
   if(!list.length){ el.className=flat?"list":""; el.innerHTML='<div class="'+(flat?'':'list')+'"><div class="empty"><b>Nothing here yet</b>'+esc(emptyMsg)+'</div></div>'; return; }
@@ -3560,7 +3662,7 @@ function renderActivity(){
   else if(filter==="Income") list=list.filter(t=>t.type==="in"&&t.cat!=="Paid back");
   else if(filter==="Paid back") list=list.filter(t=>t.cat==="Paid back");
   else if(filter==="Fixed deposit") list=list.filter(t=>t.cat==="Fixed deposit");
-  if(q) list=list.filter(t=>(t.merchant+" "+(t.note||"")+" "+t.bank+" "+pocketCat(t)).toLowerCase().includes(q));
+  if(q) list=list.filter(t=>(t.merchant+" "+(t.note||"")+" "+t.bank+" "+pocketCategoryNames(t)).toLowerCase().includes(q));
   listInto($("allList"), list, "Nothing for this month yet.");
 }
 
@@ -3745,11 +3847,11 @@ function catPicker(list, cur){ return '<div class="pick" id="pk">'+list.map(c=>'
 function wirePicker(onPick){ const pk=$("pk"); pk.querySelectorAll("button").forEach(b=>b.onclick=()=>{ pk.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); onPick(b.dataset.c); }); }
 
 function openCat(c){
-  const list=txList().filter(t=>inMonth(t)&&pocketCat(t)===c);
+  const list=txList().filter(t=>inMonth(t)&&pocketCategoryShares(t).some(a=>a.cat===c));
   if(c==="Paid back"){ const tot=list.reduce((a,t)=>a+lkrOf(t),0);
     openSheet('<div class="catHead"><span class="ic" style="background:'+CATS[c].c+'">'+icon(c,26)+'</span><div><h2>Friends paid back</h2><div class="note" style="margin:0">'+month.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+' · '+rs(tot)+'</div></div></div><p class="note">Taken off your spending. Not counted as income.</p><div class="list" id="catList"></div>');
     const el=$("catList"); el.innerHTML=list.map(txHtml).join(""); el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id)); return; }
-  const tot=list.reduce((a,t)=>a+lkrOf(t),0);
+  const tot=list.reduce((a,t)=>a+(pocketCategoryShares(t).find(x=>x.cat===c)?.amount||0),0);
   const ms=lastMonths(6).map(d=>({d,t:monthSpend(d.getFullYear(),d.getMonth()).by[c]||0})), mx=Math.max(1,...ms.map(x=>x.t));
   const avg=ms.slice(0,5).filter(x=>x.t).reduce((a,x,_,arr)=>a+x.t/arr.length,0);
   openSheet('<div class="catHead"><span class="ic" style="background:'+CATS[c].c+'">'+icon(c,26)+'</span><div><h2>'+esc(c)+'</h2><div class="note" style="margin:0">'+month.toLocaleDateString("en-GB",{month:"long",year:"numeric"})+'</div></div></div>'+
@@ -3786,6 +3888,7 @@ function openTx(id,edit){
     pocketReceivedContributionHtml(t)+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
+    (t.type==="out"?categorySplitWidget():"")+
     gymPicker(t,cat)+
     '<label class="chk"><input type="checkbox" id="rem" checked> Always use this category for this name</label>'+
     '<label class="field"><span>Bank</span><select id="tbank">'+banks.map(b=>'<option'+(b===t.bank?' selected':'')+'>'+esc(b)+'</option>').join("")+'</select></label>'+
@@ -3807,10 +3910,14 @@ function openTx(id,edit){
   }
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
-    if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
+    if(topSel){cat="Transfers";if(categoryCtrl)categoryCtrl.chooseSingle("Transfers");else document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers"));updateGym();} });
   $("tsave").onclick=()=>{
     const name=$("tname").value.trim()||t.merchant, bank=$("tbank").value;
+    const choice=categoryCtrl?categoryCtrl.get():{cat,catSplits:null};
+    if(!choice)return toast("Split amounts must equal the full payment across at least two categories");
+    cat=choice.cat;
     const n=Object.assign({},t,{cat,catSet:true,note:$("tnote").value.trim(),merchant:name});
+    if(choice.catSplits)n.catSplits=choice.catSplits;else delete n.catSplits;
     if(t.bank==="Cash"){
       const raw=String($("tamount").value).replace(/,/g,"").trim();
       const amount=Number(raw);
@@ -3824,7 +3931,7 @@ function openTx(id,edit){
     if(name!==t.merchant) n.nameSet=true;
     let askBal="";
     if(topOpts.length){
-      if(topSel){ n.topup=topSel; n.cat="Transfers"; n.catSet=true; S.topupRules[t.merchant.toLowerCase()]=topSel;
+      if(topSel){ n.topup=topSel; n.cat="Transfers";delete n.catSplits;n.catSet=true; S.topupRules[t.merchant.toLowerCase()]=topSel;
         if(!S.tracked[topSel] || S.tracked[topSel].del) askBal=topSel; }
       else if(t.topup){ delete n.topup; delete S.topupRules[t.merchant.toLowerCase()]; }
       saveAccounts(); }
@@ -3867,22 +3974,28 @@ function openAdd(cashOnly=false){
       (cashOnly?'<div class="fromhome"><span>Paid from</span><b>Cash wallet</b></div>':'<div class="field"><span>'+(type==="in"?"Received in":"Paid from")+'</span><div class="chips" id="accPick" style="flex-wrap:wrap">'+accs.map(a=>'<button type="button" class="chip'+(a.k===acc?' on':'')+'" data-k="'+esc(a.k)+'">'+esc(a.n)+'</button>').join("")+'</div></div>')+
       (cashOnly?'':'<label class="field"><span>'+(type==="in"?"From (who)":"Where")+'</span><input id="aname" value="'+esc(nameV)+'" placeholder="'+(type==="in"?"e.g. Kelum":"Shop or place")+'"></label>')+
       catPicker(cats,cat)+
+      (type==="out"?categorySplitWidget():"")+
       '<label class="field"><span>'+(cashOnly?'Date spent':'Date')+'</span><input id="adate" type="date" max="'+ymd(Date.now())+'" value="'+esc(dateV)+'"></label>'+
       '<button class="btn full" id="asave">Add</button>');
     if($("tt"))$("tt").querySelectorAll("button").forEach(b=>b.onclick=()=>{ type=b.dataset.t; draw(); });
     if($("accPick"))$("accPick").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ acc=b.dataset.k; $("accPick").querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b)); });
-    wirePicker(c=>cat=c);
+    const categoryCtrl=type==="out"?wireCategorySplit(c=>cat=c,null,()=>Number(String($("aamt").value).replace(/,/g,""))||0):null;
+    if(!categoryCtrl)wirePicker(c=>cat=c);
+    if(categoryCtrl)$("aamt").addEventListener("input",categoryCtrl.refreshAmount);
     $("acur").value=cashOnly?"LKR":currencyV;
     if(cashOnly){$("acur").value="LKR";$("acur").disabled=true;acc="Cash|";}
     $("asave").onclick=()=>{
       const amount=parseFloat($("aamt").value.replace(/,/g,"")); if(!(amount>0)) return toast("Enter an amount");
-      if(!cat) return toast("Pick a category");
+      const selection=categoryCtrl?categoryCtrl.get():{cat,catSplits:null};
+      if(!selection)return toast("Select 2+ categories and make their amounts add up to the payment");
+      cat=selection.cat;
+      if(!cat)return toast("Pick a category");
       if(!$("adate").value)return toast("Choose the date spent");
       if($("adate").value>ymd(Date.now()))return toast("Choose today or an earlier date");
       const cur=$("acur").value, d=fromYmd($("adate").value);
       const ts= sameDay(d,Date.now())?Date.now():d;
       const [bank,acct]=acc.split("|");
-      if(!put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, merchant:$("aname").value.trim()||(type==="in"?(cat==="Paid back"?"Paid back":"Cash received"):cat), ts, bank, acct:acct||"", lkr:amount*rateFor(cur), fx:rateFor(cur)}))return;
+      if(!put("tx",{id:"m"+uid(), src:"manual", amount, cur, type, cat, ...(selection.catSplits?{catSplits:selection.catSplits}:{}), merchant:$("aname").value.trim()||(type==="in"?(cat==="Paid back"?"Paid back":"Cash received"):cat), ts, bank, acct:acct||"", lkr:amount*rateFor(cur), fx:rateFor(cur)}))return;
       closeSheet(); toast("Added");
     };
   };
