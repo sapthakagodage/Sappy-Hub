@@ -2031,6 +2031,26 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 .tb-payer-mode.on{border-color:#8FDDFF;background:rgba(143,221,255,.18);color:var(--ink)}
 .tb-payer-mode:focus-visible{outline:2px solid #8FDDFF;outline-offset:2px}
 .tb-contributor-summary.is-invalid{color:#e36b4d}
+
+/* A bank debit can be partly reimbursed without changing the bank ledger amount. */
+.pocket-received-card{border:1px solid var(--line);border-radius:17px;padding:15px;margin:12px 0;background:var(--card2)}
+.pocket-received-heading{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
+.pocket-received-heading>b{font-size:14px}
+.pocket-received-heading>small,.pocket-received-hint{font-size:11px;line-height:1.5;color:var(--soft)}
+.pocket-received-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
+.pocket-received-numbers>div{display:flex;flex-direction:column;gap:7px;background:var(--card);border-radius:12px;padding:12px 10px;min-width:0}
+.pocket-received-numbers span{font-size:11px;font-weight:650;color:var(--soft)}
+.pocket-received-numbers b{font-size:18px;letter-spacing:-.03em;overflow-wrap:anywhere}
+.pocket-received-net{color:var(--pos)}
+.pocket-received-list{margin:10px 0}
+.pocket-received-row{display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;padding:11px 4px;background:transparent;border:0;border-bottom:1px solid var(--line);text-align:left;color:var(--ink)}
+.pocket-received-row span{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:750}
+.pocket-received-row small{font-weight:500;color:var(--soft);font-size:10px}
+.pocket-received-row b{font-size:13px;color:var(--pos);white-space:nowrap}
+.pocket-received-hint{margin:10px 2px 0}
+.pocket-contrib-preview{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:13px;background:var(--card2);padding:15px 12px;margin:12px 0 16px}
+.pocket-contrib-preview span{font-size:12px;font-weight:750;color:var(--soft)}
+.pocket-contrib-preview b{font-size:22px;color:var(--pos)}
 </style>
 </head>
 <body class="in-hub">
@@ -2244,7 +2264,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.115";
+const APP_VERSION = "7.3.116";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -2362,9 +2382,9 @@ const SPEND = PICK.concat(["Other"]);
 const catLabel=c=>c==="Other"?"Not sorted yet":c==="Health"?"My Health":c;
 const pocketCat=t=>t.cat==="Health"?"My Health":t.cat; // Legacy Health stays in storage.
 const NOT_SPENDING = new Set(["Transfers","Fixed deposit","Income","Paid back","Cash"]);
-// Sharing is optional for normal purchases (food, fuel, trips, shopping, etc.).
-// Bills remain straightforward personal expenses with no split controls.
-const canSplitExpense = t => !!t && live(t) && t.type==="out" && !NOT_SPENDING.has(t.cat) && t.cat!=="Bills";
+// All spending (including electricity and other Bills) can have actual repayments.
+// Bank debits remain the full amount; the effective personal cost uses linked receipts.
+const canSplitExpense = t => !!t && live(t) && t.type==="out" && !NOT_SPENDING.has(t.cat);
 const CAT_RE = {};
 for(const n in CATS){ const k=CATS[n].k; if(k.length) CAT_RE[n]=new RegExp("(^|[^a-z0-9])("+k.map(x=>x.trim().replace(/[.*+?^${}()|[\]\\\/&]/g,"\\$&")).join("|")+")","i"); }
 const MATCH_ORDER=["Subscriptions","Personal care","Fuel","Eating out","Groceries","Fitness","Day out","Fun","My Health","Education","Shopping","Bills","Transport","Cash","Transfers"];
@@ -3381,6 +3401,22 @@ function personalExpenseAmountHtml(t, original){
     '<div class="a num effective-expense">−'+rsAllocated(effective)+'</div>'+
     '<div class="personal-expense-note">Your expense</div>';
 }
+
+function pocketReceivedContributionHtml(t){
+ if(!canSplitExpense(t))return "";
+ const receipts=expenseContributors(t.id);
+ const receiptRows=receipts.length?'<div class="pocket-received-list">'+receipts.map(p=>
+   '<button type="button" class="pocket-received-row" data-received-id="'+esc(p.id)+'"><span>'+esc(p.merchant||"Received contribution")+
+   '<small>'+esc(p.bank==="Cash"?"Received as cash":"Received in "+p.bank)+(p.src==="manual"?" · Tap to edit":" · Tap to review")+'</small></span><b>+'+rsAllocated(lkrOf(p))+' ›</b></button>').join("")+'</div>':"";
+ return '<div class="pocket-received-card"><div class="pocket-received-heading"><b>Shared or reimbursed expense</b>'+
+   '<small>Keep your original bank payment unchanged</small></div>'+
+   '<div class="pocket-received-numbers"><div><span>Paid from account</span><b>'+rsAllocated(lkrOf(t))+'</b></div>'+
+   '<div><span>Actually spent by you</span><b class="pocket-received-net">'+rsAllocated(myShare(t))+'</b></div></div>'+
+   receiptRows+
+   '<button type="button" class="btn soft full" id="txAddContribution">＋ Add money received</button>'+
+   '<p class="pocket-received-hint">Use this for money you actually received in cash. If the amount already appears as a bank credit/SMS, mark that credit “Paid back” and link it instead so you do not count it twice.</p></div>';
+}
+
 function personalExpenseDetailHtml(t){
   if(!canSplitExpense(t))return '';
   const applied=linkedPaybackDetails(t);
@@ -3706,6 +3742,7 @@ function openTx(id,edit){
     
     (t.type==="in"&&t.cat==="Paid back"?'<div class="sharebar"><div><span>Paid back for</span><b>'+esc(linksOf(t).map(k=>S.tx[k].merchant).join(" + ")||"Not linked")+'</b><i>Link multiple people to the same expense</i></div><button class="btn soft" id="txLink">'+(linksOf(t).length?"Manage":"Link")+'</button></div>':'')+
     personalExpenseDetailHtml(t)+
+    pocketReceivedContributionHtml(t)+
     (t.raw?'<div class="raw">'+esc(t.raw)+'</div>':'<div style="height:10px"></div>')+
     catPicker(cats,cat)+
     gymPicker(t,cat)+
@@ -3717,6 +3754,8 @@ function openTx(id,edit){
   const updateGym=wireGymPicker(t,()=>cat);
   wirePicker(c=>{cat=c;updateGym();});
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
+  if($("txAddContribution"))$("txAddContribution").onclick=()=>openAddContributor(t.id);
+  document.querySelectorAll("#sheetBody [data-received-id]").forEach(btn=>btn.onclick=()=>openTx(btn.dataset.receivedId,true));
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
@@ -6333,9 +6372,18 @@ function openAddContributor(expenseId){
     '<label class="field"><span>Who paid you?</span><input id="cpName" placeholder="e.g. Brother" autocomplete="off"></label>'+
     '<label class="field"><span>Amount received (Rs)</span><input id="cpAmount" inputmode="decimal" class="num" placeholder="e.g. 10000"></label>'+
     '<label class="field"><span>Received on</span><input id="cpDate" type="date" value="'+ymd(Date.now())+'"></label>'+
-    '<button class="btn full" id="cpSave">Add payback</button>'+
+    '<div class="pocket-contrib-preview"><span>Your expense after this payback</span><b id="cpPreview"></b></div>'+
+    '<button class="btn full" id="cpSave">Save received amount</button>'+
     '<button class="link" id="cpCancel" style="display:block;margin:12px auto 0">Cancel</button>');
-  $("cpCancel").onclick=()=>closeSheet();
+  $("cpCancel").onclick=()=>openTx(expenseId,true);
+  const preview=()=>{
+   const amount=Number(String($("cpAmount").value||"").replace(/,/g,""));
+   const proposed=Number.isFinite(amount)&&amount>0?amount:0;
+   const net=Math.max(0,stillOwed(bill)-proposed);
+   $("cpPreview").textContent=rs(net);
+  };
+  $("cpAmount").addEventListener("input",preview);
+  preview();
   $("cpSave").onclick=()=>{
     const name=$("cpName").value.trim(),amount=parseFloat(String($("cpAmount").value||"").replace(/,/g,""));
     if(!name)return toast("Enter the person's name");
@@ -6347,7 +6395,9 @@ function openAddContributor(expenseId){
     const entry={id:"m"+uid(),src:"manual",amount,cur:"LKR",type:"in",cat:"Paid back",
       merchant:name,ts,bank:"Cash",acct:"",lkr:amount,fx:1,links:[expenseId],catSet:true,nameSet:true,
       note:"Received payback for "+bill.merchant};
-    put("tx",entry);closeSheet();toast(name+" paid back "+rs(amount));render();
+    if(!put("tx",entry))return;
+    openTx(expenseId,true);
+    toast(name+" paid back "+rs(amount)+" · Your expense updated");
   };
 }
 function openLink(id){
