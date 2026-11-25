@@ -2051,6 +2051,12 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 .pocket-contrib-preview{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:13px;background:var(--card2);padding:15px 12px;margin:12px 0 16px}
 .pocket-contrib-preview span{font-size:12px;font-weight:750;color:var(--soft)}
 .pocket-contrib-preview b{font-size:22px;color:var(--pos)}
+
+/* Edit the actual personal amount inside the transaction, not from the activity row. */
+.pocket-old-paid{color:var(--faint);text-decoration:line-through;text-decoration-thickness:1.5px}
+.pocket-real-preview{padding:11px 13px;margin:2px 0 12px;background:var(--card);border-radius:12px;font-size:12px;font-weight:800;color:var(--pos)}
+.pocket-received-card .field{margin:12px 0}
+.pocket-received-card .field input{width:100%;min-width:0}
 </style>
 </head>
 <body class="in-hub">
@@ -2264,7 +2270,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.116";
+const APP_VERSION = "7.3.117";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3402,20 +3408,55 @@ function personalExpenseAmountHtml(t, original){
     '<div class="personal-expense-note">Your expense</div>';
 }
 
+function pocketDirectReceipt(expenseId){
+ return Object.values(S.tx).find(p=>live(p)&&p.type==="in"&&p.cat==="Paid back"&&p.personalShareFor===expenseId)||null;
+}
 function pocketReceivedContributionHtml(t){
  if(!canSplitExpense(t))return "";
- const receipts=expenseContributors(t.id);
+ const receipts=expenseContributors(t.id),direct=pocketDirectReceipt(t.id);
  const receiptRows=receipts.length?'<div class="pocket-received-list">'+receipts.map(p=>
-   '<button type="button" class="pocket-received-row" data-received-id="'+esc(p.id)+'"><span>'+esc(p.merchant||"Received contribution")+
-   '<small>'+esc(p.bank==="Cash"?"Received as cash":"Received in "+p.bank)+(p.src==="manual"?" · Tap to edit":" · Tap to review")+'</small></span><b>+'+rsAllocated(lkrOf(p))+' ›</b></button>').join("")+'</div>':"";
- return '<div class="pocket-received-card"><div class="pocket-received-heading"><b>Shared or reimbursed expense</b>'+
-   '<small>Keep your original bank payment unchanged</small></div>'+
-   '<div class="pocket-received-numbers"><div><span>Paid from account</span><b>'+rsAllocated(lkrOf(t))+'</b></div>'+
-   '<div><span>Actually spent by you</span><b class="pocket-received-net">'+rsAllocated(myShare(t))+'</b></div></div>'+
+   '<div class="pocket-received-row"><span>'+esc(p.merchant||"Received contribution")+
+   '<small>'+esc(p.bank==="Cash"?"Received as cash":"Received in "+p.bank)+(p.personalShareFor===t.id?" · Editable below":"")+'</small></span><b>+'+rsAllocated(lkrOf(p))+'</b></div>').join("")+'</div>':"";
+ const paid=lkrOf(t),mine=myShare(t);
+ return '<div class="pocket-received-card"><div class="pocket-received-heading"><b>My actual expense</b>'+
+   '<small>The amount taken from your bank always stays unchanged.</small></div>'+
+   '<div class="pocket-received-numbers"><div><span>Original bank payment</span><b class="'+(mine<paid-.005?'pocket-old-paid':'')+'">'+rsAllocated(paid)+'</b></div>'+
+   '<div><span>Your real expense</span><b class="pocket-received-net">'+rsAllocated(mine)+'</b></div></div>'+
+   '<label class="field"><span>Edit my actual expense (Rs)</span><input id="txRealAmount" class="inp num" type="text" inputmode="decimal" value="'+esc(fmt(mine,Number.isInteger(mine)?0:2))+'" aria-label="Actual expense after money received"></label>'+
+   '<label class="field"><span>Received from (if reducing the amount)</span><input id="txRealFrom" class="inp" maxlength="80" value="'+esc(direct?.merchant||"")+'" placeholder="e.g. Mother"></label>'+
+   '<div id="txRealPreview" class="pocket-real-preview" aria-live="polite"></div>'+
+   '<button type="button" class="btn full" id="txSaveReal">Save my actual expense</button>'+
    receiptRows+
-   '<button type="button" class="btn soft full" id="txAddContribution">＋ Add money received</button>'+
-   '<p class="pocket-received-hint">Use this for money you actually received in cash. If the amount already appears as a bank credit/SMS, mark that credit “Paid back” and link it instead so you do not count it twice.</p></div>';
+   '<p class="pocket-received-hint">Enter only money you actually received in cash. If an incoming bank transfer is already in Activity, link that transaction as Paid back instead to avoid counting it twice. You can correct this amount again here later.</p></div>';
 }
+function pocketSaveRealExpense(id){
+ const bill=S.tx[id];if(!canSplitExpense(bill))return;
+ const raw=String($("txRealAmount").value||"").replace(/,/g,"").trim(),target=Number(raw),paid=lkrOf(bill);
+ if(!raw||!Number.isFinite(target)||target<0||target>paid)return toast("Enter an actual expense between Rs 0 and "+rsAllocated(paid));
+ const rounded=Math.round(target*100)/100,old=pocketDirectReceipt(id),previous=old?lkrOf(old):0;
+ // Other linked receipts (including SMS bank credits) have already reduced this expense.
+ // Never create another payback for the same amount.
+ const linked=backMap()[id]||0,other=Math.max(0,linked-previous),received=Math.round((paid-other-rounded)*100)/100;
+ if(received<-.005)return toast("This is higher than the amount left after other recorded paybacks. Review the linked credits first.");
+ const name=$("txRealFrom").value.trim();
+ if(received>.005&&!name)return toast("Enter who paid you back (e.g. Mother)");
+ if(!old&&received<=.005){toast("Your expense is already "+rsAllocated(rounded));return;}
+ if(old&&received<=.005){
+  if(!remove("tx",old.id))return;
+ }else{
+  const receipt=old?Object.assign({},old):{
+   id:"m"+uid(),src:"manual",type:"in",cat:"Paid back",cur:"LKR",bank:"Cash",acct:"",
+   ts:Date.now(),links:[id],catSet:true,nameSet:true,personalShareFor:id
+  };
+  receipt.amount=received;receipt.lkr=received;receipt.fx=1;
+  receipt.merchant=name;receipt.note="Cash received toward "+bill.merchant;
+  if(!put("tx",receipt))return;
+ }
+ // A manually specified real amount is an actual-reimbursement split, never equal mode.
+ if(bill.repayMode==="equal"&&!put("tx",Object.assign({},bill,{repayMode:"custom"})))return;
+ openTx(id,true);toast("Your actual expense updated to "+rsAllocated(rounded));
+}
+
 
 function personalExpenseDetailHtml(t){
   if(!canSplitExpense(t))return '';
@@ -3754,8 +3795,16 @@ function openTx(id,edit){
   const updateGym=wireGymPicker(t,()=>cat);
   wirePicker(c=>{cat=c;updateGym();});
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
-  if($("txAddContribution"))$("txAddContribution").onclick=()=>openAddContributor(t.id);
-  document.querySelectorAll("#sheetBody [data-received-id]").forEach(btn=>btn.onclick=()=>openTx(btn.dataset.receivedId,true));
+  if($("txSaveReal")){
+   $("txSaveReal").onclick=()=>pocketSaveRealExpense(t.id);
+   const preview=()=>{
+    const raw=String($("txRealAmount").value||"").replace(/,/g,"").trim();
+    const desired=Number(raw),amount=lkrOf(t),valid=raw&&Number.isFinite(desired)&&desired>=0&&desired<=amount;
+    const adjustment=valid?Math.max(0,amount-desired):0;
+    $("txRealPreview").textContent=valid?"Difference received: "+rsAllocated(adjustment):"Enter an amount between Rs 0 and "+rsAllocated(amount);
+   };
+   $("txRealAmount").addEventListener("input",preview);preview();
+  }
   document.querySelectorAll(".topb").forEach(b=>b.onclick=()=>{ topSel = topSel===b.dataset.k ? "" : b.dataset.k;
     document.querySelectorAll(".topb").forEach(x=>{ const on=x.dataset.k===topSel; x.classList.toggle("on",on); x.textContent=(on?"✓ ":"")+"Top-up to "+x.dataset.k.replace("|"," ••"); });
     if(topSel){ cat="Transfers"; document.querySelectorAll("#pk button").forEach(x=>x.classList.toggle("on",x.dataset.c==="Transfers")); updateGym(); } });
