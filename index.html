@@ -4754,8 +4754,13 @@ async function exportTripBudgetPng(id){
   const add=(block)=>{current.items.push(block);current.height+=block.h;};
   for(const group of groups){
    let needsHeader=true;
-   for(const block of group.items){
+   for(let itemIndex=0;itemIndex<group.items.length;itemIndex++){
+    const block=group.items[itemIndex],next=group.items[itemIndex+1];
     const headingH=needsHeader?61:0;
+    // Avoid splitting the day label from the first dated expense.
+    if(block.type==="date"&&next&&current.height+headingH+block.h+next.h>MAX_H-ITEM_TOP-FOOTER&&current.items.length){
+      current={items:[],height:0};pages.push(current);needsHeader=true;
+    }
     if(current.height+headingH+block.h>MAX_H-ITEM_TOP-FOOTER&&current.items.length){
      current={items:[],height:0};pages.push(current);needsHeader=true;
     }
@@ -4908,7 +4913,10 @@ async function exportTripBudgetPdf(id){
   // Render a heading only once per section: continuation pages resume with the next expense.
   for(const section of sections){
    sectionName="";
-   for(const item of section.items){
+   for(let itemIndex=0;itemIndex<section.items.length;itemIndex++){
+    const item=section.items[itemIndex],next=section.items[itemIndex+1];
+    // Keep a day heading with its first expense rather than orphaning it at a page end.
+    if(item.kind==="date"&&next&&y+item.h+next.h>B&&pages.at(-1).length)nextPage();
     if(sectionName!==section.name){
      if(y+64+item.h>B&&pages.at(-1).length)nextPage();
      pages.at(-1).push({kind:"section",label:section.name,h:64});
