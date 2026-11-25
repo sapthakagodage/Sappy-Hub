@@ -2220,7 +2220,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.111";
+const APP_VERSION = "7.3.112";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -5117,6 +5117,15 @@ function tbEditExpense(id,eid){
  (e?'<button class="btn warn full" id="tbExpenseDelete" style="margin-top:10px">Delete expense</button>':''));
  sheetReturnTo(()=>openTripBudget(id));
  $("tbCancel").onclick=()=>openTripBudget(id);
+ // New expenses use the exact time they are saved, unless a date/time was edited.
+ // Existing expenses are never restamped just by opening or saving their form.
+ let dateEdited=false,timeEdited=false;
+ if(!e){
+  $("tbExpenseDate").addEventListener("input",()=>{dateEdited=true;});
+  $("tbExpenseTime").addEventListener("input",()=>{timeEdited=true;});
+  $("tbExpenseDate").addEventListener("change",()=>{dateEdited=true;});
+  $("tbExpenseTime").addEventListener("change",()=>{timeEdited=true;});
+ }
  const panel=$("tbContributorPanel"),rows=$("tbContributorRows");
  const draft=(e?.contributions?.length?e.contributions:[{person:e?.payer||b.people[0].id,amount:e?.amount||0}]).map(c=>({person:c.person,amount:c.amount}));
  const options=id=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===id?' selected':'')+'>'+esc(p.name)+'</option>').join("");
@@ -5157,7 +5166,9 @@ function tbEditExpense(id,eid){
    if(new Set(contributions.map(c=>c.person)).size!==contributions.length)return toast("Choose each contributor once");
    if(contributions.reduce((n,c)=>n+c.amount,0)!==amount)return toast("Contributions must equal the expense");
   }
-  const date=$("tbExpenseDate").value,time=$("tbExpenseTime").value;
+  const savedAt=new Date();
+  const date=!e&&!dateEdited?ymd(savedAt):$("tbExpenseDate").value;
+  const time=!e&&!timeEdited?String(savedAt.getHours()).padStart(2,"0")+":"+String(savedAt.getMinutes()).padStart(2,"0"):$("tbExpenseTime").value;
   const data={title,amount,payer:isMulti?contributions[0].person:payer,for:members,date,time};
   if(isMulti)data.contributions=contributions;
   if(e){Object.assign(e,data);if(!isMulti)delete e.contributions;}
