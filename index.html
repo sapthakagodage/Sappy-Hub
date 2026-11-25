@@ -2028,6 +2028,13 @@ body.in-travel .sheet.trip-full .sx{
 }
 body.in-travel .sheet.trip-full .tdmap{min-height:225px}
 body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
+
+/* Make a shared payment discoverable without searching inside the payer dropdown. */
+.tb-payer-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 14px}
+.tb-payer-mode{min-width:0;border:1px solid var(--line);background:var(--card2);color:var(--soft);border-radius:13px;padding:12px 6px;font-size:12px;line-height:1.3;font-weight:800;text-align:center}
+.tb-payer-mode.on{border-color:#8FDDFF;background:rgba(143,221,255,.18);color:var(--ink)}
+.tb-payer-mode:focus-visible{outline:2px solid #8FDDFF;outline-offset:2px}
+.tb-contributor-summary.is-invalid{color:#e36b4d}
 </style>
 </head>
 <body class="in-hub">
@@ -2241,7 +2248,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.113";
+const APP_VERSION = "7.3.114";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -5158,7 +5165,8 @@ function tbEditExpense(id,eid){
  '<label class="fl2"><span>Expense time</span><input class="inp" type="time" id="tbExpenseTime" value="'+esc(e?tbExpenseTime(e):new Date().toTimeString().slice(0,5))+'"></label></div>'+
  '<div class="tb-row"><label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="tbExpenseAmount" inputmode="decimal" placeholder="3,500" value="'+(e?e.amount/100:"")+'"></label>'+
  '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'<option value="multiple"'+(e?.contributions?.length>1?' selected':'')+'>Multiple people</option></select></label></div>'+
- '<div id="tbContributorPanel" hidden><p class="tb-hint">Enter how much each person contributed. Payments are netted before settlement.</p><div id="tbContributorRows"></div><button type="button" class="btn soft full" id="tbContributorAdd">＋ Add contributor</button><div class="tb-contributor-summary" id="tbContributorTotal"></div></div>'+
+ '<div class="tb-payer-modes" role="group" aria-label="Number of people who paid"><button type="button" id="tbOnePayer" class="tb-payer-mode">One person paid</button><button type="button" id="tbMultiPayer" class="tb-payer-mode">Multiple people paid</button></div>'+
+ '<div id="tbContributorPanel" hidden><p class="tb-hint">Enter the amount paid by each contributor. Their combined payments must equal the total expense. The settlement is calculated automatically.</p><div id="tbContributorRows"></div><button type="button" class="btn soft full" id="tbContributorAdd">＋ Add contributor</button><div class="tb-contributor-summary" id="tbContributorTotal"></div></div>'+
  '<div class="tb-title"><h3>Split between <small class="tb-count" id="tbSelectedCount"></small></h3><div class="tb-select-actions"><button type="button" class="btn soft" id="tbAll">All</button><button type="button" class="btn soft" id="tbNone">None</button></div></div>'+
  (b.people.length>6?'<label class="fl2"><span>Find a traveller</span><input class="inp" id="tbFindPerson" placeholder="Search names…" autocomplete="off"></label>':'')+
  '<div class="tb-picks">'+b.people.map(p=>'<label><input type="checkbox" data-share="'+esc(p.id)+'"'+(selected.has(p.id)?' checked':'')+'>'+esc(p.name)+'</label>').join("")+'</div>'+
@@ -5177,6 +5185,15 @@ function tbEditExpense(id,eid){
   $("tbExpenseTime").addEventListener("change",()=>{timeEdited=true;});
  }
  const panel=$("tbContributorPanel"),rows=$("tbContributorRows");
+ const onePayer=$("tbOnePayer"),multiPayer=$("tbMultiPayer");
+ const setPayerMode=()=>{
+  const multi=$("tbPayer").value==="multiple";
+  panel.hidden=!multi;
+  onePayer.classList.toggle("on",!multi);
+  multiPayer.classList.toggle("on",multi);
+  onePayer.setAttribute("aria-pressed",String(!multi));
+  multiPayer.setAttribute("aria-pressed",String(multi));
+ };
  const draft=(e?.contributions?.length?e.contributions:[{person:e?.payer||b.people[0].id,amount:e?.amount||0}]).map(c=>({person:c.person,amount:c.amount}));
  const options=id=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===id?' selected':'')+'>'+esc(p.name)+'</option>').join("");
  const summary=()=>{
@@ -5192,7 +5209,29 @@ function tbEditExpense(id,eid){
   summary();
  };
  $("tbContributorAdd").onclick=()=>{const available=b.people.find(p=>!draft.some(c=>c.person===p.id));if(!available)return toast("All travellers already contributing");draft.push({person:available.id,amount:0});redraw();};
- $("tbPayer").onchange=()=>{panel.hidden=$("tbPayer").value!=="multiple";if(!panel.hidden){if(draft.length===1&&b.people.length>1&&!e?.contributions){const next=b.people.find(p=>p.id!==draft[0].person);if(next)draft.push({person:next.id,amount:0});}redraw();}};
+ $("tbPayer").onchange=()=>{
+  setPayerMode();
+  if(!panel.hidden){
+   if(draft.length===1&&b.people.length>1){
+    const next=b.people.find(p=>p.id!==draft[0].person);
+    if(next)draft.push({person:next.id,amount:0});
+   }
+   redraw();
+  }
+ };
+ onePayer.onclick=()=>{
+  const chosen=draft[0]?.person;
+  $("tbPayer").value=b.people.some(p=>p.id===chosen)?chosen:b.people[0].id;
+  $("tbPayer").onchange();
+ };
+ multiPayer.onclick=()=>{
+  if(b.people.length<2)return toast("Add at least two travellers to split a payment between contributors");
+  // Carry over the selected sole payer and fill the initial amount.
+  if($("tbPayer").value!=="multiple"){
+   draft.splice(0,draft.length,{person:$("tbPayer").value,amount:tbCents($("tbExpenseAmount").value)||0});
+  }
+  $("tbPayer").value="multiple";$("tbPayer").onchange();
+ };
  $("tbExpenseAmount").addEventListener("input",summary);
  $("tbPayer").onchange();
  const tbShares=[...document.querySelectorAll("#sheetBody [data-share]")];
