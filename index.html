@@ -2220,7 +2220,7 @@ nav.tabs{position:fixed;bottom:0;left:0;right:0}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.110";
+const APP_VERSION = "7.3.111";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -4679,6 +4679,13 @@ function tripBudgetTeaser(t){
  const x=tbTotals(b);return b.people.length+" travellers · "+tbMoney(x.total)+" spent · "+x.transfers.length+" to settle";
 }
 function tbPerson(b,id){return b.people.find(p=>p.id===id)?.name||"Unknown";}
+
+function tbExpenseDate(e){if(/^\d{4}-\d{2}-\d{2}$/.test(e.date||"")&&!isNaN(new Date(e.date+"T12:00:00").getTime()))return e.date;if(Number.isFinite(+e.ts)&&+e.ts>0)return ymd(new Date(+e.ts));return "";}
+function tbExpenseTime(e){if(/^\d{2}:\d{2}$/.test(e.time||"")&&+e.time.slice(0,2)<24&&+e.time.slice(3)<60)return e.time;if(Number.isFinite(+e.ts)&&+e.ts>0){const d=new Date(+e.ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}return "";}
+function tbExpenseTimeLabel(e){const t=tbExpenseTime(e);if(!t)return "Time not recorded";const h=+t.slice(0,2);return (h%12||12)+":"+t.slice(3)+(h>=12?" PM":" AM");}
+function tbDateLabel(d){return d?new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"Date not recorded";}
+function tbChronological(b){return b.expenses.map((e,i)=>({e,i,date:tbExpenseDate(e),time:tbExpenseTime(e)})).sort((a,z)=>a.date&&z.date?a.date.localeCompare(z.date)||((a.time||"99:99").localeCompare(z.time||"99:99"))||a.i-z.i:a.date?-1:z.date?1:a.i-z.i);}
+function tbDateGroups(b){const groups=[];for(const item of tbChronological(b)){let last=groups[groups.length-1];if(!last||last.date!==item.date){last={date:item.date,label:tbDateLabel(item.date),items:[]};groups.push(last);}last.items.push(item);}return groups;}
 function tbPayersLabel(b,e){return Array.isArray(e.contributions)&&e.contributions.length?e.contributions.map(c=>tbPerson(b,c.person)).join(", ")+" paid":tbPerson(b,e.payer)+" paid";}
 
 /* =============== Shareable trip budget PNG (separate from travel recaps) =============== */
@@ -4716,7 +4723,8 @@ async function exportTripBudgetPng(id){
    return out.length?out:["—"];
   };
   const currency=c=>"Rs "+Number(c/100).toLocaleString("en-LK",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const expenses=b.expenses.map((e,i)=>{
+  const expenseGroups=tbDateGroups(b);
+  const expenses=tbChronological(b).map(({e},i)=>{
    const pieces=(e.contributions?.length?e.contributions:[{person:e.payer,amount:e.amount}]);
    const people=(e.for||[]).map(pid=>tbPerson(b,pid));
    const payerDetails=pieces.map(c=>tbPerson(b,c.person)+" "+currency(c.amount)).join("  ·  ");
@@ -4724,7 +4732,7 @@ async function exportTripBudgetPng(id){
    const titleLines=lines((i+1)+". "+(e.title||"Expense"),25,690,800);
    const payerLines=lines("Paid: "+payerDetails,19,CONTENT-48,600);
    const splitLines=lines("Split between: "+splitDetails,19,CONTENT-48,600);
-   return {type:"expense",amount:e.amount,titleLines,payerLines,splitLines,h:28+titleLines.length*34+payerLines.length*27+splitLines.length*27+32};
+   return {type:"expense",expenseId:e.id,amount:e.amount,titleLines,payerLines,splitLines,time:tbExpenseTimeLabel(e),h:62+titleLines.length*34+payerLines.length*27+splitLines.length*27+30};
   });
   const settlements=result.transfers.map(p=>({
     type:"settlement",from:tbPerson(b,p.from),to:tbPerson(b,p.to),amount:p.amount,
@@ -4735,7 +4743,7 @@ async function exportTripBudgetPng(id){
     type:"payment",amount:p.amount,rows:lines(tbPerson(b,p.from)+"  →  "+tbPerson(b,p.to),21,660,700)
   })).map(p=>({...p,h:26+p.rows.length*28+21}));
   const groups=[
-    {label:"EXPENSE BREAKDOWN",items:expenses},
+    {label:"EXPENSE BREAKDOWN",items:expenseGroups.flatMap(g=>[{type:"date",label:g.label,h:67},...g.items.map(({e})=>expenses.find(x=>x.expenseId===e.id))])},
     {label:"WHO NEEDS TO PAY WHOM",items:settlements}
   ];
   if(previous.length)groups.push({label:"ALREADY SETTLED",items:previous});
@@ -4792,18 +4800,20 @@ async function exportTripBudgetPng(id){
    text(b.expenses.length+" expenses",RIGHT-24,summaryY+91,20,colour.muted,700,"right");
    let y=ITEM_TOP;
    for(const block of page.items){
+    if(block.type==="date"){round(M,y+7,CONTENT,54,14,"#DDEEF6");text(block.label,M+19,y+42,23,colour.dark,800);y+=block.h;continue;}
     if(block.type==="heading"){
-      text(block.label,M+7,y+40,18,colour.muted,800);y+=block.h;continue;
+      if(block.label==="WHO NEEDS TO PAY WHOM"){round(M,y+4,CONTENT,54,14,"#C7F3DD");text("FINAL TRANSFERS",M+18,y+39,22,colour.dark,800);text("Due "+currency(result.transfers.reduce((n,t)=>n+t.amount,0)),RIGHT-18,y+39,24,colour.green,800,"right");}
+      else text(block.label,M+7,y+40,18,colour.muted,800);y+=block.h;continue;
     }
     const rowY=y;round(M,rowY,CONTENT,block.h-9,18,colour.white);
     if(block.type==="expense"){
-      const titleY=drawLines(block.titleLines,M+23,rowY+45,25,34,colour.ink,800);
-      text(currency(block.amount),RIGHT-23,rowY+45,25,colour.ink,800,"right");
-      const payerY=drawLines(block.payerLines,M+23,titleY+4,19,27,colour.muted,600);
-      drawLines(block.splitLines,M+23,payerY+2,19,27,colour.muted,600);
+      text(block.time,M+23,rowY+33,19,colour.muted,750);const titleY=drawLines(block.titleLines,M+23,rowY+71,25,34,colour.ink,800);
+      text(currency(block.amount),RIGHT-23,rowY+71,25,colour.ink,800,"right");
+      const payerY=drawLines(block.payerLines,M+23,titleY+13,19,27,colour.muted,600);
+      drawLines(block.splitLines,M+23,payerY+8,19,27,colour.muted,600);
     }else if(block.type==="settlement"||block.type==="payment"){
-      const arrowEnd=drawLines(block.rows,M+23,rowY+42,block.type==="payment"?21:23,block.type==="payment"?28:31,colour.ink,800);
-      text(currency(block.amount),RIGHT-23,rowY+43,24,block.type==="payment"?colour.muted:colour.green,800,"right");
+      if(block.type==="settlement")round(M,rowY,CONTENT,block.h-9,18,"#D5F5E7");const arrowEnd=drawLines(block.rows,M+23,rowY+42,block.type==="payment"?21:23,block.type==="payment"?28:31,colour.ink,800);
+      text(currency(block.amount),RIGHT-23,rowY+43,block.type==="settlement"?29:24,block.type==="payment"?colour.muted:colour.green,800,"right");
       if(block.type==="settlement")text("TO TRANSFER",M+23,arrowEnd+4,15,colour.muted,700);
     }else if(block.type==="settled"){
       text("All settled up — no outstanding transfers",M+25,rowY+48,23,colour.green,800);
@@ -4874,14 +4884,19 @@ async function exportTripBudgetPdf(id){
    push();return out.length?out:["—"];
   };
   const currency=c=>"Rs "+(c/100).toLocaleString("en-LK",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const sections=[{name:"EXPENSES",items:b.expenses.map((e,i)=>{
+  let expenseNumber=0;
+  const sections=[{name:"EXPENSES",items:tbDateGroups(b).flatMap(g=>{
+   const out=[{kind:"date",label:g.label,h:85}];
+   for(const {e} of g.items){const i=expenseNumber++;
    const contributed=e.contributions?.length?e.contributions:[{person:e.payer,amount:e.amount}];
    const payerText=contributed.map(p=>tbPerson(b,p.person)+" ("+currency(p.amount)+")").join(", ");
    const shares=(e.for||[]).map(id=>tbPerson(b,id)).join(", ")||"None";
    const title=wrap((i+1)+". "+(e.title||"Expense"),32,720,800);
    const paid=wrap("Paid by: "+payerText,27,1030,650);
    const split=wrap("Shared by: "+shares,27,1030,650);
-   return {kind:"expense",title,paid,split,amount:e.amount,h:42+title.length*43+paid.length*37+split.length*37+32};
+   out.push({kind:"expense",title,paid,split,time:tbExpenseTimeLabel(e),amount:e.amount,h:86+title.length*43+paid.length*37+split.length*37+34});
+   }
+   return out;
   })},{name:"FINAL SETTLEMENT",items:totals.transfers.length?totals.transfers.map(p=>({
    kind:"transfer",label:wrap(tbPerson(b,p.from)+"  →  "+tbPerson(b,p.to),31,735,800),amount:p.amount
   })).map(p=>({...p,h:48+p.label.length*44+30})):[{kind:"allsettled",h:105}]}];
@@ -4942,17 +4957,19 @@ async function exportTripBudgetPdf(id){
    let rowY=pageIndex===0?FIRST_TOP:NEXT_TOP;
    for(const block of pages[pageIndex]){
     if(block.kind==="section"){
-     draw(block.label,L+5,rowY+42,23,dark,800);
-     if(block.label==="FINAL SETTLEMENT")draw("Total to transfer: "+currency(totals.transfers.reduce((sum,p)=>sum+p.amount,0)),R-5,rowY+42,21,green,800,"right");
+     if(block.label==="FINAL SETTLEMENT"){rect(L,rowY+3,R-L,56,"#BDEDD5",13);draw("FINAL TRANSFERS",L+22,rowY+41,25,dark,800);}else draw(block.label,L+5,rowY+42,23,dark,800);
+     if(block.label==="FINAL SETTLEMENT")draw("DUE "+currency(totals.transfers.reduce((sum,p)=>sum+p.amount,0)),R-21,rowY+42,25,green,800,"right");
      rowY+=block.h;continue;
     }
     rect(L,rowY,R-L,block.h-12,"#FFFFFF",16);
-    if(block.kind==="expense"){
-     const endTitle=drawLines(block.title,L+24,rowY+48,32,43,ink,800);
-     draw(currency(block.amount),R-22,rowY+48,28,ink,800,"right");
-     const endPaid=drawLines(block.paid,L+24,endTitle+9,27,37,muted,650);
-     drawLines(block.split,L+24,endPaid+8,27,37,muted,650);
-    }else if(block.kind==="transfer"||block.kind==="paid"){
+    if(block.kind==="date"){
+     rect(L,rowY+4,R-L,64,"#DDEEF6",14);draw(block.label,L+23,rowY+47,28,dark,800);
+    }else if(block.kind==="expense"){
+     draw(block.time,L+24,rowY+39,23,muted,800);const endTitle=drawLines(block.title,L+24,rowY+87,32,43,ink,800);
+     draw(currency(block.amount),R-22,rowY+88,30,ink,800,"right");
+     const endPaid=drawLines(block.paid,L+24,endTitle+15,27,37,muted,650);
+     drawLines(block.split,L+24,endPaid+12,27,37,muted,650);
+    }else if(block.kind==="transfer"||block.kind==="paid"){if(block.kind==="transfer")rect(L,rowY,R-L,block.h-12,"#D8F4E5",16);
      drawLines(block.label,L+23,rowY+45,block.kind==="transfer"?31:28,block.kind==="transfer"?44:40,ink,800);
      draw(currency(block.amount),R-24,rowY+47,30,block.kind==="transfer"?green:muted,800,"right");
     }else if(block.kind==="allsettled"){
@@ -5016,7 +5033,7 @@ function openTripBudget(id){
  '<button type="button" class="tb-export" id="tbExportPdf"><span class="tb-export-icon">▤</span><span><b>Export PDF</b><small>Readable A4 pages</small></span><span class="tb-export-arrow">›</span></button></div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Expenses <small class="tb-count">'+b.expenses.length+'</small></h3></div>'+
  '<div class="tb-expense-list '+(b.expenses.length>6?'tb-collapsed':'')+'" id="tbExpenseList">'+
- (b.expenses.length?b.expenses.slice().reverse().map(e=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+esc(tbPayersLabel(b,e))+' · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
+ (b.expenses.length?tbChronological(b).slice().reverse().map(({e})=>'<div class="tb-item"><div class="tb-main"><b>'+esc(e.title)+'</b><small>'+(tbExpenseDate(e)?esc(tbExpenseDate(e))+' · '+esc(tbExpenseTimeLabel(e))+' · ':'')+esc(tbPayersLabel(b,e))+' · '+(e.for||[]).length+' sharing</small></div><b class="num">'+tbMoney(e.amount)+'</b><button class="tb-edit" data-expense="'+esc(e.id)+'">Edit</button></div>').join(""):'<p class="tb-hint">Log food, fuel, tickets, hotels and other shared costs.</p>')+'</div>'+
  (b.expenses.length>6?'<button type="button" class="tb-expand" id="tbExpandExpenses" aria-expanded="false">Show all '+b.expenses.length+' expenses ↓</button>':'')+'</div>'+
  '<div class="tb-section"><div class="tb-title"><h3>Travellers <small class="tb-count">'+b.people.length+'</small></h3></div>'+
  '<div class="tb-roster '+(b.people.length>5?'tb-collapsed':'')+'" id="tbRoster">'+
@@ -5079,6 +5096,8 @@ function tbEditExpense(id,eid){
  const opt=(chosen)=>b.people.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===chosen?' selected':'')+'>'+esc(p.name)+'</option>').join("");
  openSheet('<div class="rc-kicker">Trip budget · Expenses</div><h2>'+(e?'Edit expense':'Add expense')+'</h2>'+
  '<label class="fl2"><span>What was it for?</span><input class="inp" id="tbExpenseTitle" maxlength="90" placeholder="Fuel, dinner, tickets…" value="'+esc(e?.title||"")+'"></label>'+
+ '<div class="tb-row"><label class="fl2"><span>Expense date</span><input class="inp" type="date" id="tbExpenseDate" value="'+esc(e?tbExpenseDate(e):ymd(Date.now()))+'"></label>'+
+ '<label class="fl2"><span>Expense time</span><input class="inp" type="time" id="tbExpenseTime" value="'+esc(e?tbExpenseTime(e):new Date().toTimeString().slice(0,5))+'"></label></div>'+
  '<div class="tb-row"><label class="fl2"><span>Amount (Rs)</span><input class="inp num" id="tbExpenseAmount" inputmode="decimal" placeholder="3,500" value="'+(e?e.amount/100:"")+'"></label>'+
  '<label class="fl2"><span>Paid by</span><select class="inp" id="tbPayer">'+opt(e?.payer||b.people[0].id)+'<option value="multiple"'+(e?.contributions?.length>1?' selected':'')+'>Multiple people</option></select></label></div>'+
  '<div id="tbContributorPanel" hidden><p class="tb-hint">Enter how much each person contributed. Payments are netted before settlement.</p><div id="tbContributorRows"></div><button type="button" class="btn soft full" id="tbContributorAdd">＋ Add contributor</button><div class="tb-contributor-summary" id="tbContributorTotal"></div></div>'+
@@ -5130,7 +5149,8 @@ function tbEditExpense(id,eid){
    if(new Set(contributions.map(c=>c.person)).size!==contributions.length)return toast("Choose each contributor once");
    if(contributions.reduce((n,c)=>n+c.amount,0)!==amount)return toast("Contributions must equal the expense");
   }
-  const data={title,amount,payer:isMulti?contributions[0].person:payer,for:members};
+  const date=$("tbExpenseDate").value,time=$("tbExpenseTime").value;
+  const data={title,amount,payer:isMulti?contributions[0].person:payer,for:members,date,time};
   if(isMulti)data.contributions=contributions;
   if(e){Object.assign(e,data);if(!isMulti)delete e.contributions;}
   else b.expenses.push(Object.assign({id:"be"+uid()},data));
