@@ -3581,9 +3581,10 @@ function personalExpenseDetailHtml(t){
     '<div class="split-person split-person-me"><span>You</span><b>'+rsAllocated(own)+'</b></div></div>'+
     '</section>';
 }
-function txHtml(t){
-  const c=CATS[pocketCat(t)]||CATS.Other, pos=t.type==="in";
-  const main=(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
+function txHtml(t,focusCategory=null){
+  const c=CATS[focusCategory||pocketCat(t)]||CATS.Other, pos=t.type==="in";
+  const portion=focusCategory&&t.type==="out"?pocketCategoryShares(t).find(x=>x.cat===focusCategory)?.amount:null;
+  const main=portion!=null?"−"+rsAllocated(portion):(pos?"+":"−")+(t.cur==="LKR"?"Rs ":t.cur+" ")+fmt(t.amount,t.cur==="LKR"?0:2);
   return '<button class="tx'+(t.bank==="ComBank"?' bank-combank':'')+'" data-id="'+esc(t.id)+'"><span class="ic" style="background:'+c.c+'">'+icon(pocketCat(t) in CATS?pocketCat(t):"Other",20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+(isCashWithdrawal(t)?"Cash withdrawal · to wallet":esc(pocketCategoryNames(t)))+' · '+(t.bank==="ComBank"?'<span class="bank-indicator" aria-hidden="true"></span>':'')+esc(t.bank||"Manual")+(t.bank==="ComBank"&&t.acct?' ••'+esc(t.acct):'')+'</div>'+(gymCoverage(t)?'<div class="c">Gym covered · renews '+esc(gymCoverage(t).renewal)+'</div>':'')+'</span><span class="rt">'+personalExpenseAmountHtml(t,main)+(t.type==="in"&&t.cat==="Paid back"&&!linksOf(t).length?'<div class="o tolink">tap to link</div>':'')+(t.balance!=null?'<div class="o num">Bal '+(t.cur==="LKR"?"Rs ":esc(t.cur)+" ")+fmt(t.balance,0)+'</div>':(t.cur!=="LKR"?'<div class="o num">≈ '+rs(lkrOf(t))+'</div>':''))+'</span></button>';
 }
 function listInto(el, list, emptyMsg, flat){
@@ -3858,7 +3859,7 @@ function openCat(c){
     '<div class="stats"><div><span>This month</span><b class="num">'+short(tot)+'</b></div><div><span>Payments</span><b class="num">'+list.length+'</b></div><div><span>Usual month</span><b class="num">'+(avg?short(avg):"–")+'</b></div></div>'+
     '<div class="trend" style="height:110px;margin-bottom:14px">'+ms.map((x,i)=>'<div class="tb'+(i===5?' on':'')+'"><span class="v num">'+(x.t?short(x.t):"")+'</span><span class="col"><i style="height:'+(x.t/mx*100)+'%;'+(i===5?'background:'+CATS[c].c:'')+'"></i></span><span class="m">'+x.d.toLocaleDateString("en-GB",{month:"short"})+'</span></div>').join("")+'</div>'+
     '<div class="list" id="catList"></div>');
-  const el=$("catList"); el.innerHTML=list.map(txHtml).join("")||'<div class="empty">Nothing this month.</div>';
+  const el=$("catList"); el.innerHTML=list.map(t=>txHtml(t,c)).join("")||'<div class="empty">Nothing this month.</div>';
   el.querySelectorAll(".tx").forEach(b=>b.onclick=()=>openTx(b.dataset.id));
 }
 
