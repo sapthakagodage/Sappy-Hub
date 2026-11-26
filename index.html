@@ -2067,6 +2067,11 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 .pocket-multi-line input{text-align:right;width:100%;min-width:0}
 .pocket-multi-total{font-size:12px;font-weight:800;text-align:right;margin-top:12px;color:var(--pos)}
 .pocket-multi-total.is-invalid{color:#cb543e}
+
+.lk-behalf{padding:12px 13px;margin:10px 0;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.lk-behalf .fl2{margin:0}
+.lk-behalf .note{font-size:11px;line-height:1.45;margin:8px 0 0}
+.lk-behalf-count{font-size:12px;font-weight:800;color:var(--pos);margin-top:9px}
 </style>
 </head>
 <body class="in-hub">
@@ -2280,7 +2285,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.118";
+const APP_VERSION = "7.3.119";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -6483,15 +6488,19 @@ function paybackLinkPreview(p,ids){
 function linkedExpensePaybacks(t){
   return Object.values(S.tx).filter(p=>live(p)&&p.type==="in"&&p.cat==="Paid back"&&linksOf(p).includes(t.id));
 }
+function paidBackPersonNames(p){
+ const stored=Array.isArray(p.paidForNames)?p.paidForNames.filter(x=>typeof x==="string"&&x.trim()).map(x=>x.trim()):[];
+ if(stored.length)return stored;
+ const name=(p.merchant||"").trim()||"Friend";
+ return [/^(paid back|credit|credited|deposit|transfer|funds received|unknown|other|cash|bank)$/i.test(name)?"Friend":name];
+}
 function linkedParticipantNames(t){
-  const names=new Map();
-  linkedExpensePaybacks(t).forEach(p=>{
-    const name=(p.merchant||"").trim()||"Friend";
-    const generic=/^(paid back|credit|credited|deposit|transfer|funds received|unknown|other|cash|bank)$/i.test(name);
-    const key=generic?p.id:name.toLocaleLowerCase();
-    if(!names.has(key))names.set(key,generic?"Friend":name);
-  });
-  return [...names.values()];
+ const names=new Map();
+ linkedExpensePaybacks(t).forEach(p=>paidBackPersonNames(p).forEach((name,i)=>{
+   const key=name==="Friend"?p.id+":"+i:name.toLocaleLowerCase();
+   if(!names.has(key))names.set(key,name);
+ }));
+ return [...names.values()];
 }
 function equalExpenseShare(t){
   if(!t||t.repayMode!=="equal")return null;
@@ -6571,6 +6580,8 @@ function openLink(id){
   // Respect existing explicit settings when the user reopens a link.
   const first=cur.length===1?S.tx[cur[0]]:null;
   let mode=first?.repayMode==="equal"?"equal":"custom";
+  let behalfNames=(Array.isArray(p.paidForNames)&&p.paidForNames.length?p.paidForNames:paidBackPersonNames(p)).join(", ");
+  const parseBehalf=()=>[...new Map(behalfNames.split(/[,\\n]+/).map(x=>x.trim()).filter(Boolean).map(n=>[n.toLocaleLowerCase(),n])).values()];
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
   openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense or expenses this payment belongs to.</p>'+
     (sug.length?'<label class="fl2" style="margin-top:12px"><span>Find an expense</span><input class="inp" id="lkSearch" type="search" placeholder="Search name, amount or date"></label><div class="list" style="margin-top:12px;max-height:34vh;overflow-y:auto" id="lkList">'+sug.map(row).join("")+'</div><p class="note" id="lkSearchEmpty" hidden>No matching expenses. Try another name or amount.</p>'+
@@ -6578,6 +6589,7 @@ function openLink(id){
     '<div class="seg" id="lkMode" style="margin-top:12px"><button type="button" data-m="custom" class="'+(mode==="custom"?'on':'')+'">Custom</button><button type="button" data-m="equal" class="'+(mode==="equal"?'on':'')+'">Equal</button></div>'+
 
     '<p class="note" id="lkModeNote" style="margin:8px 0">Custom subtracts the actual paid-back amount from your expense.</p>'+
+    '<div class="lk-behalf" id="lkBehalf"><label class="fl2"><span>Who does this transfer cover?</span><input class="inp" id="lkBehalfNames" value="'+esc(behalfNames)+'" placeholder="Mahela, Anuttara" autocomplete="off"></label><p class="note">Separate names with commas. One transfer can represent several people, but the money is counted only once.</p><div id="lkBehalfCount" class="lk-behalf-count"></div></div>'+
     '<div id="lkContributors"></div>':
     '<p class="note">No expenses found to link. This payment remains unlinked.</p>')+
     '<div class="btns">'+(sug.length?'<button class="btn" id="lkSave" style="flex:1">Link payback</button>':'')+(cur.length?'<button class="btn soft" id="lkNone">Unlink</button>':'')+'<button class="btn soft" id="lkLater">Close</button></div>'+
@@ -6590,21 +6602,20 @@ function openLink(id){
     if($("lkAddPerson"))$("lkAddPerson").hidden=!single;
     if($("lkMode")){
       $("lkMode").querySelectorAll("button").forEach(btn=>btn.classList.toggle("on",btn.dataset.m===mode));
-      $("lkModeNote").textContent=mode==="equal"?"Divide each selected expense equally between you and the distinct people whose repayments are linked to it.":"Subtract the actual linked repayments from each expense. Best for family contributions and unequal amounts.";
+      $("lkModeNote").textContent=mode==="equal"?"Split between you and all people covered by linked repayments. One bank transfer can represent multiple people.":"Subtract the actual linked repayments from each expense. Best for family contributions and unequal amounts.";
     }
+    if($("lkBehalf"))$("lkBehalf").hidden=mode!=="equal";
+    if($("lkBehalfCount"))$("lkBehalfCount").textContent=parseBehalf().length+" person"+(parseBehalf().length===1?"":"s")+" represented by this transfer · plus you";
     if($("lkContributors")){
       const allocated=paybackLinkPreview(p,ids);
       $("lkContributors").innerHTML=allocated.length?'<div class="split-summary" style="margin-top:12px">'+
         '<div class="split-summary-title">'+(mode==="equal"?"Equal expense preview":"Custom repayment preview")+'</div>'+
         allocated.map(v=>{
           const expense=S.tx[v.id],linked=linkedExpensePaybacks(expense);
-          const names=new Set(linked.map(q=>{
-            const name=(q.merchant||"").trim()||"Friend";
-            return /^(paid back|credit|credited|deposit|transfer|funds received|unknown|other|cash|bank)$/i.test(name)?q.id:name.toLocaleLowerCase();
-          }));
-          const payer=(p.merchant||"").trim()||"Friend";
-          const key=/^(paid back|credit|credited|deposit|transfer|funds received|unknown|other|cash|bank)$/i.test(payer)?p.id:payer.toLocaleLowerCase();
-          names.add(key);
+          const names=new Set();
+          const add=(name,receipt,i)=>names.add(name==="Friend"?receipt.id+":"+i:name.toLocaleLowerCase());
+          linked.filter(q=>q.id!==p.id).forEach(q=>paidBackPersonNames(q).forEach((name,i)=>add(name,q,i)));
+          parseBehalf().forEach((name,i)=>add(name,p,i));
           const count=names.size+1;
           return '<div class="split-person"><span>'+esc(expense.merchant)+(mode==="equal"?' · '+count+' people':'')+'</span><b>'+
             (mode==="equal"?"Your share "+rsAllocated(lkrOf(expense)/count):"Payback applied "+rsAllocated(v.allocated))+'</b></div>';
@@ -6614,7 +6625,11 @@ function openLink(id){
   };
   const linkSelected=()=>{
     if(!sel.size)return false;
+    const personNames=parseBehalf();
+    if(mode==="equal"&&(!personNames.length||personNames.length>20)){toast("Enter 1 to 20 people covered by this transfer");return false;}
     const entry=Object.assign({},p,{links:[...sel]});delete entry.linkTo;
+    if(mode==="equal")entry.paidForNames=personNames;
+    else delete entry.paidForNames;
     if(!put("tx",entry))return false;
     // The mode belongs to the expense, not the bank receipt. It remains
     // stable when additional family members or friends link later.
@@ -6639,6 +6654,7 @@ function openLink(id){
     $("lkSearchEmpty").hidden=showing>0;
   };
   if($("lkMode"))$("lkMode").querySelectorAll("button").forEach(btn=>btn.onclick=()=>{mode=btn.dataset.m;paint();});
+  if($("lkBehalfNames"))$("lkBehalfNames").addEventListener("input",()=>{behalfNames=$("lkBehalfNames").value;paint();});
   paint();
   if($("lkSave"))$("lkSave").onclick=()=>{if(!linkSelected())return;closeSheet();toast("Payback linked");render();setTimeout(nextLink,450);};
   if($("lkAddPerson"))$("lkAddPerson").onclick=()=>{
@@ -6647,7 +6663,7 @@ function openLink(id){
     if(!cur.includes(expenseId)||cur.length!==1){if(!linkSelected())return;}
     openAddContributor(expenseId);
   };
-  if($("lkNone"))$("lkNone").onclick=()=>{const updated=Object.assign({},p);delete updated.linkTo;delete updated.links;put("tx",updated);closeSheet();render();};
+  if($("lkNone"))$("lkNone").onclick=()=>{const updated=Object.assign({},p);delete updated.linkTo;delete updated.links;delete updated.paidForNames;put("tx",updated);closeSheet();render();};
   $("lkLater").onclick=closeSheet;
   $("lkCat").onclick=()=>openTx(p.id,true);
 }
