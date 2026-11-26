@@ -6581,7 +6581,7 @@ function openLink(id){
   const first=cur.length===1?S.tx[cur[0]]:null;
   let mode=first?.repayMode==="equal"?"equal":"custom";
   let behalfNames=(Array.isArray(p.paidForNames)&&p.paidForNames.length?p.paidForNames:paidBackPersonNames(p)).join(", ");
-  const parseBehalf=()=>[...new Map(behalfNames.split(/[,\\n]+/).map(x=>x.trim()).filter(Boolean).map(n=>[n.toLocaleLowerCase(),n])).values()];
+  const parseBehalf=()=>[...new Map(behalfNames.split(",").map(x=>x.trim()).filter(Boolean).map(n=>[n.toLocaleLowerCase(),n])).values()];
   const row=t=>'<button class="tx lrow'+(sel.has(t.id)?' sel':'')+'" data-id="'+esc(t.id)+'"><span class="tick">'+(sel.has(t.id)?'✓':'')+'</span><span class="ic" style="background:'+(CATS[pocketCat(t)]||CATS.Other).c+'">'+icon(pocketCat(t),20)+'</span><span class="mid"><div class="m">'+esc(t.merchant)+'</div><div class="c">'+new Date(t.ts).toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})+' · '+esc(pocketCat(t))+'</div></span><span class="rt"><div class="a num">'+rs(lkrOf(t))+'</div></span></button>';
   openSheet('<h2>Paid back</h2><p class="note">'+esc(p.merchant)+' paid '+rs(P)+'. Select the expense or expenses this payment belongs to.</p>'+
     (sug.length?'<label class="fl2" style="margin-top:12px"><span>Find an expense</span><input class="inp" id="lkSearch" type="search" placeholder="Search name, amount or date"></label><div class="list" style="margin-top:12px;max-height:34vh;overflow-y:auto" id="lkList">'+sug.map(row).join("")+'</div><p class="note" id="lkSearchEmpty" hidden>No matching expenses. Try another name or amount.</p>'+
