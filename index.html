@@ -2285,7 +2285,7 @@ body.in-travel .sheet.trip-full:not(.on){transform:translate3d(0,110%,0)}
 <script>
 (function(){
 "use strict";
-const APP_VERSION = "7.3.119";
+const APP_VERSION = "7.3.120";
 
 
 /* ===== auto-update: iPhone keeps old copies, so check a tiny version file every launch ===== */
@@ -3902,7 +3902,11 @@ function openTx(id,edit){
     '<label class="field"><span>Note</span><input id="tnote" value="'+esc(t.note||"")+'" placeholder="Add a note"></label>'+
     '<div class="btns"><button class="btn" id="tsave" style="flex:1">Save</button><button class="btn warn" id="tdel">Delete</button></div>');
   const updateGym=wireGymPicker(t,()=>cat);
-  wirePicker(c=>{cat=c;updateGym();});
+  // The category controller must exist in the editor before Save and top-up actions use it.
+  // Without it, saving a gym package throws a ReferenceError and nothing is persisted.
+  const categoryCtrl=t.type==="out"?wireCategorySplit(c=>{cat=c;updateGym();},t.catSplits,()=>t.bank==="Cash"?Number(String($("tamount").value).replace(/,/g,""))||0:t.amount):null;
+  if(!categoryCtrl)wirePicker(c=>{cat=c;updateGym();});
+  if(categoryCtrl&&$("tamount"))$("tamount").addEventListener("input",categoryCtrl.refreshAmount);
   if($("txLink")) $("txLink").onclick=()=>openLink(t.id);
   if($("txSaveReal")){
    $("txSaveReal").onclick=()=>pocketSaveRealExpense(t.id);
